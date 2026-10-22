@@ -4,6 +4,10 @@ What changed in each release, newest first. The format follows [Keep a Changelog
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-10-23
+
+Use it from your phone, in Italian, and decide when a recording is transcribed.
+
 ### Added
 
 - **The page in Italian.** An **IT / EN** switch in the side bar, English by default and remembered. Only the interface changes: transcripts, summaries and the names of calls and people are marked as data and never translated.
@@ -78,7 +82,8 @@ The first release. Local transcription for recorded business calls, with Whisper
 - `Install.bat`, `Start.bat` and `Stop.bat` for Windows. PyTorch is installed first, from the CUDA index.
 - An Italian README.
 
-[Unreleased]: https://github.com/thetouchsite/sottovoce/compare/v1.2.0...HEAD
+[Unreleased]: https://github.com/thetouchsite/sottovoce/compare/v1.3.0...HEAD
+[1.3.0]: https://github.com/thetouchsite/sottovoce/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/thetouchsite/sottovoce/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/thetouchsite/sottovoce/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/thetouchsite/sottovoce/releases/tag/v1.0.0
