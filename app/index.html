@@ -801,6 +801,9 @@ const IT = {
   'The follow-up email needs a language model running on this machine, like the summary: LM Studio, Ollama or llama-server. None is answering.':
     "Per l'email di follow-up serve un modello linguistico acceso su questa macchina, come per il riassunto: LM Studio, Ollama o llama-server. Nessuno risponde.",
 
+  'The first time, the model is downloaded (8 GB, once): a few minutes.':
+    'La prima volta il modello viene scaricato (8 GB, una volta sola): qualche minuto.',
+
   // the glossary view
   'The table': 'La tabella', 'Right name': 'Nome giusto', 'How it gets written wrong': 'Come viene scritto male',
   'Found in your calls': 'Trovato nelle tue call', 'How it gets written wrong, comma separated': 'Come viene scritto male, separati da virgole',
@@ -890,10 +893,12 @@ const IT_RULES = [
     (_, n, u, dl) => 'Riascolta la registrazione, senza ritrascriverla: circa ' + n
       + (u === 'seconds' ? ' secondi' : (+n === 1 ? ' minuto' : ' minuti'))
       + (dl ? ', più 32 MB da scaricare la prima volta' : '') + '.'],
-  [/^Not asked for yet\. (.+) will write it, here on this machine, in about twenty seconds\.$/,
-    (_, m) => 'Non ancora chiesto. Lo scriverà ' + m + ', qui su questa macchina, in una ventina di secondi.'],
-  [/^An email to send after the call: thanks, what was decided, next steps, what is still open\. Written by (.+) on this machine, in the language of the call, in about twenty seconds\. Missing details are left as \[placeholders\], never invented\.$/,
-    (_, m) => "Un'email da mandare dopo la call: ringraziamento, cosa si è deciso, prossimi passi, cosa resta aperto. La scrive " + m + ' su questa macchina, nella lingua della call, in una ventina di secondi. I dettagli mancanti restano come [segnaposto], mai inventati.'],
+  [/^Not asked for yet\. (.+) will write it, here on this machine, in about twenty seconds\.( The first time.*)?$/,
+    (_, m, w) => 'Non ancora chiesto. Lo scriverà ' + m + ', qui su questa macchina, in una ventina di secondi.'
+      + (w ? ' ' + translated(w.trim()) : '')],
+  [/^An email to send after the call: thanks, what was decided, next steps, what is still open\. Written by (.+) on this machine, in the language of the call, in about twenty seconds\. Missing details are left as \[placeholders\], never invented\.( The first time.*)?$/,
+    (_, m, w) => "Un'email da mandare dopo la call: ringraziamento, cosa si è deciso, prossimi passi, cosa resta aperto. La scrive " + m + ' su questa macchina, nella lingua della call, in una ventina di secondi. I dettagli mancanti restano come [segnaposto], mai inventati.'
+      + (w ? ' ' + translated(w.trim()) : '')],
   [/^No call mentions “(.*)”\.$/, (_, q) => 'Nessuna call contiene “' + q + '”.'],
   [/^(\d+) names?, (\d+) of them found in your calls\. Names are corrected after transcription, not suggested before: given to Whisper as a prompt, they made the text worse instead of better\.$/,
     (_, a, b) => n1(a, 'nome', 'nomi') + ', ' + b + ' trovati nelle tue call. I nomi si correggono dopo la trascrizione, non si suggeriscono prima: dati a Whisper come prompt, peggioravano il testo invece di migliorarlo.'],
@@ -2158,6 +2163,9 @@ function show(l, jump){
   d.append(split);
 }
 
+// The model built in, not downloaded yet: said before the first wait.
+const FIRST_TIME = 'The first time, the model is downloaded (8 GB, once): a few minutes.';
+
 // The email to send after the call, written by the local LLM from the
 // transcript: from you, to the others, in the call's language. Yours to
 // change: what you edit is saved when you leave the box.
@@ -2237,7 +2245,8 @@ function followupPanel(l){
     const v = el('p', 'note');
     v.textContent = 'An email to send after the call: thanks, what was decided, next steps, what is '
       + 'still open. Written by ' + llm.model + ' on this machine, in the language of the call, '
-      + 'in about twenty seconds. Missing details are left as [placeholders], never invented.';
+      + 'in about twenty seconds. Missing details are left as [placeholders], never invented.'
+      + (llm.builtin && !llm.downloaded ? ' ' + FIRST_TIME : '');
     const b = el('button', 'primary foot-action');
     b.type = 'button';
     b.textContent = 'Write the follow-up';
@@ -2837,7 +2846,8 @@ function readingPanel(l, st, jump){
     const v = el('p', 'empty');
     if (llm && llm.available){
       v.textContent = 'Not asked for yet. ' + llm.model
-        + ' will write it, here on this machine, in about twenty seconds.';
+        + ' will write it, here on this machine, in about twenty seconds.'
+        + (llm.builtin && !llm.downloaded ? ' ' + FIRST_TIME : '');
       const b = el('button', 'primary');
       b.type = 'button';
       b.style.marginTop = '14px';

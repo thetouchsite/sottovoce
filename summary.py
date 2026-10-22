@@ -1,14 +1,21 @@
 """The summary of a call, and the follow-up email, written by an LLM running on this machine.
 
-NOTHING NEW TO DOWNLOAD. We do not load a second model ourselves: we speak the
-OpenAI protocol to a local server that is already there (LM Studio, Ollama,
-`llama-server`). If you run one, you get summaries; if you do not, you get
-everything else and never notice, because the button does not appear.
+TWO WAYS, THE FIRST THAT IS THERE. If a local LLM server is running (LM
+Studio, Ollama, `llama-server`), it is spoken to over the OpenAI protocol:
+whoever switched one on chose their model. If none is, a small model built in
+does the job, the way Whisper does: Qwen3 4B Instruct (Apache-2.0, no
+account), downloaded from Hugging Face the first time (8 GB), loaded on the
+GPU when asked, and unloaded after ten minutes unused. Nothing to install
+for whoever clones the repo.
 
-The reason is VRAM. Whisper fits in 3 GB, a useful LLM wants another 5 to 16:
-keeping both loaded all the time, for something asked for once at the end of a
-call, is paying rent on a room you open once a day. A separate server is
-switched on when needed.
+The reason it is not kept loaded is VRAM. Whisper takes about 6 GB, the
+built-in model another 8: keeping both all the time, for something asked for
+once at the end of a call, is paying rent on a room you open once a day.
+
+MEASURED on the example calls (RTX 5090 laptop, 24 GB): the built-in model
+wrote the follow-up of a one-minute Italian call in 26 s and the summary of
+an 11-minute English one in 13 s, in 7.8 GB; Gemma 4 E4B in LM Studio took
+5 to 17 s. Gemma 4 E4B in this form weighs 16 GB: too much next to Whisper.
 
 MIND THE BACKEND, NOT THE MODEL. On 22 October 2026, a real call, 3,760
 prompt tokens, same card:
@@ -28,6 +35,9 @@ If summaries take minutes, suspect the build.
 from __future__ import annotations
 
 import json
+import os
+import threading
+import time
 import urllib.error
 import urllib.request
 
@@ -87,6 +97,85 @@ FOLLOWUP_REQUEST = (
 )
 
 
+# --- the model built in ---------------------------------------------------------
+
+BUILTIN = os.environ.get("SOTTOVOCE_LLM", "Qwen/Qwen3-4B-Instruct-2507")
+BUILTIN_GB = 8          # to download once, and to find free on the GPU
+IDLE = 600              # seconds unused before it leaves the GPU
+builtin_allowed = True  # the server turns it off with --no-model and --no-llm
+_builtin = {"model": None, "tok": None, "last": 0.0}
+_builtin_lock = threading.Lock()
+
+
+def builtin() -> dict | None:
+    """The built-in model, if it can run here: a CUDA GPU, and allowed."""
+    if not builtin_allowed:
+        return None
+    try:
+        import torch
+        if not torch.cuda.is_available():
+            return None
+    except ImportError:
+        return None
+    return {"program": "Sottovoce", "model": BUILTIN.split("/")[-1], "builtin": True,
+            "downloaded": _downloaded()}
+
+
+def _downloaded() -> bool:
+    try:
+        from huggingface_hub import try_to_load_from_cache
+        return isinstance(try_to_load_from_cache(BUILTIN, "config.json"), str)
+    except Exception:
+        return False
+
+
+def _unload_when_idle():
+    while True:
+        time.sleep(30)
+        with _builtin_lock:
+            if _builtin["model"] is not None and time.time() - _builtin["last"] > IDLE:
+                import gc
+                import torch
+                _builtin.update(model=None, tok=None)
+                gc.collect()
+                torch.cuda.empty_cache()
+                return
+
+
+def _builtin_ask(instructions: str, request: str) -> dict:
+    import torch
+    from transformers import AutoModelForCausalLM, AutoTokenizer
+    with _builtin_lock:
+        if _builtin["model"] is None:
+            free, _ = torch.cuda.mem_get_info()
+            if free < (BUILTIN_GB + 1) * 2 ** 30:
+                return {"error": f"the built-in model needs about {BUILTIN_GB + 1} GB free on the "
+                                 f"GPU and {free / 2 ** 30:.1f} GB are: run LM Studio or Ollama "
+                                 "with a smaller model instead"}
+            tok = AutoTokenizer.from_pretrained(BUILTIN)
+            model = AutoModelForCausalLM.from_pretrained(BUILTIN, dtype=torch.bfloat16,
+                                                         device_map="cuda")
+            _builtin.update(model=model, tok=tok)
+            threading.Thread(target=_unload_when_idle, daemon=True).start()
+        model, tok = _builtin["model"], _builtin["tok"]
+        ids = tok.apply_chat_template(
+            [{"role": "system", "content": instructions}, {"role": "user", "content": request}],
+            add_generation_prompt=True, return_tensors="pt", return_dict=True).to(model.device)
+        out = model.generate(**ids, max_new_tokens=1200, do_sample=False)
+        text = tok.decode(out[0][ids["input_ids"].shape[1]:], skip_special_tokens=True).strip()
+        _builtin["last"] = time.time()
+    if not text:
+        return {"error": "the built-in model answered with nothing"}
+    return {"text": text, "model": BUILTIN.split("/")[-1], "program": "Sottovoce",
+            "tokens_read": int(ids["input_ids"].shape[1]),
+            "tokens_written": int(out.shape[1] - ids["input_ids"].shape[1])}
+
+
+def available() -> dict | None:
+    """Who would write: a local server that is on, else the built-in model."""
+    return who_answers() or builtin()
+
+
 def _post(url: str, body: dict, timeout: float):
     req = urllib.request.Request(
         url, data=json.dumps(body).encode("utf-8"),
@@ -128,7 +217,13 @@ def ask(instructions: str, request: str, model: str | None = None) -> dict:
     """
     server = who_answers()
     if server is None:
-        return {"error": "no LLM server is running on this machine"}
+        if builtin():
+            try:
+                return _builtin_ask(instructions, request)
+            except Exception as e:            # a download cut short, the GPU out of memory
+                return {"error": f"the built-in model failed: {type(e).__name__}: {e}"}
+        return {"error": "no LLM server is running on this machine, and the built-in "
+                         "model needs an NVIDIA GPU"}
 
     try:
         reply = _post(

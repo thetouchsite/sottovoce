@@ -114,6 +114,7 @@ def test_recording_ids_are_checked(client):
 def test_summary_without_an_llm_explains_itself(client, monkeypatch):
     import summary
     monkeypatch.setattr(summary, "who_answers", lambda: None)
+    monkeypatch.setattr(summary, "builtin", lambda: None)       # and no GPU for the built-in one
     assert client.get("/api/llm").json()["available"] is False
     assert client.get(f"/api/history/{NORTHPINE}").json()["summary"]      # the saved one stays
     r = client.post(f"/api/summary/{NORTHPINE}?redo=true")
@@ -358,6 +359,24 @@ def test_the_follow_up_is_written_saved_edited_and_dropped_when_the_lines_change
 def test_without_an_llm_the_follow_up_explains_itself(client, monkeypatch):
     import summary
     monkeypatch.setattr(summary, "who_answers", lambda: None)
+    monkeypatch.setattr(summary, "builtin", lambda: None)       # and no GPU for the built-in one
     r = client.post(f"/api/followup/{NORTHPINE}")
     assert r.status_code == 503 and "no LLM" in r.json()["error"]
+
+
+def test_with_no_server_the_built_in_model_writes(client, monkeypatch):
+    import summary
+    monkeypatch.setattr(summary, "who_answers", lambda: None)
+    monkeypatch.setattr(summary, "builtin", lambda: {"program": "Sottovoce", "model": "Qwen3-4B-Instruct-2507",
+                                                     "builtin": True, "downloaded": False})
+    assert client.get("/api/llm").json()["builtin"] is True
+    seen = {}
+
+    def fake(instructions, request):
+        seen["request"] = request
+        return {"text": "Oggetto: prossimi passi", "model": "Qwen3-4B-Instruct-2507", "program": "Sottovoce"}
+
+    monkeypatch.setattr(summary, "_builtin_ask", fake)
+    r = client.post(f"/api/followup/{NORTHPINE}").json()
+    assert r["text"] == "Oggetto: prossimi passi" and "Voice 1:" in seen["request"]
 

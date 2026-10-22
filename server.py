@@ -1222,7 +1222,7 @@ def api_llm():
     A button that errors is worse than a button that is not there: the first
     makes the program look broken, the second makes the feature look absent.
     """
-    s = S.who_answers()
+    s = S.available()
     return {"available": bool(s), **(s or {})}
 
 
@@ -1489,6 +1489,9 @@ if __name__ == "__main__":
                     help="the name glossary (default: ./glossary.txt)")
     ap.add_argument("--no-model", action="store_true",
                     help="browse transcripts without loading Whisper (no GPU needed)")
+    ap.add_argument("--no-llm", action="store_true",
+                    help="no built-in model for summaries and emails (a running LM Studio or "
+                         "Ollama is still used)")
     ap.add_argument("--lan", action="store_true",
                     help="reachable from other devices on your network, e.g. your phone, "
                          "with a PIN asked once per device")
@@ -1496,6 +1499,8 @@ if __name__ == "__main__":
                     help="the PIN for --lan (default: one made up the first time, then kept)")
     args = ap.parse_args()
 
+    # Browsing only means no GPU work at all: the built-in LLM stays off too.
+    S.builtin_allowed = not (args.no_model or args.no_llm)
     start(args.data, args.glossary, model=not args.no_model)
     print(f"\n  Sottovoce {VERSION} on  http://127.0.0.1:{args.port}")
     print(f"  model: {T.MODEL}")
