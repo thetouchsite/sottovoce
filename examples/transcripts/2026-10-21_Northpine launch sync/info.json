@@ -178,5 +178,11 @@
    621.92
   ]
  ],
- "word_times": "estimated"
+ "word_times": "estimated",
+ "speakers_found": 3,
+ "lines_by_speaker": {
+  "Voice 1": 22,
+  "Voice 2": 22,
+  "Voice 3": 10
+ }
 }

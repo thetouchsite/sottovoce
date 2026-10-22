@@ -97,9 +97,12 @@ def test_a_call_reads_three_ways_and_the_strip_plays_from_a_point(page):
 
 
 def test_getting_back_to_the_start(page):
+    page.wait_for_function("document.querySelector('[data-need=model]').textContent === 'Transcription off'")
     open_call(page, NORTHPINE)
     page.locator(".crumbs button").click()
     assert page.locator("h1").inner_text() == "New transcription"
+    # The rebuilt home still knows the model is off (it once said "Choose files").
+    assert page.locator("[data-need=model]").inner_text() == "Transcription off"
     open_call(page, NORTHPINE)
     page.keyboard.press("Escape")
     assert page.locator("h1").inner_text() == "New transcription"
@@ -148,3 +151,19 @@ def test_phone_width(site):
         p.locator("#open-list").click()
         p.wait_for_function("document.getElementById('sidebar').classList.contains('open')")
         browser.close()
+
+
+
+def test_voices_have_their_own_colour_and_take_a_name(page):
+    open_call(page, NORTHPINE)
+    assert "3 voices told apart" in page.locator(".finding").inner_text()
+    page.locator(".tabs button").nth(2).click()
+    assert page.locator(".reader .who").all_inner_texts()[:3] == ["Voice 1", "Voice 2", "Voice 1"]
+    assert page.locator(".reader .who.v2").count() == 22
+    page.fill("input[name='Voice 2']", "Daniel")
+    with page.expect_response(lambda r: "/api/history/" in r.url):
+        page.locator("text=Save names").click()
+    page.wait_for_selector(".reader")
+    page.locator(".tabs button").nth(2).click()
+    assert page.locator(".reader .who").all_inner_texts()[:2] == ["Voice 1", "Daniel"]
+    assert page.locator("input[name='Voice 2']").input_value() == "Daniel"

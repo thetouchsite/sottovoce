@@ -21,7 +21,8 @@ ONE FOLDER PER TRANSCRIPTION, with everything inside:
         Client call.txt      [mm:ss] lines: the source everything is rebuilt from
         Client call.md       to read
         words.json           when every word was said, line by line
-        info.json            duration, timings, model, language, what was dropped
+        info.json            duration, timings, model, language, what was dropped,
+                             the names given to the voices
         corrections.jsonl    every line corrected, with before and after
         summary.md           if you asked for one
 
@@ -40,6 +41,7 @@ loads nothing from the internet, not even its fonts. (The API reference at
 from __future__ import annotations
 
 import argparse
+import importlib.util
 import json
 import pathlib
 import queue
@@ -56,7 +58,7 @@ from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse, Res
 import summary as S
 import transcribe as T
 
-VERSION = "1.1.0"
+VERSION = "1.2.0"
 ROOT = pathlib.Path(__file__).resolve().parent
 DATA = ROOT / "transcripts"            # set again by start() from --data
 INCOMING = DATA / "_incoming"
@@ -181,10 +183,39 @@ def audio_in(d: pathlib.Path) -> str | None:
     return next((f.name for f in d.iterdir() if f.suffix.lower() in AUDIO), None)
 
 
+def names_of(d: pathlib.Path) -> dict:
+    """The names given to the voices of a call: {"Voice 1": "Maya", ...}."""
+    if not (d / "info.json").exists():
+        return {}
+    return read_info(d).get("speaker_names") or {}
+
+
+def speakers_of(segments, names=None):
+    """Who speaks in a call, in order, with how long each one talks.
+
+    Talk time is measured on the words, not on the lines: a line runs until
+    the next one starts, and would count every pause as talking.
+    """
+    talk, lines = {}, {}
+    for s in segments:
+        sp = s.get("speaker")
+        if not sp:
+            continue
+        w = s.get("words") or []
+        talk[sp] = talk.get(sp, 0.0) + (w[-1][1] - w[0][0] if w else 0.0)
+        lines[sp] = lines.get(sp, 0) + 1
+
+    def order(sp):
+        return (0, 0) if sp == "Me" else (1, 0) if sp == "Them" else (2, int(sp.split()[-1]))
+
+    return [{"tag": sp, "name": (names or {}).get(sp), "seconds": round(talk[sp]),
+             "lines": lines[sp]} for sp in sorted(talk, key=order)]
+
+
 # --- the job ----------------------------------------------------------------------
 
 def process(job_id: str, upload: pathlib.Path, name: str, language: str | None,
-            two_tracks: bool = False, precise: bool = False) -> None:
+            two_tracks: bool = False, precise: bool = False, voices: bool = False) -> None:
     job = jobs[job_id]
     try:
         stem = clean(pathlib.Path(name).stem)
@@ -208,7 +239,8 @@ def process(job_id: str, upload: pathlib.Path, name: str, language: str | None,
                 job["expected"] = round(audio_seconds / (T.SPEED_PRECISE if precise else T.SPEED))
 
         t0 = time.time()
-        r = T.run(original, language, progress, two_tracks=two_tracks, precise=precise)
+        r = T.run(original, language, progress, two_tracks=two_tracks, precise=precise,
+                  voices=voices)
         taken = round(time.time() - t0)
         segments, seconds = r["segments"], r["seconds"]
 
@@ -237,8 +269,10 @@ def process(job_id: str, upload: pathlib.Path, name: str, language: str | None,
         }
         if two_tracks:
             info["two_tracks"] = True
-            info["lines_by_speaker"] = {k: sum(1 for s in segments if s.get("speaker") == k)
-                                        for k in T.SPEAKERS}
+        if "speakers_found" in r:
+            info["speakers_found"] = r["speakers_found"]
+        if two_tracks or "speakers_found" in r:
+            info["lines_by_speaker"] = {x["tag"]: x["lines"] for x in speakers_of(segments)}
         write_info(d, info)
         job.update(state="done", stage="done")
     except Exception as e:
@@ -292,31 +326,41 @@ def language_of(language: str | None) -> str | None:
 
 
 def enqueue(path: pathlib.Path, name: str, language: str | None, two_tracks=False,
-            precise=False) -> str:
+            precise=False, voices=False) -> str:
     job_id = uuid.uuid4().hex[:8]
     ahead = line_up.qsize()
     jobs[job_id] = {"state": "running", "name": name,
                     "stage": f"queued, {ahead} ahead" if ahead else "queued",
                     "started": time.time()}
-    line_up.put((job_id, path, name, language, two_tracks, precise))
+    line_up.put((job_id, path, name, language, two_tracks, precise, voices))
     return job_id
+
+
+def voices_installed() -> bool:
+    """Whether telling voices apart can run: its packages are optional."""
+    return all(importlib.util.find_spec(m) is not None for m in ("sherpa_onnx", "onnxruntime", "scipy"))
 
 
 @app.get("/api/status")
 def api_status():
-    return {**engine_state, "model": T.MODEL, "queued": line_up.qsize(), "version": VERSION}
+    import voices as V
+    return {**engine_state, "model": T.MODEL, "queued": line_up.qsize(), "version": VERSION,
+            # The page says "downloads 32 MB the first time" until it is on disk.
+            "voices": voices_installed(), "voices_ready": V.ready()}
 
 
 @app.post("/api/transcribe")
 async def api_transcribe(file: UploadFile = File(...), language: str = Form("auto"),
-                         two_tracks: bool = Form(False), precise: bool = Form(False)):
+                         two_tracks: bool = Form(False), precise: bool = Form(False),
+                         voices: bool = Form(False)):
     """Queues a recording. Several files: one request each, they run one after the other."""
     refused = refuse_if_off()
     if refused:
         return refused
     dest = INCOMING / f"{uuid.uuid4().hex[:8]}{pathlib.Path(file.filename).suffix or '.bin'}"
     dest.write_bytes(await file.read())
-    return {"job": enqueue(dest, file.filename, language_of(language), two_tracks, precise)}
+    return {"job": enqueue(dest, file.filename, language_of(language), two_tracks, precise,
+                           voices and voices_installed())}
 
 
 @app.get("/api/job/{job_id}")
@@ -385,7 +429,8 @@ async def api_recording_finish(rid: str, request: Request):
     shutil.move(str(f), dest)
     meta_f.unlink(missing_ok=True)
     return {"job": enqueue(dest, name, language, two_tracks=True,
-                           precise=bool(body.get("precise")))}
+                           precise=bool(body.get("precise")),
+                           voices=bool(body.get("voices")) and voices_installed())}
 
 
 @app.get("/api/recordings")
@@ -549,11 +594,17 @@ def api_open(name: str):
         return JSONResponse({"error": "transcript missing"}, 404)
     audio = audio_in(d)
     summary_md = d / "summary.md"
+    names = data.get("speaker_names") or {}
     return {"folder": d.name, "stem": txt.stem, "audio": audio,
             "name": data.get("original", txt.stem),
             "language": data.get("language"),
             "two_tracks": bool(data.get("two_tracks")),
             "word_times": data.get("word_times"),
+            # Who speaks, with the names given to them; speakers_found is
+            # there once the voices were told apart (1 when only one was).
+            "speakers": speakers_of(segments, names),
+            "speaker_names": names,
+            "speakers_found": data.get("speakers_found"),
             "duration": data.get("duration_s") or 0,
             "seconds_taken": data.get("seconds_taken", 0),
             "segments": segments, "paragraphs": T.paragraphs(segments),
@@ -575,11 +626,14 @@ def api_download(name: str, fmt: str):
 
     txt and md are the files in the folder. The others are written on the fly
     from the .txt and the word timings, so they always match the corrections.
+    So is the .txt when the voices have names: the file keeps "[Voice 2]",
+    the download says who Voice 2 is.
     """
     d = folder(name)
     if fmt not in T.FORMATS or not d.is_dir():
         return JSONResponse({"error": "not found"}, 404)
-    if fmt in ("txt", "md"):
+    names = names_of(d)
+    if fmt == "md" or (fmt == "txt" and not names):
         f = next(d.glob(f"*.{fmt}"), None)
         if f is None:
             return JSONResponse({"error": "not found"}, 404)
@@ -588,9 +642,9 @@ def api_download(name: str, fmt: str):
     txt, segments = read_call(d, info.get("duration_s"))
     if txt is None:
         return JSONResponse({"error": "not found"}, 404)
-    body = T.render(fmt, segments, txt.stem, info.get("duration_s") or 0,
+    body = T.render(fmt, segments, txt.stem, info.get("duration_s") or 0, names,
                     language=info.get("language"), model=info.get("model"))
-    kind = {"srt": "application/x-subrip", "vtt": "text/vtt",
+    kind = {"txt": "text/plain", "srt": "application/x-subrip", "vtt": "text/vtt",
             "json": "application/json"}[fmt]
     return Response(body, media_type=f"{kind}; charset=utf-8",
                     headers={"Content-Disposition": f'attachment; filename="{txt.stem}.{fmt}"'})
@@ -662,11 +716,132 @@ def api_correct(name: str, body: dict):
 
 
 def _write_md(d: pathlib.Path, txt: pathlib.Path):
-    """The .md is rebuilt from the .txt: one source, no copy to keep in line."""
+    """The .md is rebuilt from the .txt: one source, no copy to keep in line.
+
+    It is the file meant for reading, so it carries the voices' names.
+    """
     info = read_info(d)
     _, segments = read_call(d, info.get("duration_s"))
     d.joinpath(f"{txt.stem}.md").write_text(
-        T.as_md(segments, txt.stem, info.get("duration_s") or 0), encoding="utf-8")
+        T.as_md(segments, txt.stem, info.get("duration_s") or 0, info.get("speaker_names")),
+        encoding="utf-8")
+
+
+# --- voices -------------------------------------------------------------------
+
+def _name_problem(name: str) -> str | None:
+    if len(name) > 40:
+        return "a name is at most 40 characters"
+    if any(c in name for c in "[]\n\r"):
+        return "a name cannot contain brackets or line breaks"
+    return None
+
+
+@app.post("/api/speakers/{name}")
+def api_speakers(name: str, body: dict):
+    """Names for the voices of a call: {"names": {"Voice 1": "Maya"}}.
+
+    Kept in info.json, not written into the lines: the .txt says "[Voice 1]"
+    and stays that way, so a wrong name is undone by changing one word. An
+    empty name takes the label back.
+    """
+    d = folder(name)
+    if not d.is_dir() or not (d / "info.json").exists():
+        return JSONResponse({"error": "not found"}, 404)
+    txt, segments = read_call(d)
+    if txt is None:
+        return JSONResponse({"error": "transcript missing"}, 404)
+    given = body.get("names")
+    if not isinstance(given, dict):
+        return JSONResponse({"error": "names is required, as {label: name}"}, 400)
+    present = {x["tag"] for x in speakers_of(segments)}
+    info = read_info(d)
+    names = dict(info.get("speaker_names") or {})
+    for tag, value in given.items():
+        if tag not in present:
+            return JSONResponse({"error": f"nobody is labelled {tag!r} in this call"}, 400)
+        value = " ".join(str(value or "").split())
+        problem = _name_problem(value)
+        if problem:
+            return JSONResponse({"error": problem}, 400)
+        if value and value != tag:
+            names[tag] = value
+        else:
+            names.pop(tag, None)
+    info["speaker_names"] = names
+    write_info(d, info)
+    _write_md(d, txt)
+    return {"speaker_names": names, "speakers": speakers_of(segments, names)}
+
+
+_voices_busy = threading.Lock()
+
+
+@app.post("/api/voices/{name}")
+def api_voices(name: str):
+    """Tells the voices apart in a call already transcribed.
+
+    Needs the recording, not the model: it works with --no-model too. The
+    words keep their times; only who said them changes, and lines are split
+    where the voice changes inside one. On two tracks "Me" stays "Me".
+
+    The lines change, so names given before are dropped (Voice 2 may now be
+    someone else) and so is the summary, which was written on the old labels.
+    """
+    d = folder(name)
+    if not d.is_dir() or not (d / "info.json").exists():
+        return JSONResponse({"error": "not found"}, 404)
+    if not voices_installed():
+        return JSONResponse({"error": "telling voices apart needs: pip install sherpa-onnx onnxruntime scipy"}, 503)
+    audio = audio_in(d)
+    if audio is None:
+        return JSONResponse({"error": "the recording is not in the folder"}, 404)
+    txt, segments = read_call(d)
+    if txt is None or not segments:
+        return JSONResponse({"error": "transcript missing"}, 404)
+    if not _voices_busy.acquire(blocking=False):
+        return JSONResponse({"error": "voices are already being told apart in another call"}, 409)
+    try:
+        info = read_info(d)
+        two = bool(info.get("two_tracks"))
+        words, speakers, breaks = [], [], set()
+        for s in segments:
+            breaks.add(len(words))
+            for w in s["words"]:
+                words.append(list(w))
+                speakers.append("Me" if s.get("speaker") == "Me" else ("Them" if two else None))
+        import tempfile
+        t0 = time.time()
+        if two:
+            _, track, _ = T.read_two_tracks(d / audio)
+        else:
+            import soundfile as sf
+            with tempfile.TemporaryDirectory() as tmp:
+                wav = pathlib.Path(tmp) / "audio.wav"
+                T.prepare(d / audio, wav)
+                track, _ = sf.read(str(wav), dtype="float32")
+        labels, found = T.tell_voices(words, track, speakers if two else None, breaks=breaks)
+        info["speakers_found"] = found
+        info["voices_seconds"] = round(time.time() - t0)
+        if found < 2:
+            write_info(d, info)
+            return {"speakers_found": found, "changed": False}
+
+        lines = T.lines_from_words(words, labels, breaks)
+        # Phantom lines were dropped at transcription; what is left keeps its
+        # text exactly, so the lines are rebuilt from the words alone.
+        txt.write_text(T.as_txt(lines), encoding="utf-8")
+        write_words(d, lines)
+        info["speaker_names"] = {k: v for k, v in (info.get("speaker_names") or {}).items()
+                                 if k == "Me"}
+        info["segments"] = len(lines)
+        info["lines_by_speaker"] = {x["tag"]: x["lines"] for x in speakers_of(lines)}
+        write_info(d, info)
+        _write_md(d, txt)
+        (d / "summary.md").unlink(missing_ok=True)
+        return {"speakers_found": found, "changed": True, "lines": len(lines)}
+    finally:
+        _voices_busy.release()
 
 
 # --- the summary --------------------------------------------------------------
@@ -708,7 +883,8 @@ def api_summary(name: str, redo: bool = False):
     # The text goes without timestamps: a timestamp costs a token per line,
     # which over 550 lines is a tenth of the prompt spent on nothing. Who spoke
     # goes with it when it is known: "who does what" is half of a summary.
-    text = "\n".join((f"{s['speaker']}: " if s.get("speaker") else "") + s["text"]
+    names = names_of(d)
+    text = "\n".join((f"{T.who(s, names)}: " if s.get("speaker") else "") + s["text"]
                      for s in segments)
     t0 = time.time()
     r = S.summarize(text)

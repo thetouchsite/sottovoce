@@ -44,6 +44,11 @@ drop_phantoms().
 TWO TRACKS. A call recorded from the page has your microphone on the left
 channel and the call's audio on the right. Who speaks is then a measurement,
 not a guess: see label_speakers().
+
+VOICES. On request (--voices), the people on the call are told apart by the
+sound of their voice, for any recording: see voices.py for the models and the
+measurements. On two tracks only the call's side is split, since "Me" is
+already known.
 """
 from __future__ import annotations
 
@@ -88,9 +93,11 @@ SUBTITLE_PHRASES = (
 )
 
 # The two voices of a call recorded from the page: you on the microphone, the
-# others on the call's audio. Only these two are read back as speaker tags,
-# so a line that really starts with "[Music]" stays text.
+# others on the call's audio. With voices told apart, the others become
+# "Voice 1", "Voice 2"... Only these are read back as speaker tags, so a line
+# that really starts with "[Music]" stays text.
 SPEAKERS = ("Me", "Them")
+TAG = "|".join(SPEAKERS) + r"|Voice \d{1,2}"
 
 ROOT = pathlib.Path(__file__).resolve().parent
 
@@ -505,6 +512,24 @@ def label_speakers(words, left, right, rate, window=0.08):
     return labels
 
 
+def tell_voices(words, audio, speakers=None, progress=None, breaks=None):
+    """Voice 1, Voice 2... for every word, and how many voices were found.
+
+    `audio` is mono 16 kHz: the whole call, or only the call's side of a
+    two-track recording, whose "Me" words are then left as they are. With a
+    single voice nothing changes: one label on every line says nothing.
+    """
+    import numpy as np
+    import voices
+    peak = float(np.abs(audio).max()) if len(audio) else 0.0
+    turns = voices.diarize(audio / peak * 0.9 if peak > 0 else audio, progress)
+    found = len({t[2] for t in turns})
+    if found < 2 or not words:
+        return speakers, found
+    keep = [s if s == "Me" else None for s in speakers] if speakers else None
+    return voices.assign(words, turns, keep, breaks), found
+
+
 def read_two_tracks(source, rate=16000):
     """The two tracks of a recording as two arrays: (microphone, call, rate)."""
     import soundfile as sf
@@ -655,12 +680,16 @@ def suspicious(segments):
 #
 #   [mm:ss] text                    a line
 #   [mm:ss] [Me] text               a line of a call recorded on two tracks
+#   [mm:ss] [Voice 2] text          a line, with the voices told apart
+#
+# Names given to the voices are kept in info.json, never in the .txt: renaming
+# "Voice 2" must not mean rewriting every line, and a name can be changed back.
 #
 # The .txt is the source everything else is rebuilt from, and stays readable in
 # any editor. Word timings live next to it, in words.json.
 
-LINE = re.compile(r"^\[(\d+):(\d+)\]\s*(?:\[(" + "|".join(SPEAKERS) + r")\]\s*)?(.*)$")
-PREFIX = re.compile(r"^(\[\d+:\d+\]\s*(?:\[(?:" + "|".join(SPEAKERS) + r")\]\s*)?)(.*)$")
+LINE = re.compile(r"^\[(\d+):(\d+)\]\s*(?:\[(" + TAG + r")\]\s*)?(.*)$")
+PREFIX = re.compile(r"^(\[\d+:\d+\]\s*(?:\[(?:" + TAG + r")\]\s*)?)(.*)$")
 
 
 def parse_line(line):
@@ -671,19 +700,25 @@ def parse_line(line):
     return int(m[1]) * 60 + int(m[2]), m[3], m[4].strip()
 
 
-def as_txt(segments) -> str:
-    return "".join(f"[{mmss(s['start'])}] " + (f"[{s['speaker']}] " if s.get("speaker") else "")
+def who(s, names=None):
+    """The speaker of a line as a reader should see it: the name, if given."""
+    sp = s.get("speaker")
+    return (names or {}).get(sp) or sp
+
+
+def as_txt(segments, names=None) -> str:
+    return "".join(f"[{mmss(s['start'])}] " + (f"[{who(s, names)}] " if s.get("speaker") else "")
                    + f"{s['text']}\n" for s in segments)
 
 
-def as_md(segments, title, seconds) -> str:
+def as_md(segments, title, seconds, names=None) -> str:
     words = sum(len(s["text"].split()) for s in segments)
     lines = [f"# {title}\n",
              f"*{seconds/60:.0f} min · {words} words · "
              f"transcribed locally with {MODEL}*\n"]
     for p in paragraphs(segments):
-        who = f" · {p['speaker']}" if p.get("speaker") else ""
-        lines.append(f"**{mmss(p['start'])}{who}** — {p['text']}\n")
+        by = f" · {who(p, names)}" if p.get("speaker") else ""
+        lines.append(f"**{mmss(p['start'])}{by}** — {p['text']}\n")
     return "\n".join(lines)
 
 
@@ -714,28 +749,28 @@ def _stamp(t, sep):
     return f"{h:02d}:{m:02d}:{s:02d}{sep}{ms:03d}"
 
 
-def as_srt(segments, duration) -> str:
+def as_srt(segments, duration, names=None) -> str:
     out = []
     for i, (s, e) in enumerate(zip(segments, ends(segments, duration)), 1):
-        who = f"{s['speaker']}: " if s.get("speaker") else ""
-        out.append(f"{i}\n{_stamp(s['start'], ',')} --> {_stamp(e, ',')}\n{who}{s['text']}\n")
+        by = f"{who(s, names)}: " if s.get("speaker") else ""
+        out.append(f"{i}\n{_stamp(s['start'], ',')} --> {_stamp(e, ',')}\n{by}{s['text']}\n")
     return "\n".join(out)
 
 
-def as_vtt(segments, duration) -> str:
+def as_vtt(segments, duration, names=None) -> str:
     out = ["WEBVTT\n"]
     for s, e in zip(segments, ends(segments, duration)):
-        who = f"<v {s['speaker']}>" if s.get("speaker") else ""
-        out.append(f"{_stamp(s['start'], '.')} --> {_stamp(e, '.')}\n{who}{s['text']}\n")
+        by = f"<v {who(s, names)}>" if s.get("speaker") else ""
+        out.append(f"{_stamp(s['start'], '.')} --> {_stamp(e, '.')}\n{by}{s['text']}\n")
     return "\n".join(out)
 
 
-def as_json(segments, duration, **meta) -> str:
+def as_json(segments, duration, names=None, **meta) -> str:
     lines = []
     for s, e in zip(segments, ends(segments, duration)):
         item = {"start": s["start"], "end": round(e, 2), "text": s["text"]}
         if s.get("speaker"):
-            item["speaker"] = s["speaker"]
+            item["speaker"] = who(s, names)
         if s.get("words"):
             item["words"] = [{"start": a, "end": b, "word": w} for a, b, w in s["words"]]
         lines.append(item)
@@ -745,28 +780,30 @@ def as_json(segments, duration, **meta) -> str:
 FORMATS = {"txt", "md", "srt", "vtt", "json"}
 
 
-def render(fmt, segments, title, duration, **meta) -> str:
+def render(fmt, segments, title, duration, names=None, **meta) -> str:
+    """A transcript in one of FORMATS. `names` maps a speaker tag to a name."""
     if fmt == "txt":
-        return as_txt(segments)
+        return as_txt(segments, names)
     if fmt == "md":
-        return as_md(segments, title, duration)
+        return as_md(segments, title, duration, names)
     if fmt == "srt":
-        return as_srt(segments, duration)
+        return as_srt(segments, duration, names)
     if fmt == "vtt":
-        return as_vtt(segments, duration)
+        return as_vtt(segments, duration, names)
     if fmt == "json":
-        return as_json(segments, duration, title=title, **meta)
+        return as_json(segments, duration, names, title=title, **meta)
     raise ValueError(f"unknown format {fmt!r}: choose from {', '.join(sorted(FORMATS))}")
 
 
 # --- the whole job ------------------------------------------------------------------
 
-def run(source, language=None, progress=None, two_tracks=False, precise=False):
+def run(source, language=None, progress=None, two_tracks=False, precise=False, voices=False):
     """From a file to lines. `progress(stage, seconds_to_transcribe)` for the page.
 
-    Returns a dict: segments (lines with words, and speaker for two tracks),
-    seconds, speech_seconds, corrected (name -> count), phantoms, speech (the
-    map), language.
+    Returns a dict: segments (lines with words, and speaker for two tracks or
+    voices), seconds, speech_seconds, corrected (name -> count), phantoms,
+    speech (the map), language, word_times, and speakers_found when the voices
+    were told apart.
     """
     source = pathlib.Path(source)
     with tempfile.TemporaryDirectory() as tmp:
@@ -802,14 +839,26 @@ def run(source, language=None, progress=None, two_tracks=False, precise=False):
             left, right, rate = read_two_tracks(source)
             speakers = label_speakers(words, left, right, rate)
 
+        found = None
+        if voices and words:
+            if two_tracks:
+                audio = right
+            else:
+                import soundfile as sf
+                audio, _ = sf.read(str(wav), dtype="float32")
+            speakers, found = tell_voices(words, audio, speakers, progress, breaks)
+
         segments = lines_from_words(words, speakers, breaks)
         phantoms = drop_phantoms(segments, wav, level)
 
     # Proper nouns are fixed here, on the output: see glossary().
     corrected = apply_glossary(segments, glossary())
-    return {"segments": segments, "seconds": seconds, "speech_seconds": speech_s,
-            "corrected": corrected, "phantoms": phantoms, "speech": speech,
-            "language": used, "word_times": "precise" if breaks is None else "estimated"}
+    out = {"segments": segments, "seconds": seconds, "speech_seconds": speech_s,
+           "corrected": corrected, "phantoms": phantoms, "speech": speech,
+           "language": used, "word_times": "precise" if breaks is None else "estimated"}
+    if found is not None:
+        out["speakers_found"] = found
+    return out
 
 
 def speech_map(source):
@@ -838,6 +887,8 @@ def main() -> None:
                     help="precise word timings: twice as slow (default: estimated)")
     ap.add_argument("--two-tracks", action="store_true",
                     help="stereo recording: your microphone left, the call right")
+    ap.add_argument("--voices", action="store_true",
+                    help="tell the voices apart: Voice 1, Voice 2... (about 2 s a minute, on the CPU)")
     args = ap.parse_args()
 
     source = pathlib.Path(args.file).expanduser()
@@ -851,7 +902,7 @@ def main() -> None:
     print(f"\n  {source.name}")
     t0 = time.time()
     r = run(source, args.language, lambda stage, s: print(f"  {stage}...", flush=True),
-            two_tracks=args.two_tracks, precise=args.precise)
+            two_tracks=args.two_tracks, precise=args.precise, voices=args.voices)
     dt = time.time() - t0
     segments = r["segments"]
 
@@ -870,6 +921,8 @@ def main() -> None:
     if r["corrected"]:
         print("  names corrected: " +
               ", ".join(f"{k} ({v}x)" for k, v in r["corrected"].items()))
+    if "speakers_found" in r:
+        print(f"  voices: {r['speakers_found']}")
     print(f"  {words} words\n")
     for fmt in formats:
         print(f"  {source.with_suffix('.' + fmt).name}")

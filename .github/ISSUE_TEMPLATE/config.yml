@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Try it without a GPU
+    url: https://github.com/thetouchsite/sottovoce#try-it-in-a-minute-no-gpu
+    about: Four fictional calls to reproduce a problem on, with no real data involved.
+  - name: Contributing
+    url: https://github.com/thetouchsite/sottovoce/blob/master/CONTRIBUTING.md
+    about: How defaults are changed, the checks before a pull request, and what never goes in the repo.

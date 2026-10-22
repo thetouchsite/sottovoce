@@ -6,12 +6,12 @@
 
 [![tests](https://github.com/thetouchsite/sottovoce/actions/workflows/tests.yml/badge.svg)](https://github.com/thetouchsite/sottovoce/actions/workflows/tests.yml)
 
-[Italiano](README.it.md) · [Try it without a GPU](#try-it-in-a-minute-no-gpu) · [Record a call](#record-a-call) · [What we measured](#what-we-measured) · MIT licence
+[Italiano](README.it.md) · [Try it without a GPU](#try-it-in-a-minute-no-gpu) · [Record a call](#record-a-call) · [Tell voices apart](#tell-voices-apart) · [What we measured](#what-we-measured) · MIT licence
 
 Built by [TouchSite Software](https://www.touchsitesoftware.it).
 
-![Sottovoce with a fictional 10-minute call open: the call strip, the figures, the summary, the phrases to check and the glossary](docs/images/screenshot.png)
-<sub>A fictional demo call. Nothing in these images is real client data.</sub>
+![A 24-second tour of Sottovoce on fictional calls: the home screen and the Separate voices switch, a call's summary, a click on the call strip that jumps to that moment in the text, the line-by-line view with three voices in three colours, naming them Maya, Daniel and Priya in the Voices panel, the lines now showing the names, a call recorded on two tracks with You and Them, and back to the start](docs/images/demo.gif)
+<sub>Fictional calls from `examples/`: nothing in these images is real client data. Made with `--no-model`, which is why transcription shows as off.</sub>
 
 ## Why
 
@@ -34,6 +34,7 @@ Sottovoce fixes the first two, and shows you where the third one is.
 
 - **It tells you where not to trust it.** The *call strip* shows the whole recording as one band: where people speak, where it's silent, where an invented phrase was dropped, where a line was corrected. Click anywhere to listen from there.
 - **It records the call too, and knows who spoke.** Record a Google Meet, Zoom or Teams call straight from the page: your microphone and the call's tab go on two separate tracks, so the transcript says *You* and *Them* without a speaker-recognition model.
+- **It tells voices apart, with no account to create.** Tick **Separate voices** and every line says *Voice 1*, *Voice 2*…; name them once and the names follow into downloads and the summary. Two small open models on the CPU, fetched once from GitHub: no Hugging Face token, no licence to accept. 12% error on public meetings, with the number of people counted right on every one.
 - **Every default was measured.** On a real call, against the alternatives, with the numbers [below](#what-we-measured), including the four approaches that didn't work.
 - **Names are fixed after, not suggested before.** Given to Whisper as a prompt, a glossary made the text *worse*. Here it's a correction table, and it can be applied again to old calls when you add a name.
 - **Your corrections are kept.** Every line you fix is saved with its *before* and *after*: the dataset you'd need to fine-tune a model on your own calls.
@@ -59,10 +60,10 @@ Start.bat
 
 The page opens on **New transcription**: drop one or more files on the left, or record a call on the right. 27 minutes of call take about 4 minutes. The language is detected, or you pick it from the menu; the choice is remembered. Close the server with the power button, or `Stop.bat`.
 
-**Linux and macOS:** the Python code is cross-platform and the tests run on Ubuntu, but the launchers are for Windows.
+**Linux and macOS:** `./install.sh`, then `./start.sh`. They do what the Windows launchers do: PyTorch first, from the CUDA index on Linux when `nvidia-smi` is there, then the rest, then whether the GPU is seen. `./start.sh` passes its arguments to the server, so `./start.sh --no-model` works. On GitHub they're checked for syntax and with `shellcheck` on every push, but not run end to end there: the install downloads gigabytes and needs a GPU. If you run them on a clean machine, tell us how it went (see the [roadmap](ROADMAP.md)). If they fail, these are the steps they take:
 
 ```sh
-python -m venv .venv && source .venv/bin/activate
+python3 -m venv .venv && source .venv/bin/activate
 pip install torch --index-url https://download.pytorch.org/whl/cu130   # match your CUDA
 pip install -r requirements.txt
 cp glossary.example.txt glossary.txt
@@ -80,7 +81,7 @@ pip install fastapi uvicorn python-multipart
 python server.py --no-model --data examples/transcripts --glossary examples/glossary.txt
 ```
 
-Then open <http://127.0.0.1:8200>. The strip, the summary, who spoke, search, corrections, downloads and the glossary all work. Only transcribing and recording are switched off.
+Then open <http://127.0.0.1:8200>. The strip, the summary, who spoke (two tracks, and three named voices in the Northpine call), search, corrections, downloads and the glossary all work. Only transcribing and recording are switched off.
 
 ## Record a call
 
@@ -91,6 +92,34 @@ On **New transcription**, give the call a name and press **Start recording**. Th
 - **Nothing is lost if the page closes.** The recording reaches the server every five seconds. If the tab is closed, the browser crashes or the laptop sleeps, the page offers the interrupted recording again the next time: transcribe it, or delete it.
 - **Where it works.** Chrome or Edge on a computer, for calls that run in a browser tab (Google Meet, Zoom and Teams on the web). Firefox and Safari can't capture another tab's sound. Calls in desktop apps need system-wide capture, which is on the [roadmap](ROADMAP.md).
 - **Use headphones**, or your microphone also picks up the others. **Tell the others you're recording**: depending on where you are, you may have to.
+
+## Tell voices apart
+
+On a call with several people, tick **Separate voices** before transcribing, or open a call that's already transcribed and press **Tell the voices apart** (no need to transcribe again). Every line gets *Voice 1*, *Voice 2*…, numbered in the order they first speak. Name them in the **Voices** panel next to the transcript: the names appear in the three reading views, in what you copy, in every download and in the summary. The `.txt` keeps the labels and `info.json` keeps the names, so a wrong name is undone by changing one field.
+
+- **No account, no gate.** The usual choice, [pyannote](https://github.com/pyannote/pyannote-audio), asks for a Hugging Face token and for accepting its terms before it downloads anything. Sottovoce uses the same segmentation model, pyannote segmentation-3.0 (MIT), as redistributed by [sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx), with a [3D-Speaker](https://github.com/modelscope/3D-Speaker) ERes2Net voice-fingerprint model (Apache-2.0). Both come from GitHub on first use, 32 MB in all, and are checked against a fixed SHA-256 before they're used.
+- **On the CPU.** About 2.5 seconds per minute of audio. The GPU stays with Whisper.
+- **You don't say how many people there were.** They're counted.
+- **On two tracks**, *You* stays a measurement: only the call's side is split into voices.
+
+### How well it works
+
+Measured on two public [AMI](https://groups.inf.ed.ac.uk/ami/corpus/) meetings, where every speaker is annotated. The threshold was chosen on one meeting and graded on the other, which it never saw. Each meeting has four people; for three and two, the others are muted where they speak alone, so the room and the microphones stay the same.
+
+| people on the call | 4 | 3 | 2 |
+| --- | --- | --- | --- |
+| error (DER) | 12.6% | 11.8% | 11.9% |
+| people counted | 4 of 4 | 3 of 3 | 2 of 2 |
+
+DER adds up missed speech, false alarms and speech given to the wrong person, over all the speech, with the usual 0.25 s tolerance where turns change. It's the standard measure, and published pipelines land roughly between 15% and 25% on AMI. Reproduce it with `python research/voices_ami.py`.
+
+End to end, transcribed by Whisper with voices on, **96% of the words** where one person is speaking got the right voice (14 minutes, three people). On the real 27-minute call from the measurements below, it found the two people in 36 seconds.
+
+**Which fingerprints.** Five models were tried the same way. NVIDIA TitaNet-large scored the same on AMI (12.3% / 11.1% / 12.3%), but on the real call it gave the client's questions to the consultant. WeSpeaker ResNet34 and ResNet293 and 3D-Speaker CAM++ were clearly worse with this grouping.
+
+**Grouping mattered more than the model.** Grouping every fingerprint by average distance, the first version merged three people into one: a few noisy fingerprints from short bursts formed groups of their own. Now only fingerprints from at least a second of clean speech are grouped, and the short ones join the nearest person afterwards.
+
+**Where it goes wrong.** Two similar voices on the same phone can merge into one. A short "yes" or "okay" can go to the wrong person. Someone who talks for less than about 15 seconds in all joins the nearest voice instead of getting their own: on short calls where one person does most of the talking, expect fewer voices than people. When two people talk over each other, the overlapping words go to one of them. And the number of people can't be set by hand yet: see the [roadmap](ROADMAP.md).
 
 ## What we measured
 
@@ -179,7 +208,7 @@ It should print a version ending in `+cu130` and `True`.
 
 ## Summaries
 
-Summaries come from an LLM that's already running on your machine, spoken to over the OpenAI-compatible API. Sottovoce looks for one on these ports: LM Studio `1234`, Ollama `11434`, llama-server `8080`. Nothing extra to install. And no VRAM held when you don't need it: Whisper takes 3 GB, a useful LLM another 5 to 16. On a call recorded on two tracks the model is told who said each line, so *To do* can say who does what.
+Summaries come from an LLM that's already running on your machine, spoken to over the OpenAI-compatible API. Sottovoce looks for one on these ports: LM Studio `1234`, Ollama `11434`, llama-server `8080`. Nothing extra to install. And no VRAM held when you don't need it: Whisper takes 3 GB, a useful LLM another 5 to 16. When who spoke is known (two tracks, or voices told apart) the model is told who said each line, with the names you gave, so *To do* can say who does what.
 
 With LM Studio:
 
@@ -203,7 +232,7 @@ Matching ignores case and respects word boundaries. You can edit the file, or us
 
 ## Downloads
 
-Every call downloads as `.md` (paragraphs, to read or paste), `.txt` (line by line, with timestamps), `.srt` and `.vtt` (subtitles), and `.json` (lines, speakers and word timings, for other programs). The last three are written from the transcript as it is now, corrections included.
+Every call downloads as `.md` (paragraphs, to read or paste), `.txt` (line by line, with timestamps), `.srt` and `.vtt` (subtitles), and `.json` (lines, speakers and word timings, for other programs). The last three are written from the transcript as it is now, corrections included. Voices you named appear by name in all of them.
 
 ## What a call looks like on disk
 
@@ -211,10 +240,10 @@ Every call downloads as `.md` (paragraphs, to read or paste), `.txt` (line by li
 transcripts/
   2026-10-21_Northpine launch sync/
     Northpine launch sync.m4a    the original, kept next to its transcript
-    Northpine launch sync.txt    [mm:ss] text, or [mm:ss] [Me] text: the source of everything else
+    Northpine launch sync.txt    [mm:ss] text, [mm:ss] [Me] text or [mm:ss] [Voice 2] text: the source of everything else
     Northpine launch sync.md     paragraphs, to read or paste
     words.json                   when each word was said, line by line
-    info.json                    duration, language, timings, what was dropped, speech map
+    info.json                    duration, language, timings, what was dropped, speech map, voice names
     corrections.jsonl            every corrected line, before and after
     summary.md                   if you asked for one
 ```
@@ -226,6 +255,7 @@ transcripts/
 ```sh
 python transcribe.py "Client call.mp4" --language it --formats txt,md,srt   # next to the file
 python transcribe.py "Recording.webm" --two-tracks --precise
+python transcribe.py "Team meeting.m4a" --voices                             # Voice 1, Voice 2…
 python summary.py "Client call.md"                                          # with the local LLM
 python server.py --port 8300 --data D:\calls --glossary D:\calls\names.txt
 python server.py --no-model                                                 # browse, no GPU
@@ -252,13 +282,15 @@ The tests run on the fictional calls in `examples/`, with the server started `--
 | Path | What |
 | --- | --- |
 | `transcribe.py` | The engine: ffmpeg, Whisper, the clean-up, who spoke, the formats. Also a command-line tool |
+| `voices.py` | Telling voices apart: the two models, their download and checksums, the grouping |
 | `server.py` | FastAPI, one job at a time (two in parallel slow each other down: 233 s instead of 190) |
 | `summary.py` | The local LLM client |
 | `app/index.html` | The page: one file, no build step, no framework, its fonts next to it |
 | `examples/` | Four fictional calls, to try the interface with `--no-model` |
 | `tests/` | Engine, API and page tests; they run on the examples |
-| `research/` | The scripts behind the numbers above: run several models, compare without a reference |
+| `research/` | The scripts behind the numbers above: run several models, compare without a reference, grade the voices on AMI |
 | `Install.bat`, `Start.bat`, `Stop.bat` | Double-click launchers for Windows |
+| `install.sh`, `start.sh` | The same, for Linux and macOS |
 
 ## Prior art
 
@@ -266,14 +298,14 @@ Whisper wrappers are everywhere. These four are excellent and shaped this one: [
 
 ## Roadmap
 
-Recording calls from desktop apps, and fine-tuning on your own corrections. See [ROADMAP.md](ROADMAP.md), with the reasons and how each one will be judged done.
+Recording calls from desktop apps, telling the number of people when you know it, recognising the same person across calls, and fine-tuning on your own corrections. See [ROADMAP.md](ROADMAP.md), with the reasons and how each one will be judged done. What changed in each release is in [CHANGELOG.md](CHANGELOG.md).
 
 ## Contributing
 
-Issues and pull requests are welcome: see [CONTRIBUTING.md](CONTRIBUTING.md). Especially welcome: the phrases Whisper invents on silence in **your** language (a few lines in `transcribe.py`), and launchers for Linux and macOS.
+Issues and pull requests are welcome: see [CONTRIBUTING.md](CONTRIBUTING.md). Especially welcome: the phrases Whisper invents on silence in **your** language (a few lines in `transcribe.py`), and a run of `./install.sh` and `./start.sh` on a clean Linux machine with an NVIDIA GPU.
 
 ## Licence
 
-[MIT](LICENSE) © 2026 TouchSite Software. Third-party parts keep their licences: Whisper large-v3 weights (Apache-2.0, downloaded from Hugging Face on first use), Public Sans (SIL OFL 1.1, [`app/fonts/OFL.md`](app/fonts/OFL.md)), and ffmpeg (installed by the `imageio-ffmpeg` package, not shipped in this repository).
+[MIT](LICENSE) © 2026 TouchSite Software. Third-party parts keep their licences: Whisper large-v3 weights (Apache-2.0, downloaded from Hugging Face on first use), pyannote segmentation-3.0 (MIT) and 3D-Speaker ERes2Net (Apache-2.0) for telling voices apart (downloaded from the sherpa-onnx releases on first use), sherpa-onnx (Apache-2.0), Public Sans (SIL OFL 1.1, [`app/fonts/OFL.md`](app/fonts/OFL.md)), and ffmpeg (installed by the `imageio-ffmpeg` package, not shipped in this repository).
 
 *Sotto voce* is Italian for "in a low voice". It's what this tool drops, the phrases that fall below the level of speech, and how it works: quietly, on your own machine. It was built for Italian calls first.

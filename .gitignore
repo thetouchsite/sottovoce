@@ -18,3 +18,8 @@ __pycache__/
 
 # Test runs
 .pytest_cache/
+
+# Voice models, downloaded on first use and checked by SHA-256
+/models/
+# Public meetings for research/voices.py, downloaded on first run
+/research/ami/

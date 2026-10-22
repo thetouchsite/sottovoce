@@ -119,3 +119,91 @@ def test_phantoms_dropped_only_where_it_is_quiet():
     assert [s["start"] for s in dropped] == [10]
     assert [s["start"] for s in segs] == [20, 30]
     assert T.suspicious(segs) == [segs[0]]
+
+
+# --- voices ---------------------------------------------------------------------
+
+def test_voice_tags_are_read_back_and_other_brackets_stay_text():
+    assert T.parse_line("[01:02] [Voice 12] Hello") == (62, "Voice 12", "Hello")
+    assert T.parse_line("[01:02] [Voice two] Hello") == (62, None, "[Voice two] Hello")
+    assert T.PREFIX.match("[00:03] [Voice 3] fixed").group(1) == "[00:03] [Voice 3] "
+
+
+def test_names_reach_every_format_but_only_where_given():
+    segs = [{"start": 0, "text": "hi", "speaker": "Voice 1", "words": [[0, 0.5, "hi"]]},
+            {"start": 1, "text": "yo", "speaker": "Voice 2", "words": [[1, 1.5, "yo"]]}]
+    names = {"Voice 1": "Maya"}
+    assert T.as_txt(segs, names) == "[00:00] [Maya] hi\n[00:01] [Voice 2] yo\n"
+    assert T.as_txt(segs) == "[00:00] [Voice 1] hi\n[00:01] [Voice 2] yo\n"
+    assert "Maya: hi" in T.render("srt", segs, "t", 2, names)
+    assert "<v Maya>hi" in T.render("vtt", segs, "t", 2, names)
+    assert "**00:00 · Maya**" in T.render("md", segs, "t", 2, names)
+    import json
+    assert [x["speaker"] for x in json.loads(T.render("json", segs, "t", 2, names))["lines"]] \
+        == ["Maya", "Voice 2"]
+
+
+def test_each_word_takes_the_voice_that_covers_most_of_it():
+    import voices
+    turns = [(0.0, 2.0, "Voice 1"), (2.0, 4.0, "Voice 2"), (6.0, 8.0, "Voice 1")]
+    words = [[0.1, 0.5, "a"], [1.8, 2.6, "b"], [4.5, 4.8, "c"], [5.6, 5.9, "d"]]
+    # b overlaps Voice 2 more; c and d fall in no turn and take the nearest.
+    assert voices.assign(words, turns) == ["Voice 1", "Voice 2", "Voice 2", "Voice 1"]
+
+
+def test_a_lone_word_inside_someone_elses_sentence_is_smoothed_but_me_is_kept():
+    import voices
+    turns = [(0, 1, "Voice 1"), (1, 1.2, "Voice 2"), (1.2, 3, "Voice 1")]
+    words = [[0.2, 0.8, "one"], [1.0, 1.2, "two"], [1.3, 2.0, "three"]]
+    assert voices.assign(words, turns) == ["Voice 1", "Voice 1", "Voice 1"]
+    # On two tracks the microphone is a measurement: never overwritten.
+    assert voices.assign(words, turns, keep=[None, "Me", None]) == ["Voice 1", "Me", "Voice 1"]
+
+
+def test_fingerprints_group_into_people_and_noise_is_not_a_person():
+    import numpy as np
+    import pytest
+    pytest.importorskip("scipy")
+    import voices
+    rng = np.random.default_rng(0)
+    centres = np.eye(3, 16)
+    vecs = np.concatenate([c + 0.08 * rng.standard_normal((40, 16)) for c in centres])
+    noise = rng.standard_normal((2, 16))
+    vecs = np.concatenate([vecs, noise])
+    vecs /= np.linalg.norm(vecs, axis=1, keepdims=True)
+    seconds = np.array([3.0] * 120 + [3.0, 3.0])
+    # Each person talks at 40 different moments; the noise is one moment,
+    # seen twice, as overlapping windows see it.
+    bins = [{i * 10 + k for k in range(6)} for i in range(120)] + [{9000, 9001}, {9000, 9001}]
+    who, n = voices.group(vecs, seconds, bins)
+    assert n == 3
+    assert all(len(set(who[i * 40:(i + 1) * 40])) == 1 for i in range(3))
+    # Short fingerprints are not grouped, but still join the nearest person.
+    who, n = voices.group(vecs, np.array([3.0] * 120 + [0.4, 0.4]), bins)
+    assert n == 3 and len(who) == 122
+
+
+def test_a_burst_seen_by_four_windows_is_not_a_person():
+    import numpy as np
+    import pytest
+    pytest.importorskip("scipy")
+    import voices
+    rng = np.random.default_rng(1)
+    person = np.eye(2, 16)[0] + 0.05 * rng.standard_normal((40, 16))
+    burst = np.eye(2, 16)[1] + 0.01 * rng.standard_normal((4, 16))
+    vecs = np.concatenate([person, burst])
+    vecs /= np.linalg.norm(vecs, axis=1, keepdims=True)
+    bins = [{i * 10 + k for k in range(6)} for i in range(40)] + [{5000, 5001, 5002}] * 4
+    who, n = voices.group(vecs, np.full(44, 3.0), bins)
+    assert n == 1 and set(who) == {0}
+
+
+def test_a_word_at_the_edge_of_a_line_stays_with_its_sentence():
+    import voices
+    # Estimated timings push the last word of a line into the next turn.
+    turns = [(0, 2.6, "Voice 1"), (2.6, 5, "Voice 2")]
+    words = [[0, 0.8, "to"], [0.8, 1.6, "your"], [1.6, 2.4, "left,"], [2.4, 3.0, "right."],
+             [3.2, 4.0, "Right?"]]
+    assert voices.assign(words, turns)[3] == "Voice 2"
+    assert voices.assign(words, turns, lines={0, 4}) == ["Voice 1"] * 4 + ["Voice 2"]
+

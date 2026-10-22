@@ -118,3 +118,44 @@ def test_summary_without_an_llm_explains_itself(client, monkeypatch):
     assert client.get(f"/api/history/{NORTHPINE}").json()["summary"]      # the saved one stays
     r = client.post(f"/api/summary/{NORTHPINE}?redo=true")
     assert r.status_code == 503 and "no LLM" in r.json()["error"]
+
+
+
+def test_voices_are_listed_with_talk_time_and_named_without_touching_the_text(client, data):
+    o = client.get(f"/api/history/{NORTHPINE}").json()
+    assert [x["tag"] for x in o["speakers"]] == ["Voice 1", "Voice 2", "Voice 3"]
+    assert [x["lines"] for x in o["speakers"]] == [22, 22, 10]
+    assert all(x["seconds"] > 60 and x["name"] is None for x in o["speakers"])
+    assert o["speakers_found"] == 3
+
+    r = client.post(f"/api/speakers/{NORTHPINE}", json={"names": {"Voice 1": "  Maya ", "Voice 3": "Priya"}})
+    assert r.json()["speaker_names"] == {"Voice 1": "Maya", "Voice 3": "Priya"}
+    d = data / "transcripts" / NORTHPINE
+    assert "[Voice 1]" in (d / "Northpine launch sync.txt").read_text(encoding="utf-8")
+    assert "· Maya**" in (d / "Northpine launch sync.md").read_text(encoding="utf-8")
+    base = f"/api/history/{NORTHPINE}/download"
+    assert client.get(base + ".txt").text.startswith("[00:00] [Maya] Okay")
+    assert "Priya:" in client.get(base + ".srt").text
+    # An empty name gives the label back.
+    r = client.post(f"/api/speakers/{NORTHPINE}", json={"names": {"Voice 1": ""}})
+    assert r.json()["speaker_names"] == {"Voice 3": "Priya"}
+
+
+def test_voice_names_are_checked(client):
+    url = f"/api/speakers/{NORTHPINE}"
+    assert client.post(url, json={"names": {"Voice 9": "X"}}).status_code == 400
+    assert client.post(url, json={"names": {"Voice 1": "[Me]"}}).status_code == 400
+    assert client.post(url, json={"names": {"Voice 1": "x" * 41}}).status_code == 400
+    assert client.post(url, json={}).status_code == 400
+    assert client.post("/api/speakers/nowhere", json={"names": {}}).status_code == 404
+
+
+def test_telling_voices_apart_later_needs_the_packages_and_the_recording(client, monkeypatch):
+    import server
+    monkeypatch.setattr(server, "voices_installed", lambda: False)
+    r = client.post(f"/api/voices/{NORTHPINE}")
+    assert r.status_code == 503 and "pip install" in r.json()["error"]
+    monkeypatch.setattr(server, "voices_installed", lambda: True)
+    r = client.post(f"/api/voices/{NORTHPINE}")              # the examples carry no audio
+    assert r.status_code == 404 and "recording" in r.json()["error"]
+    assert client.post("/api/voices/nowhere").status_code == 404

@@ -1,0 +1,60 @@
+name: Bug report
+description: Something went wrong while transcribing, recording or reading a call.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time.
+
+        **Never paste a real transcript, a client's name or a real glossary here.** Issues are public, and so is everything in them. To show a problem with the text, a few lines with their timestamp are enough, with names replaced. Or reproduce it on the fictional calls in `examples/`.
+
+  - type: textarea
+    id: input
+    attributes:
+      label: What you dropped or recorded
+      description: The format, how long it was, the language, and the browser. For a recording, which app the call was in (Meet, Zoom, Teams on the web...).
+      placeholder: |
+        .m4a from a phone, 27 minutes, Italian, Chrome 141
+    validations:
+      required: true
+
+  - type: input
+    id: system
+    attributes:
+      label: Operating system and GPU
+      description: And the Python version, if you know it.
+      placeholder: Windows 11, RTX 4070 12 GB, Python 3.12
+    validations:
+      required: true
+
+  - type: textarea
+    id: happened
+    attributes:
+      label: What happened
+      description: What you saw. Error messages and the server's console output are welcome, as long as they hold no names.
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+    validations:
+      required: true
+
+  - type: textarea
+    id: info
+    attributes:
+      label: The lines of info.json that matter
+      description: |
+        `info.json` sits in the call's folder, under `transcripts/`. It has the duration, the language, the timings and what was dropped. Paste only the fields that matter, **not** the transcript.
+      render: json
+
+  - type: checkboxes
+    id: privacy
+    attributes:
+      label: Privacy
+      options:
+        - label: "Nothing in this issue comes from a real call: no transcript, no client names, no glossary."
+          required: true

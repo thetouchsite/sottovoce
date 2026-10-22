@@ -6,12 +6,12 @@
 
 [![tests](https://github.com/thetouchsite/sottovoce/actions/workflows/tests.yml/badge.svg)](https://github.com/thetouchsite/sottovoce/actions/workflows/tests.yml)
 
-[English](README.md) · [Provalo senza GPU](#provalo-in-un-minuto-senza-gpu) · [Registrare una call](#registrare-una-call) · [Cosa abbiamo misurato](#cosa-abbiamo-misurato) · Licenza MIT
+[English](README.md) · [Provalo senza GPU](#provalo-in-un-minuto-senza-gpu) · [Registrare una call](#registrare-una-call) · [Separare le voci](#separare-le-voci) · [Cosa abbiamo misurato](#cosa-abbiamo-misurato) · Licenza MIT
 
 Creato da [TouchSite Software](https://www.touchsitesoftware.it).
 
-![Sottovoce con aperta una call inventata di 10 minuti: la striscia della call, i numeri, il riassunto, le frasi da controllare e il glossario](docs/images/screenshot.png)
-<sub>Una call dimostrativa inventata. In queste immagini non c'è nessun dato reale di clienti.</sub>
+![Ventiquattro secondi di Sottovoce su call inventate: la schermata iniziale e l'interruttore Separate voices, il riassunto di una call, un clic sulla striscia della call che porta a quel punto del testo, la vista riga per riga con tre voci in tre colori, i nomi Maya, Daniel e Priya dati nel pannello Voices, le righe che ora mostrano i nomi, una call registrata su due tracce con You e Them, e il ritorno all'inizio](docs/images/demo.gif)
+<sub>Call inventate, prese da `examples/`: in queste immagini non c'è nessun dato reale di clienti. La GIF è fatta con `--no-model`: per questo la trascrizione risulta spenta.</sub>
 
 > L'interfaccia è in inglese. La trascrizione e il riassunto seguono la lingua della call: un file in italiano esce in italiano.
 
@@ -36,6 +36,7 @@ Sottovoce risolve i primi due, e per il terzo ti mostra dove guardare.
 
 - **Ti dice dove non fidarti.** La *striscia della call* mostra tutta la registrazione in una banda: dove si parla, dove c'è silenzio, dove è stata buttata una frase inventata, dove una riga è stata corretta. Clicchi in un punto qualunque e ascolti da lì.
 - **Registra anche la call, e sa chi parla.** Registri una call di Google Meet, Zoom o Teams direttamente dalla pagina: il tuo microfono e la scheda della call finiscono su due tracce separate, quindi la trascrizione dice *You* e *Them* senza nessun modello di riconoscimento delle voci.
+- **Separa le voci, senza creare account.** Spunti **Separate voices** e ogni riga dice *Voice 1*, *Voice 2*…; dai i nomi una volta e i nomi passano nei download e nel riassunto. Due piccoli modelli aperti sul processore, scaricati una volta da GitHub: niente token di Hugging Face, nessuna licenza da accettare. 12% di errore su riunioni pubbliche, col numero di persone contato giusto su ognuna.
 - **Ogni impostazione è stata misurata.** Su una call vera, contro le alternative, con i numeri [qui sotto](#cosa-abbiamo-misurato): compresi i quattro tentativi che non hanno funzionato.
 - **I nomi si correggono dopo, non si suggeriscono prima.** Passato a Whisper come prompt, il glossario peggiorava il testo. Qui è una tabella di correzione, e quando aggiungi un nome la puoi riapplicare anche alle call vecchie.
 - **Le tue correzioni restano.** Ogni riga che correggi viene salvata col *prima* e col *dopo*: il materiale che serve per addestrare un modello sulle tue call.
@@ -61,10 +62,10 @@ Start.bat
 
 La pagina si apre su **New transcription**: a sinistra trascini uno o più file, a destra registri una call. 27 minuti di call richiedono circa 4 minuti. La lingua viene riconosciuta, oppure la scegli dal menu, e la scelta viene ricordata. Il server si spegne col bottone di accensione, oppure con `Stop.bat`.
 
-**Linux e macOS:** il codice Python è multipiattaforma e i test girano su Ubuntu, ma i lanciatori sono per Windows.
+**Linux e macOS:** `./install.sh`, poi `./start.sh`. Fanno quello che fanno i lanciatori per Windows: prima PyTorch, dall'indice CUDA su Linux se c'è `nvidia-smi`, poi il resto, e alla fine ti dicono se la GPU si vede. `./start.sh` passa i suoi argomenti al server, quindi `./start.sh --no-model` funziona. Su GitHub vengono controllati a ogni push, la sintassi e `shellcheck`, ma lì non vengono eseguiti davvero: l'installazione scarica gigabyte e richiede una GPU. Se li provi su una macchina pulita, facci sapere com'è andata (vedi i [prossimi passi](ROADMAP.md)). Se non funzionano, questi sono i passi che fanno:
 
 ```sh
-python -m venv .venv && source .venv/bin/activate
+python3 -m venv .venv && source .venv/bin/activate
 pip install torch --index-url https://download.pytorch.org/whl/cu130   # adatta alla tua versione di CUDA
 pip install -r requirements.txt
 cp glossary.example.txt glossary.txt
@@ -82,7 +83,7 @@ pip install fastapi uvicorn python-multipart
 python server.py --no-model --data examples/transcripts --glossary examples/glossary.txt
 ```
 
-Poi apri <http://127.0.0.1:8200>. Striscia, riassunto, chi parla, ricerca, correzioni, download e glossario funzionano tutti; sono spenti solo la trascrizione e la registrazione.
+Poi apri <http://127.0.0.1:8200>. Striscia, riassunto, chi parla (due tracce, e tre voci da nominare nella call Northpine), ricerca, correzioni, download e glossario funzionano tutti; sono spenti solo la trascrizione e la registrazione.
 
 ## Registrare una call
 
@@ -93,6 +94,34 @@ In **New transcription** dai un nome alla call e premi **Start recording**. Il b
 - **Non si perde niente se la pagina si chiude.** La registrazione arriva al server ogni cinque secondi. Se chiudi la scheda, il browser si blocca o il portatile va in sospensione, la volta dopo la pagina ti ripropone la registrazione interrotta: la trascrivi, o la cancelli.
 - **Dove funziona.** Chrome o Edge su un computer, per le call che girano in una scheda del browser (Google Meet, Zoom e Teams nella versione web). Firefox e Safari non sanno catturare il suono di un'altra scheda. Le call nelle app desktop richiedono la cattura dell'audio di sistema, che è nei [prossimi passi](ROADMAP.md).
 - **Usa le cuffie**, altrimenti il microfono sente anche gli altri. **Avvisa gli altri che stai registrando**: a seconda di dove ti trovi, può essere un obbligo.
+
+## Separare le voci
+
+In una call con più persone, spunta **Separate voices** prima di trascrivere, oppure apri una call già trascritta e premi **Tell the voices apart** (non serve ritrascriverla). Ogni riga prende *Voice 1*, *Voice 2*…, numerate nell'ordine in cui parlano la prima volta. Dai loro un nome nel pannello **Voices** accanto alla trascrizione: i nomi compaiono nelle tre viste, in quello che copi, in ogni download e nel riassunto. Il `.txt` tiene le etichette e `info.json` tiene i nomi, quindi un nome sbagliato si corregge cambiando un campo.
+
+- **Niente account, niente cancello.** La scelta di solito è [pyannote](https://github.com/pyannote/pyannote-audio), che prima di scaricare chiede un token di Hugging Face e di accettarne le condizioni. Sottovoce usa lo stesso modello di segmentazione, pyannote segmentation-3.0 (MIT), nella versione ridistribuita da [sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx), insieme a un modello di impronte vocali [3D-Speaker](https://github.com/modelscope/3D-Speaker) ERes2Net (Apache-2.0). Arrivano tutti e due da GitHub al primo uso, 32 MB in tutto, e prima di usarli se ne controlla lo SHA-256.
+- **Sul processore.** Circa 2,5 secondi per minuto di audio. La GPU resta a Whisper.
+- **Non devi dire quante persone c'erano.** Le conta lui.
+- **Su due tracce** *You* resta una misura: si separano in voci solo gli altri, quelli della call.
+
+### Quanto funziona
+
+Misurato su due riunioni pubbliche [AMI](https://groups.inf.ed.ac.uk/ami/corpus/), dove ogni persona è annotata. La soglia è stata scelta su una riunione e valutata sull'altra, mai vista prima. Ogni riunione ha quattro persone; per averne tre e due, le altre vengono silenziate dove parlano da sole, così stanza e microfoni restano gli stessi.
+
+| persone nella call | 4 | 3 | 2 |
+| --- | --- | --- | --- |
+| errore (DER) | 12,6% | 11,8% | 11,9% |
+| persone contate | 4 su 4 | 3 su 3 | 2 su 2 |
+
+Il DER somma il parlato perso, i falsi allarmi e il parlato dato alla persona sbagliata, sul totale del parlato, con la solita tolleranza di 0,25 s dove cambia il turno. È la misura standard; le pipeline pubblicate stanno più o meno tra il 15% e il 25% su AMI. Si riproduce con `python research/voices_ami.py`.
+
+Dall'inizio alla fine, trascritto da Whisper con le voci attive, il **96% delle parole** dove parla una persona sola ha preso la voce giusta (14 minuti, tre persone). Sulla call vera di 27 minuti delle misure qui sotto ha trovato le due persone in 36 secondi.
+
+**Quali impronte.** Abbiamo provato cinque modelli nello stesso modo. NVIDIA TitaNet-large su AMI andava uguale (12,3% / 11,1% / 12,3%), ma sulla call vera dava le domande del cliente al consulente. WeSpeaker ResNet34 e ResNet293 e 3D-Speaker CAM++ erano nettamente peggio con questo raggruppamento.
+
+**Il raggruppamento ha contato più del modello.** Raggruppando tutte le impronte per distanza media, la prima versione fondeva tre persone in una: poche impronte rumorose, da frammenti brevi, formavano gruppi a sé. Ora si raggruppano solo le impronte di almeno un secondo di parlato pulito, e quelle brevi si uniscono dopo alla persona più vicina.
+
+**Dove sbaglia.** Due voci simili sullo stesso telefono possono fondersi in una. Un "sì" o un "ok" brevi possono finire alla persona sbagliata. Chi parla meno di circa 15 secondi in tutto non ha una voce sua e finisce in quella più vicina: nelle call brevi dove parla quasi solo una persona, aspettati meno voci che persone. Quando due persone si parlano sopra, le parole sovrapposte vanno a una delle due. E il numero di persone non si può ancora impostare a mano: vedi i [prossimi passi](ROADMAP.md).
 
 ## Cosa abbiamo misurato
 
@@ -181,7 +210,7 @@ Deve stampare una versione che finisce in `+cu130` e `True`.
 
 ## Riassunti
 
-I riassunti li scrive un LLM che hai già acceso sulla tua macchina, interrogato tramite l'API compatibile con OpenAI. Sottovoce lo cerca su queste porte: LM Studio `1234`, Ollama `11434`, llama-server `8080`. Niente da installare in più, e nessuna VRAM occupata quando non ti serve: Whisper prende 3 GB, un LLM utile altri 5-16. In una call registrata su due tracce il modello sa chi ha detto ogni riga, quindi *Da fare* può dire chi fa cosa.
+I riassunti li scrive un LLM che hai già acceso sulla tua macchina, interrogato tramite l'API compatibile con OpenAI. Sottovoce lo cerca su queste porte: LM Studio `1234`, Ollama `11434`, llama-server `8080`. Niente da installare in più, e nessuna VRAM occupata quando non ti serve: Whisper prende 3 GB, un LLM utile altri 5-16. Quando si sa chi parla (due tracce, o voci separate) il modello sa chi ha detto ogni riga, coi nomi che hai dato, quindi *Da fare* può dire chi fa cosa.
 
 Con LM Studio:
 
@@ -205,7 +234,7 @@ Il confronto ignora maiuscole e minuscole e rispetta i confini delle parole. Puo
 
 ## Download
 
-Ogni call si scarica in `.md` (paragrafi, da leggere o incollare), `.txt` (riga per riga, coi minuti), `.srt` e `.vtt` (sottotitoli), e `.json` (righe, chi parla e tempi delle parole, per altri programmi). Gli ultimi tre si scrivono dalla trascrizione com'è in quel momento, correzioni comprese.
+Ogni call si scarica in `.md` (paragrafi, da leggere o incollare), `.txt` (riga per riga, coi minuti), `.srt` e `.vtt` (sottotitoli), e `.json` (righe, chi parla e tempi delle parole, per altri programmi). Gli ultimi tre si scrivono dalla trascrizione com'è in quel momento, correzioni comprese. Le voci a cui hai dato un nome compaiono col loro nome in tutti.
 
 ## Com'è fatta una call sul disco
 
@@ -213,10 +242,10 @@ Ogni call si scarica in `.md` (paragrafi, da leggere o incollare), `.txt` (riga 
 transcripts/
   2026-10-21_Northpine launch sync/
     Northpine launch sync.m4a    la registrazione originale, accanto alla sua trascrizione
-    Northpine launch sync.txt    [mm:ss] testo, o [mm:ss] [Me] testo: la fonte di tutto il resto
+    Northpine launch sync.txt    [mm:ss] testo, [mm:ss] [Me] testo o [mm:ss] [Voice 2] testo: la fonte di tutto il resto
     Northpine launch sync.md     in paragrafi, da leggere o incollare
     words.json                   quando è stata detta ogni parola, riga per riga
-    info.json                    durata, lingua, tempi, cosa è stato buttato, mappa del parlato
+    info.json                    durata, lingua, tempi, cosa è stato buttato, mappa del parlato, nomi delle voci
     corrections.jsonl            ogni riga corretta, col prima e col dopo
     summary.md                   se l'hai chiesto
 ```
@@ -228,6 +257,7 @@ transcripts/
 ```sh
 python transcribe.py "Call cliente.mp4" --language it --formats txt,md,srt   # accanto al file
 python transcribe.py "Registrazione.webm" --two-tracks --precise
+python transcribe.py "Riunione.m4a" --voices                                 # Voice 1, Voice 2…
 python summary.py "Call cliente.md"                                          # col LLM locale
 python server.py --port 8300 --data D:\call --glossary D:\call\nomi.txt
 python server.py --no-model                                                  # sfoglia, senza GPU
@@ -254,13 +284,15 @@ I test girano sulle call inventate di `examples/`, col server avviato `--no-mode
 | Percorso | Cosa |
 | --- | --- |
 | `transcribe.py` | Il motore: ffmpeg, Whisper, la ripulitura, chi parla, i formati. Anche da riga di comando |
+| `voices.py` | Separare le voci: i due modelli, il download col controllo, il raggruppamento |
 | `server.py` | FastAPI, un lavoro alla volta (due in parallelo si rallentano: 233 s invece di 190) |
 | `summary.py` | Il client per il LLM locale |
 | `app/index.html` | La pagina: un file solo, niente build, niente framework, i caratteri accanto |
 | `examples/` | Quattro call inventate, per provare l'interfaccia con `--no-model` |
 | `tests/` | Test del motore, dell'API e della pagina; girano sugli esempi |
-| `research/` | Gli script dietro ai numeri qui sopra: più modelli a confronto, senza riferimento |
+| `research/` | Gli script dietro ai numeri qui sopra: più modelli a confronto, senza riferimento, le voci misurate su AMI |
 | `Install.bat`, `Start.bat`, `Stop.bat` | Lanciatori da doppio clic per Windows |
+| `install.sh`, `start.sh` | Gli stessi, per Linux e macOS |
 
 ## Progetti affini
 
@@ -268,14 +300,14 @@ Di programmi basati su Whisper ce ne sono tanti. Questi quattro sono ottimi e ha
 
 ## Prossimi passi
 
-Registrare le call delle app desktop, e addestrare sulle tue correzioni. Vedi [ROADMAP.md](ROADMAP.md) (in inglese), con il perché di ognuno e come si capirà che è fatto.
+Registrare le call delle app desktop, dire quante persone c'erano quando lo sai, riconoscere la stessa persona in call diverse, e addestrare sulle tue correzioni. Vedi [ROADMAP.md](ROADMAP.md) (in inglese), con il perché di ognuno e come si capirà che è fatto. Cosa è cambiato in ogni versione è in [CHANGELOG.md](CHANGELOG.md) (in inglese).
 
 ## Contribuire
 
-Issue e pull request sono benvenute: vedi [CONTRIBUTING.md](CONTRIBUTING.md). Contributi particolarmente utili: le frasi che Whisper inventa sul silenzio nella **tua** lingua (poche righe in `transcribe.py`), e lanciatori per Linux e macOS.
+Issue e pull request sono benvenute: vedi [CONTRIBUTING.md](CONTRIBUTING.md). Contributi particolarmente utili: le frasi che Whisper inventa sul silenzio nella **tua** lingua (poche righe in `transcribe.py`), e una prova di `./install.sh` e `./start.sh` su una macchina Linux pulita con una GPU NVIDIA.
 
 ## Licenza
 
-[MIT](LICENSE) © 2026 TouchSite Software. Le parti di terzi mantengono le loro licenze: i pesi di Whisper large-v3 (Apache-2.0, scaricati da Hugging Face al primo uso), Public Sans (SIL OFL 1.1, [`app/fonts/OFL.md`](app/fonts/OFL.md)) e ffmpeg (installato dal pacchetto `imageio-ffmpeg`, non incluso in questa repo).
+[MIT](LICENSE) © 2026 TouchSite Software. Le parti di terzi mantengono le loro licenze: i pesi di Whisper large-v3 (Apache-2.0, scaricati da Hugging Face al primo uso), pyannote segmentation-3.0 (MIT) e 3D-Speaker ERes2Net (Apache-2.0) per separare le voci (scaricati dalle release di sherpa-onnx al primo uso), sherpa-onnx (Apache-2.0), Public Sans (SIL OFL 1.1, [`app/fonts/OFL.md`](app/fonts/OFL.md)) e ffmpeg (installato dal pacchetto `imageio-ffmpeg`, non incluso in questa repo).
 
 *Sottovoce*: a bassa voce. È quello che questo strumento butta via, le frasi che cadono sotto il livello del parlato, ed è il modo in cui lavora: in silenzio, sulla tua macchina. È nato per le call in italiano.

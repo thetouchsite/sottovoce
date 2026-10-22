@@ -22,7 +22,7 @@ jobs:
         with:
           python-version: ${{ matrix.python }}
       - run: python -m pip install -r requirements-dev.txt
-      - run: python -m py_compile server.py transcribe.py summary.py research/benchmark.py research/compare.py
+      - run: python -m py_compile server.py transcribe.py summary.py voices.py research/benchmark.py research/compare.py research/voices_ami.py
       - run: python -m pytest tests/test_engine.py tests/test_api.py -q
 
   page:
@@ -35,3 +35,13 @@ jobs:
       - run: python -m pip install -r requirements-dev.txt playwright
       - run: python -m playwright install --with-deps chromium
       - run: python -m pytest tests/test_page.py -q
+
+  # install.sh and start.sh can't really run here: the install downloads
+  # gigabytes and needs a GPU. So they're checked for syntax and for the
+  # usual shell mistakes, not run end to end.
+  launchers:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: bash -n install.sh start.sh
+      - run: shellcheck install.sh start.sh

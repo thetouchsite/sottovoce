@@ -6,6 +6,10 @@ The ideas come from projects that do this job well: [whisper.cpp](https://github
 
 ---
 
+## Done in 1.2
+
+**Telling voices apart, for any recording.** The item that was number 4 here said "`pyannote` as an opt-in, with a Hugging Face token". It turned out the token wasn't needed: pyannote's segmentation model is MIT and redistributed without a gate by sherpa-onnx, and the voice fingerprints come from 3D-Speaker (Apache-2.0). So it's one tick on the page, nothing to sign up for. On a public meeting never seen while tuning: 12.6%, 11.8% and 11.9% error with four, three and two people, all counted right; 96% of words get the right voice end to end. Switching it off leaves 32 MB in `models/`, which can be deleted.
+
 ## Done in 1.1
 
 **Recording a call from the page.** The Vibe idea, done in the browser instead of natively: the call's tab and the microphone on two tracks, sent to the server every five seconds so an interrupted recording is offered again instead of lost. Checked on a synthetic two-track recording made from a real call: the two voices labelled correctly, with the other side bleeding into the microphone at -25 dB.
@@ -42,16 +46,28 @@ The ideas come from projects that do this job well: [whisper.cpp](https://github
 
 And a rule learned the hard way, on another project: **never decide on a single training run.** The variance between two identical runs changes the result more than almost any real improvement. Use three seeds, and report the mean and the spread.
 
-## 4. Speaker labels for calls recorded elsewhere
+## 4. Say how many people were on the call
 
-**Why.** A phone recording has one track, so who spoke can't be measured. On calls with several people it sometimes matters.
+**Why.** The count is right on every meeting measured, but a call where two voices sound alike can still come out as one person. If you know there were three, you should be able to say so.
 
-**How.** `pyannote` on top of the transcript, as an opt-in. It needs a Hugging Face token and accepting a licence, so it stays off by default.
+**Tried, not good enough.** Over-splitting and then merging the closest groups down to the given number scored 27-34% error on AMI, against 12% for counting on its own. So it isn't offered. pyannote's way is to constrain the grouping itself, not to merge after it.
 
-**Done when** it can be switched on from the page, and switching it off leaves no trace in the install.
+**Done when** giving the right number never scores worse than counting, on both AMI meetings, and the page offers it next to **Tell the voices apart**.
 
-## 5. Linux and macOS launchers
+## 5. Recognise the same person across calls
 
-**Why.** The Python code is cross-platform and the tests run on Ubuntu, but only Windows has double-click launchers.
+**Why.** *Voice 2* in Monday's call and *Voice 1* in Thursday's may be the same client. Naming them every time is the chore this would remove.
+
+**How.** Keep each named voice's fingerprint, locally, next to the glossary; on a new call, suggest the name when a voice is close enough. Never automatic without a threshold measured on calls where the answer is known: a wrong name is worse than no name.
+
+**Done when** a name suggested is right at least 95% of the time on a held-out set, and the fingerprints can be listed and deleted from the page.
+
+## 6. Linux and macOS launchers
+
+**Why.** The Python code is cross-platform and the tests run on Ubuntu, but only Windows had launchers.
+
+**Done so far.** `install.sh` and `start.sh` do what `Install.bat` and `Start.bat` do. PyTorch goes in first: from the CUDA index on Linux when `nvidia-smi` is there, the plain build otherwise and on macOS, which has no CUDA. Then the rest, and whether the GPU is seen. `./start.sh` passes its arguments to the server. On every push, CI checks both with `bash -n` and `shellcheck`.
+
+**Still open.** Nobody has run them end to end. CI can't: the install downloads gigabytes and needs a GPU. And the author's machine runs Windows.
 
 **Done when** `install.sh` and `start.sh` work on a clean Ubuntu machine with an NVIDIA GPU, checked by someone who isn't the author.
