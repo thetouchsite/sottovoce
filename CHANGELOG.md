@@ -6,6 +6,7 @@ What changed in each release, newest first. The format follows [Keep a Changelog
 
 ### Added
 
+- **The page in Italian.** An **IT / EN** switch in the side bar, English by default and remembered. Only the interface changes: transcripts, summaries and the names of calls and people are marked as data and never translated.
 - **Add first, transcribe when you choose.** A file dropped on the page, or onto the list of calls, is added and waits there tagged *Not transcribed*: open it to listen to it, rename it, pick the language and the options, and press **Transcribe**, with an estimate of how long it takes. The home lists what is waiting, with **Transcribe all**. The state lives on disk, so the list stays true after a reload, and a transcription cut short by a restart goes back to waiting. A failed one keeps its recording and can be tried again (before, the upload was deleted).
 - **Rename and delete** from a call's **⋯** menu, transcribed or not. Renaming moves the folder and its files; deleting moves the folder to `transcripts/_deleted/`, never erases it.
 - `/api/uploads`, `/api/transcribe/{name}`, `/api/history/{name}/rename` and `DELETE /api/history/{name}`. `/api/transcribe` still adds and transcribes in one call, for scripts.

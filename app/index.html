@@ -86,7 +86,9 @@
      on the nearest edge. Here, the edge of the rail. */
   .rail button[aria-current=page]::after{content:"";position:absolute;
     right:-8px;top:5px;bottom:5px;width:1px;background:var(--accent)}
-  .rail .bottom{margin-top:auto}
+  .rail .bottom{margin-top:auto;display:flex;flex-direction:column;align-items:center;gap:6px}
+  .rail .lang{font-size:11px;font-weight:600;letter-spacing:.04em;color:var(--muted)}
+  .rail .lang:hover{color:var(--text)}
   .rail svg{width:17px;height:17px;fill:none;stroke:currentColor;
     stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round}
 
@@ -450,7 +452,7 @@
     .rail .mark{margin:0 6px 0 0}
     .rail button[aria-current=page]::after{right:5px;left:5px;top:auto;
       bottom:-1px;width:auto;height:1px}
-    .rail .bottom{margin:0 0 0 auto}
+    .rail .bottom{margin:0 0 0 auto;flex-direction:row}
     /* here the list really floats over the canvas: the shadow is earned */
     .sidebar{position:fixed;top:48px;bottom:0;left:0;width:min(340px,86vw);
       z-index:5;box-shadow:var(--shadow);transform:translateX(-101%);
@@ -592,9 +594,12 @@
   <button id="v-glossary" type="button" title="Name glossary" aria-label="Name glossary">
     <svg viewBox="0 0 20 20"><path d="M3.5 4.5a1 1 0 0 1 1-1h11v13h-11a1 1 0 0 1-1-1z"/><path d="M3.5 13.5h12M7 7h5"/></svg>
   </button>
-  <button class="bottom" id="shutdown" type="button" title="Stop the server" aria-label="Stop the server">
-    <svg viewBox="0 0 20 20"><path d="M10 3v6"/><path d="M14.5 6a6 6 0 1 1-9 0"/></svg>
-  </button>
+  <div class="bottom">
+    <button class="lang" id="ui-lang" type="button" translate="no"></button>
+    <button id="shutdown" type="button" title="Stop the server" aria-label="Stop the server">
+      <svg viewBox="0 0 20 20"><path d="M10 3v6"/><path d="M14.5 6a6 6 0 1 1-9 0"/></svg>
+    </button>
+  </div>
 </nav>
 
 <aside class="sidebar" id="sidebar">
@@ -653,6 +658,303 @@ const store = {
   set(k, v){ try{ localStorage.setItem(k, v); } catch(e){} },
 };
 const currentLanguage = () => store.get('sottovoce-language') || 'auto';
+
+/* ============================ the page in Italian ======================== */
+// Italian, for the interface only.
+const IT = {
+  // the frame
+  'Calls': 'Call', 'Views': 'Viste', 'Home': 'Home', 'Home: new transcription and latest calls': 'Home: nuova trascrizione e ultime call',
+  'Open the call list': 'Apri la lista delle call', 'Sottovoce: home': 'Sottovoce: home', 'Sottovoce, home': 'Sottovoce, home',
+  'Name glossary': 'Glossario dei nomi', 'Stop the server': 'Spegni il server', 'New transcription': 'Nuova trascrizione',
+  'Search every call': 'Cerca in tutte le call', 'loading the model': 'carico il modello',
+  'browsing only, Whisper not loaded': 'solo consultazione, Whisper non caricato', 'No calls yet.': 'Ancora nessuna call.',
+  'Where you are': 'Dove sei', 'Back to the start (Esc)': "Torna all'inizio (Esc)", 'Sottovoce': 'Sottovoce',
+  'adding…': 'aggiungo…',
+
+  // home
+  'Drop recordings you already have, or record a call as it happens. Everything is transcribed on this machine.':
+    'Trascina le registrazioni che hai già, o registra una call mentre la fai. Tutto viene trascritto su questa macchina.',
+  'Before you start': 'Prima di iniziare', 'for files and recordings · remembered': 'per file e registrazioni · ricordate',
+  'Language': 'Lingua', 'Leave it on detect, or choose it if the call opens in silence or mixes languages.':
+    'Lasciala su rileva, oppure sceglila se la call inizia in silenzio o mescola più lingue.',
+  'Language of the recording': 'Lingua della registrazione', 'Detect language': 'Rileva lingua',
+  'Separate voices': 'Separa le voci',
+  'Every line says who is speaking: Voice 1, Voice 2… Name them afterwards. About 2 seconds more per minute.':
+    'Ogni riga dice chi parla: Voce 1, Voce 2… Dai i nomi dopo. Circa 2 secondi in più per minuto.',
+  'Every line says who is speaking: Voice 1, Voice 2… Name them afterwards. About 2 seconds more per minute; the first time it downloads 32 MB.':
+    'Ogni riga dice chi parla: Voce 1, Voce 2… Dai i nomi dopo. Circa 2 secondi in più per minuto; la prima volta scarica 32 MB.',
+  'Precise word timings': 'Tempi precisi delle parole',
+  'A click on a word plays from exactly that word. Takes about twice as long: 27 minutes in 7 instead of 4.':
+    'Un clic su una parola fa partire proprio da quella parola. Ci mette circa il doppio: 27 minuti in 7 invece che in 4.',
+  'voices off': 'voci no', 'voices separated': 'voci separate', 'fast timings': 'tempi veloci', 'precise timings': 'tempi precisi',
+  'Transcribe files': 'Trascrivi file', 'Drop recordings here': 'Trascina qui le registrazioni',
+  'or onto the list on the left. They wait there until you choose how to transcribe them. mp4, m4a, mp3, wav and anything else ffmpeg can open.':
+    'oppure sulla lista a sinistra. Restano lì finché non scegli come trascriverle. mp4, m4a, mp3, wav e tutto quello che ffmpeg sa aprire.',
+  'Send a recording': 'Manda una registrazione',
+  'A voice memo, a call recorded on the phone, a video. It waits in the list until you press Transcribe.':
+    'Un vocale, una call registrata col telefono, un video. Resta nella lista finché non premi Trascrivi.',
+  'Add recordings': 'Aggiungi registrazioni',
+  'Record a call': 'Registra una call', 'Open your call in a browser tab:': 'Apri la call in una scheda del browser:',
+  ', Zoom or Teams on the web.': ', Zoom o Teams nella versione web.', 'Google Meet': 'Google Meet',
+  'Press': 'Premi', 'and pick that tab. Leave': 'e scegli quella scheda. Lascia attivo',
+  'Also share tab audio': "Condividi anche l'audio della scheda", 'on.': '.',
+  'Talk. When the call ends, press': 'Parla. Quando la call finisce, premi',
+  'Name of the call': 'Nome della call', 'e.g. Weekly sync with Northpine': 'es. Riunione settimanale con Northpine',
+  'Start recording': 'Avvia registrazione', 'Stop and transcribe': 'Ferma e trascrivi', 'Discard': 'Scarta',
+  'Your microphone and the call are saved on two separate tracks, so the transcript says You and Them. With Separate voices on, the people on the call are told apart too. Use headphones, and tell the others you are recording.':
+    'Il tuo microfono e la call finiscono su due tracce separate, quindi la trascrizione dice Tu e Loro. Con Separa le voci attivo, si distinguono anche le persone della call. Usa le cuffie, e avvisa gli altri che stai registrando.',
+  'Recording needs Chrome or Edge on a computer: this browser cannot capture the sound of another tab.':
+    "Per registrare serve Chrome o Edge su un computer: questo browser non sa catturare il suono di un'altra scheda.",
+  'Recording works on the computer running Sottovoce, at 127.0.0.1. From here you can read, listen, search, correct and send recordings to transcribe.':
+    'La registrazione funziona sul computer dove gira Sottovoce, su 127.0.0.1. Da qui puoi leggere, ascoltare, cercare, correggere e mandare registrazioni da trascrivere.',
+  'Latest calls': 'Ultime call', 'No calls yet. The ones you transcribe appear here and in the list on the left.':
+    'Ancora nessuna call. Quelle che trascrivi compaiono qui e nella lista a sinistra.',
+  'Waiting to be transcribed': 'In attesa di trascrizione', 'Open': 'Apri', 'Transcribe': 'Trascrivi',
+  'Transcription off': 'Trascrizione spenta', 'Loading the model…': 'Carico il modello…',
+  'Transcribe again': 'Trascrivi di nuovo', 'Transcribing': 'In trascrizione', 'all done': 'tutto fatto', 'Clear': 'Pulisci',
+  'The page was closed while recording. What was recorded until then is safe: transcribe it, or delete it.':
+    'La pagina si è chiusa durante una registrazione. Quello registrato fino a lì è al sicuro: trascrivilo, o cancellalo.',
+  'Delete': 'Elimina', 'You (microphone)': 'Tu (microfono)', 'The call (tab)': 'La call (scheda)',
+  'Keep this page open. Switching to the call’s tab is fine.': 'Tieni aperta questa pagina. Passare alla scheda della call va bene.',
+  'No sound from the call yet. If the others are talking, the tab may be the wrong one, or shared without its audio.':
+    'Ancora nessun suono dalla call. Se gli altri stanno parlando, forse la scheda è quella sbagliata, o è condivisa senza audio.',
+  'Nothing was shared, so nothing is being recorded.': 'Non è stato condiviso niente, quindi non si registra niente.',
+  'The share came without sound. Pick the tab of your call and leave “Also share tab audio” on.':
+    'La condivisione è arrivata senza suono. Scegli la scheda della call e lascia attivo “Condividi anche l\'audio della scheda”.',
+  'The microphone was not allowed: without it your voice would be missing.': 'Il microfono non è stato permesso: senza, mancherebbe la tua voce.',
+  'The server did not answer: is it still running?': 'Il server non risponde: è ancora acceso?',
+
+  // states
+  'Not transcribed': 'Da trascrivere', 'Failed': 'Fallita', 'Queued': 'In coda', 'Transcribing…': 'Trascrivo…',
+  'queued': 'in coda', 'done': 'fatto', 'failed': 'fallita', 'almost done': 'quasi finito',
+  'preparing the audio': "preparo l'audio", 'transcribing': 'trascrivo', 'telling the two voices apart': 'distinguo le due voci',
+  'telling the voices apart': 'separo le voci', 'downloading the voice models (30 MB, once)': 'scarico i modelli delle voci (30 MB, una volta sola)',
+  'Waiting for the transcriptions before it.': 'Aspetta le trascrizioni prima di lei.',
+  'not transcribed yet. Choose how, then transcribe.': 'non ancora trascritta. Scegli come, poi trascrivi.',
+  'being transcribed.': 'in trascrizione.', 'unknown error': 'errore sconosciuto', 'Added': 'Aggiunta',
+  'The recording': 'La registrazione',
+
+  // a call
+  'More: rename, delete': 'Altro: rinomina, elimina', 'Rename or delete': 'Rinomina o elimina', 'Rename': 'Rinomina',
+  'Delete…': 'Elimina…', 'New name': 'Nuovo nome', 'Save': 'Salva', 'Cancel': 'Annulla',
+  'Download': 'Scarica', 'to read, in paragraphs': 'da leggere, in paragrafi', 'line by line, timestamps': 'riga per riga, coi minuti',
+  'subtitles': 'sottotitoli', 'subtitles for the web': 'sottotitoli per il web', 'lines and word timings': 'righe e tempi delle parole',
+  'Go to': 'Vai a', 'Transcript': 'Trascrizione', 'Voices': 'Voci', 'To check': 'Da controllare', 'Glossary': 'Glossario',
+  'The call, minute by minute': 'La call, minuto per minuto', 'speech': 'parlato', 'phrase dropped': 'frase scartata',
+  'line corrected': 'riga corretta',
+  'Duration': 'Durata', 'Words': 'Parole', 'Transcribed in': 'Trascritta in', 'Speed': 'Velocità', '× real time': '× tempo reale',
+  'Names corrected': 'Nomi corretti',
+  'Nothing to flag: no phrase dropped, no name corrected.': 'Niente da segnalare: nessuna frase scartata, nessun nome corretto.',
+  'one voice heard': 'una voce sola',
+  'Summary': 'Riassunto', 'Read': 'Leggi', 'Line by line': 'Riga per riga', 'Lines': 'Righe',
+  'Play': 'Riproduci', 'Pause': 'Pausa', 'Copy': 'Copia', 'Copied': 'Copiato', 'Correct': 'Correggi', 'Done': 'Fatto',
+  'cannot play this file': 'non riesco a riprodurre questo file',
+  'Click a word to listen from it · double-click a line, or press': 'Clicca una parola per ascoltare da lì · doppio clic su una riga, oppure premi',
+  ', to fix it ·': ', per correggerla ·', 'saves ·': 'salva ·', 'cancels.': 'annulla.',
+  'Tap a word to listen from it · press': 'Tocca una parola per ascoltare da lì · premi',
+  ', then tap a line to fix it.': ', poi tocca una riga per correggerla.',
+  'Every correction is kept with its before and after: it is the material a model can one day learn your calls from.':
+    'Ogni correzione viene tenuta col prima e col dopo: è il materiale da cui un giorno un modello può imparare le tue call.',
+  'Redo': 'Rifai', 'Summarize the call': 'Riassumi la call', 'the model is reading the call…': 'il modello sta leggendo la call…',
+  'A summary needs a language model running on this machine: LM Studio, Ollama or llama-server. None is answering, so there is nothing to ask.':
+    'Per il riassunto serve un modello linguistico acceso su questa macchina: LM Studio, Ollama o llama-server. Nessuno risponde, quindi non c\'è a chi chiederlo.',
+  'You': 'Tu', 'Them': 'Loro', 'Name them': 'Dagli un nome', 'Name this voice': 'Dai un nome a questa voce', 'Save names': 'Salva i nomi',
+  'Who is speaking is not marked yet. Separate the voices to see Voice 1, Voice 2… on every line, then give them names.':
+    'Chi parla non è ancora segnato. Separa le voci per vedere Voce 1, Voce 2… su ogni riga, poi dai loro un nome.',
+  'More than one person on the call? Separate their voices to tell them apart, instead of one Them.':
+    'Più di una persona nella call? Separa le loro voci per distinguerle, invece di un solo Loro.',
+  'Only one voice was heard on the call side.': 'Dal lato della call si è sentita una voce sola.',
+  'Only one voice was heard in this call.': 'In questa call si è sentita una voce sola.',
+  'Only one voice was heard, so nothing changed.': 'Si è sentita una voce sola, quindi non è cambiato niente.',
+  'Only one voice was heard on the call side, so nothing changed.': 'Dal lato della call si è sentita una voce sola, quindi non è cambiato niente.',
+  'Listening for voices…': 'Ascolto le voci…',
+  'Nothing suspicious. The phrases Whisper invented on silence have already been dropped, and the strip above shows where.':
+    'Niente di sospetto. Le frasi che Whisper ha inventato sul silenzio sono già state scartate, e la striscia qui sopra mostra dove.',
+  'Whisper learned from YouTube subtitles and sometimes repeats them on silence. These were said where the audio was not quiet, so they stayed: you decide.':
+    "Whisper ha imparato dai sottotitoli di YouTube e a volte li ripete sul silenzio. Queste sono cadute dove l'audio non era silenzioso, quindi sono rimaste: decidi tu.",
+  'No name corrected in this transcript.': 'Nessun nome corretto in questa trascrizione.',
+  'Names from the glossary in this call, all heard right:': 'Nomi del glossario in questa call, tutti sentiti giusti:',
+  'None of the names in the glossary appears in this call.': 'Nessuno dei nomi del glossario compare in questa call.',
+  'Apply the glossary again': 'Riapplica il glossario', 'applying…': 'applico…', 'Already up to date': 'Già aggiornata',
+
+  // the glossary view
+  'The table': 'La tabella', 'Right name': 'Nome giusto', 'How it gets written wrong': 'Come viene scritto male',
+  'Found in your calls': 'Trovato nelle tue call', 'How it gets written wrong, comma separated': 'Come viene scritto male, separati da virgole',
+  'e.g. Kubernetes': 'es. Kubernetes', 'e.g. Cuber Netis, Cubernetes': 'es. Cuber Netis, Cubernetes', 'Add': 'Aggiungi',
+  'Empty. Add the names Whisper cannot know (clients, products, people) and the ways it gets them wrong.':
+    'Vuoto. Aggiungi i nomi che Whisper non può conoscere (clienti, prodotti, persone) e i modi in cui li sbaglia.',
+
+  // languages
+  'English': 'Inglese', 'Italian': 'Italiano', 'Spanish': 'Spagnolo', 'French': 'Francese', 'German': 'Tedesco',
+  'Portuguese': 'Portoghese', 'Dutch': 'Olandese', 'Polish': 'Polacco', 'Romanian': 'Rumeno', 'Swedish': 'Svedese',
+  'Greek': 'Greco', 'Turkish': 'Turco', 'Russian': 'Russo', 'Ukrainian': 'Ucraino', 'Arabic': 'Arabo', 'Hindi': 'Hindi',
+  'Chinese': 'Cinese', 'Japanese': 'Giapponese', 'Korean': 'Coreano',
+
+  // fragments of lists and meters
+  'words': 'parole', 'words ·': 'parole ·', 'min ·': 'min ·', 'in': 'in',
+
+  // dialogs
+  'Delete this call?': 'Eliminare questa call?',
+  'It is moved to the _deleted folder next to your transcripts: you can still get it back from there.':
+    'Viene spostata nella cartella _deleted accanto alle tue trascrizioni: da lì puoi ancora recuperarla.',
+  'Delete this recording? It cannot be recovered.': 'Cancellare questa registrazione? Non si potrà recuperare.',
+  'Discard this recording? Nothing will be kept.': 'Scartare questa registrazione? Non verrà tenuto niente.',
+  'A call is being recorded: stop it first.': 'Stai registrando una call: fermala prima.',
+  'Stop the server? The VRAM is freed; start it again with Start.bat.': 'Spegnere il server? La VRAM si libera; per riaccenderlo usa Start.bat.',
+  'The recording is saved, but could not be sent to transcription:': 'La registrazione è salvata, ma non è stato possibile mandarla in trascrizione:',
+  'A call is being recorded: switching language reloads the page. The recording is kept and offered again.':
+    'Stai registrando una call: cambiare lingua ricarica la pagina. La registrazione viene tenuta e riproposta.',
+
+  // what the server answers
+  'transcription is off: the server was started with --no-model': 'la trascrizione è spenta: il server è stato avviato con --no-model',
+  'the model is still loading': 'il modello si sta ancora caricando',
+  'it is already being transcribed': 'è già in trascrizione', 'it is already transcribed': 'è già trascritta',
+  'the recording is not in the folder': 'la registrazione non è nella cartella', 'not found': 'non trovata',
+  'the name is empty': 'il nome è vuoto', 'a name is at most 120 characters': 'un nome è al massimo di 120 caratteri',
+  'another call already has that name': "un'altra call ha già quel nome",
+  'it is being transcribed: rename it when it is done': 'è in trascrizione: rinominala quando ha finito',
+  'it is being transcribed: wait for it to finish': 'è in trascrizione: aspetta che finisca',
+  'a file of this call is in use (is it playing?): stop it and try again': 'un file di questa call è in uso (sta suonando?): fermalo e riprova',
+  'a transcription is running: wait for it to finish': 'una trascrizione è in corso: aspetta che finisca',
+  'telling voices apart needs: pip install sherpa-onnx onnxruntime scipy': 'per separare le voci serve: pip install sherpa-onnx onnxruntime scipy',
+  'voices are already being told apart in another call': 'si stanno già separando le voci di un\'altra call',
+  'a name is at most 40 characters': 'un nome è al massimo di 40 caratteri',
+  'a name cannot contain brackets or line breaks': 'un nome non può contenere parentesi quadre o a capo',
+  'the recording is empty': 'la registrazione è vuota', 'transcript missing': 'manca la trascrizione',
+  'the right name and at least one variant are required': 'servono il nome giusto e almeno una variante',
+  '<- separates the two columns and cannot be in a name': '<- separa le due colonne e non può stare in un nome',
+  'commas separate the variants and cannot be inside one': 'le virgole separano le varianti e non possono stare dentro una',
+  'a variant equal to the right name corrects nothing': 'una variante uguale al nome giusto non corregge niente',
+};
+
+const n1 = (n, one, many) => n + ' ' + (+n === 1 ? one : many);
+const IT_RULES = [
+  [/^(\d+) min$/, (_, n) => n + ' min'],
+  [/^(\d+) calls?$/, (_, n) => n1(n, 'call', 'call')],
+  [/^(\d+) minutes in all$/, (_, n) => n + ' minuti in tutto'],
+  [/^(\d+) phrases? dropped$/, (_, n) => n1(n, 'frase scartata', 'frasi scartate')],
+  [/^(\d+) phrases?$/, (_, n) => n1(n, 'frase', 'frasi')],
+  [/^(\d+) match(?:es)?$/, (_, n) => n1(n, 'risultato', 'risultati')],
+  [/^(\d+) lines?$/, (_, n) => n1(n, 'riga', 'righe')],
+  [/^([\d:]+) talking$/, (_, t) => t + ' di parlato'],
+  [/^(\d+) names? corrected in this transcript\.$/, (_, n) => n1(n, 'nome corretto', 'nomi corretti') + ' in questa trascrizione.'],
+  [/^(\d+) voices told apart( on the call)?$/, (_, n, c) => n + ' voci separate' + (c ? ' nella call' : '')],
+  [/^(\d+) invented phrases? dropped from silence$/, (_, n) => n1(n, 'frase inventata scartata dal silenzio', 'frasi inventate scartate dal silenzio')],
+  [/^(\d+) names? corrected by the glossary$/, (_, n) => n1(n, 'nome corretto dal glossario', 'nomi corretti dal glossario')],
+  [/^(\d+) lines? corrected by hand$/, (_, n) => n1(n, 'riga corretta a mano', 'righe corrette a mano')],
+  [/^(\d+) phrases? still to check$/, (_, n) => n1(n, 'frase ancora da controllare', 'frasi ancora da controllare')],
+  [/^recorded on two tracks: (\d+) lines? from you, (\d+) from the others$/,
+    (_, a, b) => 'registrata su due tracce: ' + n1(a, 'riga tua', 'righe tue') + ', ' + b + ' degli altri'],
+  [/^Strip of ([\d:]+) of recording: speech, dropped phrases and corrected lines\. Click to listen from that point\.$/,
+    (_, t) => 'Striscia di ' + t + ' di registrazione: parlato, frasi scartate e righe corrette. Clicca per ascoltare da quel punto.'],
+  [/^Added ([^·]+)$/, (_, w) => 'Aggiunta il ' + w],
+  [/^([\d:]+) of audio$/, (_, t) => t + ' di audio'],
+  [/^the transcription failed: (.*)$/, (_, e) => 'la trascrizione è fallita: ' + (translated(e) || e)],
+  [/^About (\d+) (minutes|seconds) on this computer\.$/, (_, n, u) => 'Circa ' + n + (u === 'minutes' ? ' minuti' : ' secondi') + ' su questo computer.'],
+  [/^Transcribe all (\d+)$/, (_, n) => 'Trascrivi tutte e ' + n],
+  [/^Name for (.+)$/, (_, x) => 'Nome per ' + (translated(x) || x)],
+  [/^Voice (\d+)$/, (_, n) => 'Voce ' + n],
+  [/^Transcribing (\d+)%$/, (_, n) => 'In trascrizione ' + n + '%'],
+  [/^(\d+) jobs? left, one at a time$/, (_, n) => n1(n, 'lavoro rimasto', 'lavori rimasti') + ', uno alla volta'],
+  [/^queued, (\d+) ahead$/, (_, n) => 'in coda, ' + n + ' prima'],
+  [/^(\d+) min of audio$/, (_, n) => n + ' min di audio'],
+  [/^about (\d+) s left$/, (_, n) => 'circa ' + n + ' s alla fine'],
+  [/^started (.+)$/, (_, w) => 'iniziata ' + w],
+  [/^([\d.,]+ [KMG]?B) saved$/, (_, s) => s + ' salvati'],
+  [/^(.+)…$/, (_, x) => { const t = translated(x); return t === null ? null : t + '…'; }],
+  [/^Listens to the recording again, without transcribing it again: about (\d+) (seconds|minutes?)(, plus a 32 MB download the first time)?\.$/,
+    (_, n, u, dl) => 'Riascolta la registrazione, senza ritrascriverla: circa ' + n
+      + (u === 'seconds' ? ' secondi' : (+n === 1 ? ' minuto' : ' minuti'))
+      + (dl ? ', più 32 MB da scaricare la prima volta' : '') + '.'],
+  [/^Not asked for yet\. (.+) will write it, here on this machine, in about twenty seconds\.$/,
+    (_, m) => 'Non ancora chiesto. Lo scriverà ' + m + ', qui su questa macchina, in una ventina di secondi.'],
+  [/^No call mentions “(.*)”\.$/, (_, q) => 'Nessuna call contiene “' + q + '”.'],
+  [/^(\d+) names?, (\d+) of them found in your calls\. Names are corrected after transcription, not suggested before: given to Whisper as a prompt, they made the text worse instead of better\.$/,
+    (_, a, b) => n1(a, 'nome', 'nomi') + ', ' + b + ' trovati nelle tue call. I nomi si correggono dopo la trascrizione, non si suggeriscono prima: dati a Whisper come prompt, peggioravano il testo invece di migliorarlo.'],
+  [/^(.+) · ready$/, (_, m) => m + ' · pronto'],
+];
+
+// The page is written in English. In Italian, every piece of interface text
+// is looked up as it appears on screen: one dictionary, plus rules for the
+// texts that carry a number. Calls are never touched: transcripts, summaries,
+// names of calls and of people are marked as data and left as they are.
+// Switching language reloads the page, so nothing half-translated stays.
+const UI = store.get('sottovoce-ui') === 'it' ? 'it' : 'en';
+document.documentElement.lang = UI;
+const KEEP = '.data, [translate=no], .reader span.text, .reader .summary, .recent td:first-child, '
+  + '.waiting-row>span:first-child, .qname, .hit span, .suspect span, script, style';
+
+function T(s){
+  if (UI !== 'it' || typeof s !== 'string') return s;
+  const k = s.trim();
+  if (!k) return s;
+  const out = translated(k);
+  if (out === null) return s;
+  // "… scheda" + " on." becomes "… scheda" + ".": no space before the stop
+  return (/^[.,;:]/.test(out) ? s.replace(/^\s+/, '') : s).replace(k, out);
+}
+
+function translated(k){
+  if (Object.prototype.hasOwnProperty.call(IT, k)) return IT[k];
+  for (const [rx, f] of IT_RULES){
+    const m = rx.exec(k);
+    if (m) return f(...m);
+  }
+  // "a · b · c": each part on its own, when every part is known or a number
+  if (k.includes(' · ')){
+    const parts = k.split(' · ');
+    const t = parts.map(x => /^[\d:.,\s%-]*$/.test(x) ? x : translated(x));
+    if (t.every(x => x !== null)) return t.join(' · ');
+  }
+  return null;
+}
+
+function translateTree(root){
+  if (UI !== 'it') return;
+  if (root.nodeType === 3){ translateText(root); return; }
+  if (root.nodeType !== 1 || root.closest(KEEP)) return;
+  translateAttrs(root);
+  const w = document.createTreeWalker(root, NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT, {
+    acceptNode: n => n.nodeType === 1 && n.matches(KEEP) ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT});
+  let n;
+  while ((n = w.nextNode())){
+    if (n.nodeType === 3) translateText(n); else translateAttrs(n);
+  }
+}
+
+function translateText(n){
+  const p = n.parentElement;
+  if (!p || p.closest(KEEP)) return;
+  const t = T(n.nodeValue);
+  if (t !== n.nodeValue) n.nodeValue = t;
+}
+
+function translateAttrs(e){
+  for (const a of ['placeholder', 'title', 'aria-label']){
+    const v = e.getAttribute(a);
+    if (v){ const t = T(v); if (t !== v) e.setAttribute(a, t); }
+  }
+}
+
+if (UI === 'it'){
+  new MutationObserver(ms => {
+    for (const m of ms){
+      if (m.type === 'characterData') translateText(m.target);
+      else if (m.type === 'attributes') translateAttrs(m.target);
+      else m.addedNodes.forEach(translateTree);
+    }
+  }).observe(document.body, {childList: true, subtree: true, characterData: true,
+                             attributes: true, attributeFilter: ['placeholder', 'title', 'aria-label']});
+  translateTree(document.body);
+}
+$('#ui-lang').textContent = UI === 'it' ? 'EN' : 'IT';
+$('#ui-lang').title = UI === 'it' ? 'Switch to English' : 'Passa all\'italiano';
+$('#ui-lang').setAttribute('aria-label', $('#ui-lang').title);
+$('#ui-lang').onclick = () => {
+  if (rec && !confirm(T('A call is being recorded: switching language reloads the page. The recording is kept and offered again.'))) return;
+  store.set('sottovoce-ui', UI === 'it' ? 'en' : 'it');
+  location.reload();
+};
 const precise = () => store.get('sottovoce-precise') === '1';
 // Asked for, and possible: the packages are optional, and without them the
 // choice is not offered at all.
@@ -677,8 +979,7 @@ async function checkEngine(){
     const vt = $('#voices-toggle');
     if (vt){
       vt.hidden = !voicesAvail;
-      if (voicesReady) vt.querySelector('small').textContent = vt.querySelector('small')
-        .textContent.replace('; the first time it downloads 32 MB.', '.');
+      vt.querySelector('small').textContent = voicesText();
     }
     if (d.error){ light.className = 'light no'; t.textContent = d.error; return; }
     // Started with --no-model: reading old calls, nothing to transcribe with.
@@ -754,6 +1055,7 @@ function drawList(){
     if (view === 'call' && v.folder === openNow) b.setAttribute('aria-current', 'true');
     const n = el('span', 'name');
     n.textContent = v.name || v.original || v.folder;
+    n.classList.add('data');
     // A count only on what asks to be looked at, and it names what it counts:
     // never a bare number next to a name.
     const dropped = (v.phantoms_dropped || []).length;
@@ -805,6 +1107,7 @@ async function search(q){
   for (const r of d.results){
     const g = el('p', 'group');
     g.textContent = r.folder;
+    g.classList.add('data');
     l.append(g);
     for (const x of r.lines){
       const b = el('button', 'hit');
@@ -889,6 +1192,11 @@ function optionsSummary(){
   return parts.join(' · ');
 }
 
+function voicesText(){
+  return 'Every line says who is speaking: Voice 1, Voice 2… Name them afterwards. '
+    + 'About 2 seconds more per minute' + (voicesReady ? '.' : '; the first time it downloads 32 MB.');
+}
+
 function optionsPanel(){
   const p = panel('Before you start');
   p.classList.add('options-panel');
@@ -906,10 +1214,7 @@ function optionsPanel(){
   // Telling voices apart runs on the processor and is off unless asked: on a
   // call recorded here with one other person, the two tracks already say who
   // is who.
-  const v = optionTile('voices-toggle', 'Separate voices',
-    'Every line says who is speaking: Voice 1, Voice 2… Name them afterwards. '
-    + 'About 2 seconds more per minute'
-    + (voicesReady ? '.' : '; the first time it downloads 32 MB.'), 'sottovoce-voices');
+  const v = optionTile('voices-toggle', 'Separate voices', voicesText(), 'sottovoce-voices');
   v.hidden = !voicesAvail;
 
   // Precise word timings cost twice the time (measured: 395 s instead of 200
@@ -938,7 +1243,7 @@ function optionsPanel(){
   return p;
 }
 
-function crumbs(here){
+function crumbs(here, data){
   const n = el('nav', 'crumbs');
   n.setAttribute('aria-label', 'Where you are');
   const b = el('button');
@@ -950,6 +1255,7 @@ function crumbs(here){
   sep.textContent = '/';
   const h = el('span');
   h.textContent = here;
+  if (data) h.className = 'data';
   n.append(b, sep, h);
   return n;
 }
@@ -1219,7 +1525,7 @@ async function drawUnfinished(){
         headers:{'Content-Type':'application/json'},
         body: JSON.stringify({language: currentLanguage(), precise: precise(),
                               voices: voicesWanted()})})).json();
-      if (j.error) return alert(j.error);
+      if (j.error) return alert(T(j.error));
       track(j.job, x.name + '.webm');
       drawUnfinished();
     };
@@ -1227,7 +1533,7 @@ async function drawUnfinished(){
     del.type = 'button';
     del.textContent = 'Delete';
     del.onclick = async () => {
-      if (!confirm('Delete this recording? It cannot be recovered.')) return;
+      if (!confirm(T('Delete this recording? It cannot be recovered.'))) return;
       await fetch('/api/recordings/' + x.id, {method:'DELETE'});
       drawUnfinished();
     };
@@ -1483,7 +1789,7 @@ function drawRecordLive(){
   const cancel = el('button', 'text-button danger');
   cancel.type = 'button';
   cancel.textContent = 'Discard';
-  cancel.onclick = () => { if (confirm('Discard this recording? Nothing will be kept.')) stopRecording(false); };
+  cancel.onclick = () => { if (confirm(T('Discard this recording? Nothing will be kept.'))) stopRecording(false); };
   foot.append(stop, cancel);
   c.append(live, m1, m2, hint, foot);
   tickRecording();
@@ -1553,7 +1859,7 @@ async function stopRecording(keep){
     if (view !== 'home') showHome();
     drawRecordIdle();
     drawUnfinished();
-    alert('The recording is saved, but could not be sent to transcription: ' + e.message
+    alert(T('The recording is saved, but could not be sent to transcription:') + ' ' + e.message
       + '. It is listed under “Interrupted recordings”.');
   }
 }
@@ -1750,12 +2056,13 @@ function show(l, jump){
 
   const d = $('#inner');
   d.textContent = '';
-  d.append(crumbs(l.name));
+  d.append(crumbs(l.name, true));
 
   const tr = el('div', 'title-row');
   const left = el('div');
   const h1 = el('h1');
   h1.textContent = l.name;
+  h1.className = 'data';
   const fd = el('p', 'finding');
   fd.textContent = finding(l);
   left.append(h1, fd);
@@ -1889,13 +2196,13 @@ function renameInline(l, h1){
 }
 
 async function deleteCall(l){
-  if (!confirm('Delete "' + l.name + '"?\n\nIt is moved to the _deleted folder next to your '
-      + 'transcripts: you can still get it back from there.')) return;
+  if (!confirm(T('Delete this call?') + '\n\n' + l.name + '\n\n'
+      + T('It is moved to the _deleted folder next to your transcripts: you can still get it back from there.'))) return;
   releaseAudio();
   try{
     const r = await (await fetch('/api/history/' + encodeURIComponent(l.folder), {method:'DELETE'})).json();
     if (r.error) throw new Error(r.error);
-  } catch(e){ alert(e.message); return; }
+  } catch(e){ alert(T(e.message)); return; }
   await loadCalls();
   showHome();
 }
@@ -1906,12 +2213,13 @@ function showPending(l){
   pendingShown = {folder: l.folder, status: l.status};
   const d = $('#inner');
   d.textContent = '';
-  d.append(crumbs(l.name));
+  d.append(crumbs(l.name, true));
 
   const tr = el('div', 'title-row');
   const left = el('div');
   const h1 = el('h1');
   h1.textContent = l.name;
+  h1.className = 'data';
   const fd = el('p', 'finding');
   const when = (l.uploaded_at ? 'Added ' + l.uploaded_at : 'Added')
     + (l.duration ? ' · ' + mmss(l.duration) + ' of audio' : '');
@@ -2198,7 +2506,7 @@ function sidePanel(l, st){
     const tb = el('tbody');
     for (const x of names){
       const r = el('tr');
-      r.innerHTML = '<td>' + esc(x.name) + '</td><td class="n">' + thousands(x.count) + '</td>';
+      r.innerHTML = '<td class="data">' + esc(x.name) + '</td><td class="n">' + thousands(x.count) + '</td>';
       tb.append(r);
     }
     t.append(tb);
@@ -2619,8 +2927,8 @@ async function showGlossary(){
     const tb = el('tbody');
     for (const r of g.rules){
       const row = el('tr');
-      row.innerHTML = '<td>' + esc(r.right) + '</td>'
-        + '<td class="variants">' + r.variants.map(esc).join(', ') + '</td>'
+      row.innerHTML = '<td class="data">' + esc(r.right) + '</td>'
+        + '<td class="variants data">' + r.variants.map(esc).join(', ') + '</td>'
         + '<td class="n">' + (r.count ? thousands(r.count)
             : '<span style="color:var(--muted)">—</span>') + '</td>';
       tb.append(row);
@@ -2645,7 +2953,7 @@ async function showGlossary(){
         body: JSON.stringify({right, variants})})).json();
       if (r.error) throw new Error(r.error);
       showGlossary();
-    } catch(err){ alert(err.message); }
+    } catch(err){ alert(T(err.message)); }
   };
   c.append(form);
   p.append(c);
@@ -2700,11 +3008,11 @@ side.addEventListener('drop', e => {
 $('#file').onchange = e => { if (e.target.files.length) sendFiles([...e.target.files]); e.target.value = ''; };
 
 $('#shutdown').onclick = async () => {
-  if (rec){ alert('A call is being recorded: stop it first.'); return; }
-  if (!confirm('Stop the server? The VRAM is freed; start it again with Start.bat.')) return;
+  if (rec){ alert(T('A call is being recorded: stop it first.')); return; }
+  if (!confirm(T('Stop the server? The VRAM is freed; start it again with Start.bat.'))) return;
   try{
     const r = await (await fetch('/api/shutdown', {method:'POST'})).json();
-    if (r.error){ alert(r.error); return; }
+    if (r.error){ alert(T(r.error)); return; }
   } catch(e){ /* the server dies while answering: the normal case */ }
   document.body.innerHTML = '';
   document.body.style.gridTemplateColumns = '1fr';

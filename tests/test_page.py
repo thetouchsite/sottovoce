@@ -269,3 +269,30 @@ def test_a_transcribed_call_can_be_renamed(page):
     page.keyboard.press("Escape")                  # closes the field, stays on the call
     assert page.locator("h1").inner_text() == "Supplier check-in, Brenna Print.webm"
 
+
+def test_the_page_in_italian_leaves_the_calls_as_they_are(site):
+    with playwright.sync_playwright() as pw:
+        browser = launch(pw)
+        ctx = browser.new_context(viewport={"width": 1440, "height": 900})
+        ctx.add_init_script("if (!localStorage.getItem('sottovoce-ui')) localStorage.setItem('sottovoce-ui', 'it')")
+        p = ctx.new_page()
+        errors = []
+        p.on("pageerror", lambda e: errors.append(str(e)))
+        p.goto(site)
+        assert p.locator("h1").inner_text() == "Nuova trascrizione"
+        assert p.locator("html").get_attribute("lang") == "it"
+        p.locator(".item", has_text="Northpine").click()
+        p.wait_for_selector(".reader")
+        assert "3 voci separate" in p.locator(".finding").inner_text()
+        p.locator(".tabs button").nth(2).click()
+        assert p.locator(".tabs button").nth(2).inner_text() == "Riga per riga"
+        assert p.locator(".reader .who").first.inner_text() == "Voce 1"
+        # The transcript is data: never translated, even where a line is one word.
+        assert p.locator(".reader p[data-i='0'] span.text").inner_text().startswith("Okay, I think")
+        assert p.locator("h1").inner_text() == "Northpine launch sync.m4a"
+        p.locator("#ui-lang").click()                     # back to English
+        p.wait_for_selector("h1")
+        assert p.locator("html").get_attribute("lang") == "en"
+        assert errors == []
+        browser.close()
+
