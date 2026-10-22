@@ -20,7 +20,20 @@ The ideas come from projects that do this job well: [whisper.cpp](https://github
 
 **Exports** (`.srt`, `.vtt`, `.json`), **several files at once**, **tests and CI** (engine, API and page, on every push, Ubuntu and Windows, Python 3.10 and 3.14).
 
-## 1. Record calls from desktop apps
+## 1. Two tracks: transcribe each track on its own
+
+**Why.** On a call recorded here, who speaks when is known exactly: it's in the two tracks. But Whisper hears them mixed, and gives times per line, not per word. When one line holds the end of one person's turn and the start of the other's, which *word* falls at the change is a guess. On a fast test call in Meet (two people, short overlapping turns) about 19 words of 136 still go to the wrong person, against 1% on a meeting with long turns.
+
+**Tried.** Each track transcribed alone, only in the stretches where its person speaks, each stretch at its own time. On that call every line went to the right person, and the text came out better punctuated. Two problems before it can be the default:
+
+- Whisper invents *"Grazie."* on short noises from the microphone (a breath, a click): a dozen on that call.
+- Without headphones the microphone hears the others faintly, and that echo is transcribed a second time under your name: on an AMI meeting with the others at -25 dB in the microphone, words on the right side fell to 75%.
+
+Both look fixable: a stretch belongs to your track only where your track is the louder of the two (as the current labelling already decides), and stretches too short or too quiet are not sent to Whisper.
+
+**Done when** it beats the current way on several real calls recorded here (with and without headphones, two and three people), counted word by word, and never puts lines out of order. Transcribing each whole track without cutting was tried too: Whisper's times drift on a track that is silent half the time (median 2.3 s off).
+
+## 2. Record calls from desktop apps
 
 **Why.** Recording from the page covers calls in a browser tab. Teams, Zoom and Webex desktop apps, and phone calls through the PC, don't have a tab to share.
 
@@ -28,7 +41,7 @@ The ideas come from projects that do this job well: [whisper.cpp](https://github
 
 **Done when** a call in the Teams desktop app is recorded and transcribed with *You* and *Them*, without a browser tab.
 
-## 2. Check precise word timings against a reference
+## 3. Check precise word timings against a reference
 
 **Why.** Precise mode promises a click lands on the word. Nobody has measured how close it lands.
 
@@ -36,7 +49,7 @@ The ideas come from projects that do this job well: [whisper.cpp](https://github
 
 **Done when** the median offset is under half a second, or the README says what it really is.
 
-## 3. Fine-tune on your own corrections
+## 4. Fine-tune on your own corrections
 
 **Why.** Every line corrected by hand is a pair: what the model heard, and what was right. It's the one thing here that can't be bought or downloaded. It's your language, your names, your calls, recorded badly.
 
@@ -46,7 +59,7 @@ The ideas come from projects that do this job well: [whisper.cpp](https://github
 
 And a rule learned the hard way, on another project: **never decide on a single training run.** The variance between two identical runs changes the result more than almost any real improvement. Use three seeds, and report the mean and the spread.
 
-## 4. Say how many people were on the call
+## 5. Say how many people were on the call
 
 **Why.** The count is right on every meeting measured, but a call where two voices sound alike can still come out as one person. If you know there were three, you should be able to say so.
 
@@ -54,7 +67,7 @@ And a rule learned the hard way, on another project: **never decide on a single 
 
 **Done when** giving the right number never scores worse than counting, on both AMI meetings, and the page offers it next to **Separate voices**.
 
-## 5. Recognise the same person across calls
+## 6. Recognise the same person across calls
 
 **Why.** *Voice 2* in Monday's call and *Voice 1* in Thursday's may be the same client. Naming them every time is the chore this would remove.
 
@@ -62,7 +75,7 @@ And a rule learned the hard way, on another project: **never decide on a single 
 
 **Done when** a name suggested is right at least 95% of the time on a held-out set, and the fingerprints can be listed and deleted from the page.
 
-## 6. Linux and macOS launchers
+## 7. Linux and macOS launchers
 
 **Why.** The Python code is cross-platform and the tests run on Ubuntu, but only Windows had launchers.
 
