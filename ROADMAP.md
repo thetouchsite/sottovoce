@@ -33,6 +33,8 @@ Both look fixable: a stretch belongs to your track only where your track is the 
 
 **Measured.** `research/two_tracks.py` builds real two-track calls from AMI meetings, where every person wore a headset microphone: one person's headset on one side, the others on the other, with the room heard faintly in every microphone as in real life. On the held-out meeting the current way puts about **90%** of words on the right side (2 people 89.8%, 3 people 91.8%, 4 people 90.7%; with the call leaking from loudspeakers at -25 dB, 90.7%, 91.8%, 89.2%). Earlier figures of 99% came from tracks cut apart artificially, with no crosstalk: too kind.
 
+**Each track alone, on the same test** (`--method per_track`, with pieces taken only where a track is the louder of the two, and pieces under 0.4 s skipped): about **62%** of words on the right side, and half as many words again as there were, because every headset in an AMI room also hears the others clearly and Whisper transcribes them twice. It loses here. But a real Meet call is kinder to it than this test: the call's track never carries your voice, and with headphones your microphone doesn't carry theirs. So it is parked, not dropped, until it can be measured on real calls recorded here.
+
 **Done when** it beats those numbers in `research/two_tracks.py` and on several real calls recorded here (with and without headphones, two and three people), counted word by word, and never puts lines out of order. Transcribing each whole track without cutting was tried too: Whisper's times drift on a track that is silent half the time (median 2.3 s off).
 
 ## 2. Record calls from desktop apps
