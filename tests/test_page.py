@@ -89,7 +89,9 @@ def test_the_page_opens_on_a_new_transcription_not_on_a_call(page):
     assert page.locator("h1").inner_text() == "New transcription"
     assert page.locator("#drop").is_visible()
     assert page.locator("#record-panel").is_visible()
-    page.wait_for_function("document.querySelector('[data-need=model]').textContent === 'Transcription off'")
+    page.wait_for_function("document.getElementById('engine-text').textContent.includes('browsing only')")
+    # Adding a file needs no model: it only waits to be transcribed.
+    assert page.locator("#drop .primary").is_enabled()
     names = page.locator(".item .name").all_inner_texts()
     assert names[0].startswith("Supplier check-in")              # newest first
     assert len(names) == 4
@@ -112,12 +114,10 @@ def test_a_call_reads_three_ways_and_the_strip_plays_from_a_point(page):
 
 
 def test_getting_back_to_the_start(page):
-    page.wait_for_function("document.querySelector('[data-need=model]').textContent === 'Transcription off'")
+    page.wait_for_function("document.getElementById('engine-text').textContent.includes('browsing only')")
     open_call(page, NORTHPINE)
     page.locator(".crumbs button").click()
     assert page.locator("h1").inner_text() == "New transcription"
-    # The rebuilt home still knows the model is off (it once said "Choose files").
-    assert page.locator("[data-need=model]").inner_text() == "Transcription off"
     open_call(page, NORTHPINE)
     page.keyboard.press("Escape")
     assert page.locator("h1").inner_text() == "New transcription"
@@ -144,7 +144,7 @@ def test_search_and_jump(page):
 
 def test_download_menu_offers_every_format(page):
     open_call(page, SUPPLIER)
-    page.locator(".menu summary").click()
+    page.locator(".menu:not(.more) summary").click()
     links = page.locator(".menu-list a").evaluate_all("a => a.map(x => x.getAttribute('href'))")
     assert [h.rsplit(".", 1)[1] for h in links] == ["md", "txt", "srt", "vtt", "json"]
 
@@ -234,3 +234,38 @@ def test_voices_have_their_own_colour_and_take_a_name(page):
     page.locator(".tabs button").nth(2).click()
     assert page.locator(".reader .who").all_inner_texts()[:2] == ["Voice 1", "Daniel"]
     assert page.locator("input[name='Voice 2']").input_value() == "Daniel"
+
+
+def test_a_file_added_waits_in_the_list_and_can_be_renamed_and_deleted(page, tmp_path):
+    f = tmp_path / "Team call.wav"
+    f.write_bytes(b"RIFF....WAVEfmt ")
+    page.wait_for_function("document.getElementById('engine-text').textContent.includes('browsing only')")
+    page.locator("#file").set_input_files(str(f))
+    page.wait_for_selector(".go .primary")
+    assert page.locator("h1").inner_text() == "Team call.wav"
+    assert "not transcribed yet" in page.locator(".finding").inner_text()
+    # No model here: the button says why it can't start, instead of failing.
+    assert page.locator(".go .primary").inner_text() == "Transcription off"
+    item = page.locator(".item", has_text="Team call")
+    assert item.locator(".state.waiting").inner_text() == "Not transcribed"
+    page.locator(".menu.more summary").click()
+    page.locator(".menu-list button", has_text="Rename").click()
+    page.locator(".rename input").fill("Team call, Monday")
+    page.keyboard.press("Enter")
+    page.wait_for_function("document.querySelector('h1') && document.querySelector('h1').textContent === 'Team call, Monday'")
+    assert page.locator(".item", has_text="Team call, Monday").count() == 1
+    page.once("dialog", lambda d: d.accept())
+    page.locator(".menu.more summary").click()
+    page.locator(".menu-list button", has_text="Delete").click()
+    page.wait_for_function("document.querySelector('h1').textContent === 'New transcription'")
+    assert page.locator(".item", has_text="Team call").count() == 0
+
+
+def test_a_transcribed_call_can_be_renamed(page):
+    open_call(page, SUPPLIER)
+    page.locator(".menu.more summary").click()
+    page.locator(".menu-list button", has_text="Rename").click()
+    assert page.locator(".rename input").input_value() == "Supplier check-in, Brenna Print"
+    page.keyboard.press("Escape")                  # closes the field, stays on the call
+    assert page.locator("h1").inner_text() == "Supplier check-in, Brenna Print.webm"
+

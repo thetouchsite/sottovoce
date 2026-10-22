@@ -159,3 +159,112 @@ def test_telling_voices_apart_later_needs_the_packages_and_the_recording(client,
     r = client.post(f"/api/voices/{NORTHPINE}")              # the examples carry no audio
     assert r.status_code == 404 and "recording" in r.json()["error"]
     assert client.post("/api/voices/nowhere").status_code == 404
+
+
+# --- adding first, transcribing when asked ------------------------------------------
+
+def fake_run(monkeypatch, fail=False):
+    """Whisper's place taken by a function that returns two lines at once."""
+    import server
+    import transcribe as T
+
+    def run(source, language=None, progress=None, **kw):
+        if fail:
+            raise RuntimeError("the decoder gave up")
+        progress and progress("transcribing", 4.0)
+        words = [[0.0, 0.4, "Hello"], [0.4, 0.9, "there."], [1.2, 1.6, "Second"], [1.6, 2.0, "line."]]
+        segs = T.lines_from_words(words, None, {0, 2})
+        return {"segments": segs, "seconds": 4.0, "speech_seconds": 3.0, "corrected": {},
+                "phantoms": [], "speech": [(0.0, 2.0)], "language": language or "en",
+                "word_times": "estimated"}
+
+    monkeypatch.setattr(server.T, "run", run)
+    monkeypatch.setitem(server.engine_state, "ready", True)
+    monkeypatch.setitem(server.engine_state, "off", False)
+
+
+def wait_for(client, folder, status, tries=200):
+    import time
+    for _ in range(tries):
+        e = next((e for e in client.get("/api/history").json()["history"] if e["folder"] == folder), None)
+        if e and e["status"] == status:
+            return e
+        time.sleep(0.02)
+    raise AssertionError(f"{folder} never became {status}: {e}")
+
+
+def test_an_added_recording_waits_and_is_transcribed_when_asked(client, data, monkeypatch):
+    r = client.post("/api/uploads", files={"file": ("Weekly sync.m4a", b"not really audio", "audio/mp4")})
+    folder = r.json()["folder"]
+    assert folder.endswith("_Weekly sync")
+    e = wait_for(client, folder, "waiting")
+    assert e["name"] == "Weekly sync.m4a" and e["words"] == 0
+    o = client.get(f"/api/history/{folder}").json()
+    assert o["pending"] and o["status"] == "waiting" and o["audio"] == "Weekly sync.m4a"
+    # Without the model it waits, it is not lost.
+    assert client.post(f"/api/transcribe/{folder}", json={}).status_code == 503
+
+    fake_run(monkeypatch)
+    r = client.post(f"/api/transcribe/{folder}", json={"language": "en", "precise": True})
+    assert "job" in r.json()
+    e = wait_for(client, folder, "done")
+    assert e["words"] == 4 and e["language"] == "en" and "uploaded_at" in e
+    assert [s["text"] for s in client.get(f"/api/history/{folder}").json()["segments"]] \
+        == ["Hello there.", "Second line."]
+    assert client.post(f"/api/transcribe/{folder}", json={}).status_code == 409   # done already
+
+
+def test_a_failed_transcription_keeps_the_recording(client, data, monkeypatch):
+    folder = client.post("/api/uploads", files={"file": ("Broken.wav", b"x", "audio/wav")}).json()["folder"]
+    fake_run(monkeypatch, fail=True)
+    client.post(f"/api/transcribe/{folder}", json={})
+    e = wait_for(client, folder, "failed")
+    assert "decoder gave up" in e["error"]
+    assert (data / "transcripts" / folder / "Broken.wav").exists()
+    fake_run(monkeypatch)
+    client.post(f"/api/transcribe/{folder}", json={})
+    wait_for(client, folder, "done")
+
+
+def test_a_restart_puts_an_interrupted_transcription_back_to_waiting(client, data):
+    import server
+    folder = client.post("/api/uploads", files={"file": ("Cut.wav", b"x", "audio/wav")}).json()["folder"]
+    d = data / "transcripts" / folder
+    server.write_info(d, {**server.read_info(d), "status": "transcribing"})
+    server.sweep()
+    assert server.read_info(d)["status"] == "waiting"
+
+
+def test_a_call_is_renamed_with_its_files(client, data):
+    r = client.post(f"/api/history/{SUPPLIER}/rename", json={"name": "  Brenna  Print, October "})
+    new = r.json()["folder"]
+    assert new == "2026-10-22_Brenna Print, October"
+    d = data / "transcripts" / new
+    assert sorted(f.name for f in d.iterdir() if f.suffix in (".txt", ".md")) \
+        == ["Brenna Print, October.md", "Brenna Print, October.txt"]
+    o = client.get(f"/api/history/{new}").json()
+    assert o["name"] == "Brenna Print, October" and len(o["segments"]) == 13
+    assert not (data / "transcripts" / SUPPLIER).exists()
+    assert client.post(f"/api/history/{new}/rename", json={"name": " "}).status_code == 400
+    assert client.post(f"/api/history/{new}/rename",
+                       json={"name": "Northpine launch sync"}).status_code == 200   # another day: no clash
+
+
+def test_renaming_onto_another_call_is_refused(client):
+    r = client.post(f"/api/history/{NORTHPINE}/rename", json={"name": "Northpine launch sync"})
+    assert r.status_code == 200                                # same name: nothing to do
+    import server
+    d = server.DATA / "2026-10-21_Other"
+    d.mkdir()
+    server.write_info(d, {"original": "x.wav"})
+    assert client.post(f"/api/history/{NORTHPINE}/rename", json={"name": "Other"}).status_code == 409
+
+
+def test_deleting_moves_the_call_to_a_bin(client, data):
+    r = client.delete(f"/api/history/{NORTHPINE}")
+    assert r.json() == {"deleted": True, "kept_in": f"_deleted/{NORTHPINE}"}
+    assert (data / "transcripts" / "_deleted" / NORTHPINE / "info.json").exists()
+    folders = [e["folder"] for e in client.get("/api/history").json()["history"]]
+    assert NORTHPINE not in folders and "_deleted" not in folders
+    assert client.get("/api/search?q=Trailhead").json()["total"] == 0
+    assert client.delete(f"/api/history/{NORTHPINE}").status_code == 404

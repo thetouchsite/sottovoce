@@ -58,7 +58,7 @@ Start.bat
 
 ![The New transcription screen: the choices that apply to everything at the top (language, Separate voices, Precise word timings), drop files on the left, record a call on the right, the latest calls below](docs/images/home.png)
 
-The page opens on **New transcription**: drop one or more files on the left, or record a call on the right. 27 minutes of call take about 4 minutes. Above both, **Before you start** holds the three choices that apply to either: the language (detected, or picked from the menu), **Separate voices** and **Precise word timings**, each with a line saying what it does. They're remembered. Close the server with the power button, or `Stop.bat`.
+The page opens on **New transcription**: drop one or more files on the left (or onto the list of calls), or record a call on the right. A file you add **waits** in the list, tagged *Not transcribed*: open it to listen, rename it, choose how, and press **Transcribe**. 27 minutes of call take about 4 minutes. Every call can be renamed or deleted from its **⋯** menu; deleting moves its folder to `transcripts/_deleted/`, so a wrong tap can be undone from the file explorer. Above both, **Before you start** holds the three choices that apply to either: the language (detected, or picked from the menu), **Separate voices** and **Precise word timings**, each with a line saying what it does. They're remembered. Close the server with the power button, or `Stop.bat`.
 
 **Linux and macOS:** `./install.sh`, then `./start.sh`. They do what the Windows launchers do: PyTorch first, from the CUDA index on Linux when `nvidia-smi` is there, then the rest, then whether the GPU is seen. `./start.sh` passes its arguments to the server, so `./start.sh --no-model` works. On GitHub they're checked for syntax and with `shellcheck` on every push, but not run end to end there: the install downloads gigabytes and needs a GPU. If you run them on a clean machine, tell us how it went (see the [roadmap](ROADMAP.md)). If they fail, these are the steps they take:
 
@@ -267,7 +267,7 @@ python server.py --no-model                                                 # br
 
 `--language` takes a Whisper code (`en`, `it`, `de`…). Leave it out to detect the language.
 
-Everything the page does goes through a small HTTP API, documented at <http://127.0.0.1:8200/docs> while the server runs: upload a file from your own scripts, read a call as JSON, search, correct. That reference page is FastAPI's own and loads Swagger UI from a CDN when you open it; the app's page doesn't.
+Everything the page does goes through a small HTTP API, documented at <http://127.0.0.1:8200/docs> while the server runs: add a file from your own scripts (`/api/uploads`, then `/api/transcribe/{name}`; or `/api/transcribe` to do both at once), read a call as JSON, search, correct, rename, delete. That reference page is FastAPI's own and loads Swagger UI from a CDN when you open it; the app's page doesn't.
 
 ## Development
 

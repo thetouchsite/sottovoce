@@ -60,7 +60,7 @@ Start.bat
 
 ![La schermata New transcription: in alto le scelte che valgono per tutto (lingua, Separate voices, Precise word timings), a sinistra si trascinano i file, a destra si registra una call, sotto le ultime call](docs/images/home.png)
 
-La pagina si apre su **New transcription**: a sinistra trascini uno o più file, a destra registri una call. 27 minuti di call richiedono circa 4 minuti. Sopra a tutti e due, **Before you start** raccoglie le tre scelte che valgono per entrambi: la lingua (riconosciuta, o scelta dal menu), **Separate voices** e **Precise word timings**, ognuna con una riga che dice cosa fa. Vengono ricordate. Il server si spegne col bottone di accensione, oppure con `Stop.bat`.
+La pagina si apre su **New transcription**: a sinistra trascini uno o più file (oppure sulla lista delle call), a destra registri una call. Un file aggiunto **resta in attesa** nella lista, con l'etichetta *Not transcribed*: lo apri per ascoltarlo, rinominarlo, scegliere come trascriverlo, e premi **Transcribe**. 27 minuti di call richiedono circa 4 minuti. Ogni call si rinomina o si elimina dal suo menu **⋯**; eliminare sposta la cartella in `transcripts/_deleted/`, quindi un tocco sbagliato si recupera da Esplora file. Sopra a tutti e due, **Before you start** raccoglie le tre scelte che valgono per entrambi: la lingua (riconosciuta, o scelta dal menu), **Separate voices** e **Precise word timings**, ognuna con una riga che dice cosa fa. Vengono ricordate. Il server si spegne col bottone di accensione, oppure con `Stop.bat`.
 
 **Linux e macOS:** `./install.sh`, poi `./start.sh`. Fanno quello che fanno i lanciatori per Windows: prima PyTorch, dall'indice CUDA su Linux se c'è `nvidia-smi`, poi il resto, e alla fine ti dicono se la GPU si vede. `./start.sh` passa i suoi argomenti al server, quindi `./start.sh --no-model` funziona. Su GitHub vengono controllati a ogni push, la sintassi e `shellcheck`, ma lì non vengono eseguiti davvero: l'installazione scarica gigabyte e richiede una GPU. Se li provi su una macchina pulita, facci sapere com'è andata (vedi i [prossimi passi](ROADMAP.md)). Se non funzionano, questi sono i passi che fanno:
 
@@ -269,7 +269,7 @@ python server.py --no-model                                                  # s
 
 `--language` accetta un codice Whisper (`it`, `en`, `de`…). Se lo ometti, la lingua viene riconosciuta.
 
-Tutto quello che fa la pagina passa da una piccola API HTTP, documentata su <http://127.0.0.1:8200/docs> mentre il server è acceso: mandare un file dai tuoi script, leggere una call in JSON, cercare, correggere. Quella pagina di riferimento è di FastAPI e carica Swagger UI da una CDN quando la apri; la pagina dell'app no.
+Tutto quello che fa la pagina passa da una piccola API HTTP, documentata su <http://127.0.0.1:8200/docs> mentre il server è acceso: aggiungere un file dai tuoi script (`/api/uploads`, poi `/api/transcribe/{name}`; oppure `/api/transcribe` per fare tutte e due le cose insieme), leggere una call in JSON, cercare, correggere, rinominare, eliminare. Quella pagina di riferimento è di FastAPI e carica Swagger UI da una CDN quando la apri; la pagina dell'app no.
 
 ## Sviluppo
 

@@ -30,6 +30,11 @@ ONE FOLDER PER TRANSCRIPTION, with everything inside:
 The original is kept: if you lose it from your phone or your Downloads, the
 copy is here next to its transcript.
 
+ADDED, THEN TRANSCRIBED. A file sent from the page is kept first, as a
+folder with its recording and an info.json that says "waiting": it can be
+renamed, listened to, deleted, and transcribed when you choose how. The state
+lives on disk, not in the page, so a reload or a restart does not lose it.
+
 ONE AT A TIME. Jobs queue up instead of running together: two transcriptions in
 parallel share the same pipeline and slow each other down (measured: 233 s
 instead of 190 when two were running).
@@ -48,6 +53,7 @@ import pathlib
 import queue
 import re
 import shutil
+import subprocess
 import threading
 import time
 import uuid
@@ -113,6 +119,18 @@ def sweep():
             print(f"  removed {n} uploads left over from a previous run")
     INCOMING.mkdir(parents=True, exist_ok=True)
     RECORDINGS.mkdir(parents=True, exist_ok=True)
+    # A transcription cut short by a restart: the recording is in its folder,
+    # so it goes back to waiting instead of saying "transcribing" forever.
+    for d in DATA.iterdir():
+        f = d / "info.json"
+        if d.is_dir() and f.exists():
+            try:
+                info = read_info(d)
+            except (json.JSONDecodeError, OSError):
+                continue
+            if info.get("status") in ("queued", "transcribing"):
+                info["status"] = "waiting"
+                write_info(d, info)
 
 
 def write_info(d: pathlib.Path, info: dict):
@@ -215,20 +233,45 @@ def speakers_of(segments, names=None):
 
 # --- the job ----------------------------------------------------------------------
 
-def process(job_id: str, upload: pathlib.Path, name: str, language: str | None,
+def take(upload: pathlib.Path, name: str) -> pathlib.Path:
+    """A new call folder for an uploaded file, and the file moved into it."""
+    stem = clean(pathlib.Path(name).stem)
+    d = DATA / f"{date.today():%Y-%m-%d}_{stem}"
+    n = 2
+    while d.exists():                      # two calls with the same name
+        d = DATA / f"{date.today():%Y-%m-%d}_{stem} ({n})"
+        n += 1
+    d.mkdir(parents=True)
+    original = d / f"{stem}{pathlib.Path(name).suffix}"
+    shutil.move(str(upload), original)
+    return original
+
+
+def probe_seconds(f: pathlib.Path) -> float | None:
+    """How long a recording lasts, from ffmpeg's own reading of its header.
+
+    None when it can't be read: adding a file must not fail because its
+    length is unknown.
+    """
+    try:
+        r = subprocess.run([T.ffmpeg(), "-hide_banner", "-i", str(f)], capture_output=True, text=True)
+    except Exception:
+        return None
+    m = re.search(r"Duration: (\d+):(\d+):([\d.]+)", r.stderr)
+    return round(int(m[1]) * 3600 + int(m[2]) * 60 + float(m[3]), 1) if m else None
+
+
+def process(job_id: str, original: pathlib.Path, language: str | None,
             two_tracks: bool = False, precise: bool = False, voices: bool = False) -> None:
     job = jobs[job_id]
+    d = original.parent
+    # What the folder already knew (a name given, when it was added) stays.
+    before = read_info(d) if (d / "info.json").exists() else {}
+    keep = {k: before[k] for k in ("title", "uploaded_at") if k in before}
     try:
-        stem = clean(pathlib.Path(name).stem)
-        d = DATA / f"{date.today():%Y-%m-%d}_{stem}"
-        n = 2
-        while d.exists():                      # two calls with the same name
-            d = DATA / f"{date.today():%Y-%m-%d}_{stem} ({n})"
-            n += 1
-        d.mkdir(parents=True)
-        original = d / f"{stem}{pathlib.Path(name).suffix}"
-        shutil.move(str(upload), original)
+        stem = original.stem
         job["folder"] = d.name
+        write_info(d, {**before, "status": "transcribing"})
 
         def progress(stage, audio_seconds):
             job["stage"] = stage
@@ -237,7 +280,9 @@ def process(job_id: str, upload: pathlib.Path, name: str, language: str | None,
                 # An honest estimate: the speed measured end to end on a real
                 # call. Not real progress (the pipeline does not expose it),
                 # but it is off by a few seconds over four minutes.
-                job["expected"] = round(audio_seconds / (T.SPEED_PRECISE if precise else T.SPEED))
+                job["expected"] = round(audio_seconds / (T.SPEED_PRECISE if precise else T.SPEED)
+                                        # telling voices apart: about 2.5 s a minute, on the CPU
+                                        + (audio_seconds / 24 if voices else 0))
 
         t0 = time.time()
         r = T.run(original, language, progress, two_tracks=two_tracks, precise=precise,
@@ -249,6 +294,7 @@ def process(job_id: str, upload: pathlib.Path, name: str, language: str | None,
         (d / f"{stem}.md").write_text(T.as_md(segments, stem, seconds), encoding="utf-8")
         write_words(d, segments)
         info = {
+            **keep,
             "original": original.name,
             "transcribed_at": time.strftime("%Y-%m-%d %H:%M"),
             "model": T.MODEL,
@@ -278,7 +324,9 @@ def process(job_id: str, upload: pathlib.Path, name: str, language: str | None,
         job.update(state="done", stage="done")
     except Exception as e:
         job.update(state="error", error=f"{type(e).__name__}: {e}")
-        upload.unlink(missing_ok=True)
+        # The recording stays in its folder: it can be transcribed again.
+        if d.exists():
+            write_info(d, {**before, "status": "failed", "error": job["error"]})
 
 
 def counter():
@@ -326,15 +374,25 @@ def language_of(language: str | None) -> str | None:
     return re.sub(r"[^a-z]", "", language.lower())[:3] or None
 
 
-def enqueue(path: pathlib.Path, name: str, language: str | None, two_tracks=False,
+def enqueue(original: pathlib.Path, name: str, language: str | None, two_tracks=False,
             precise=False, voices=False) -> str:
+    """Queues the recording already in its folder."""
     job_id = uuid.uuid4().hex[:8]
     ahead = line_up.qsize()
-    jobs[job_id] = {"state": "running", "name": name,
+    d = original.parent
+    info = read_info(d) if (d / "info.json").exists() else {"original": original.name}
+    info.pop("error", None)
+    write_info(d, {**info, "status": "queued"})
+    jobs[job_id] = {"state": "running", "name": name, "folder": d.name,
                     "stage": f"queued, {ahead} ahead" if ahead else "queued",
                     "started": time.time()}
-    line_up.put((job_id, path, name, language, two_tracks, precise, voices))
+    line_up.put((job_id, original, language, two_tracks, precise, voices))
     return job_id
+
+
+def busy(d: pathlib.Path) -> bool:
+    """Whether a transcription is queued or running on this folder."""
+    return any(j["state"] == "running" and j.get("folder") == d.name for j in jobs.values())
 
 
 def voices_installed() -> bool:
@@ -354,14 +412,60 @@ def api_status():
 async def api_transcribe(file: UploadFile = File(...), language: str = Form("auto"),
                          two_tracks: bool = Form(False), precise: bool = Form(False),
                          voices: bool = Form(False)):
-    """Queues a recording. Several files: one request each, they run one after the other."""
+    """Adds a recording and transcribes it at once, in one call: for scripts.
+
+    The page adds first (/api/uploads) and transcribes when asked
+    (/api/transcribe/{name}). Several files: one request each, they run one
+    after the other.
+    """
     refused = refuse_if_off()
     if refused:
         return refused
     dest = INCOMING / f"{uuid.uuid4().hex[:8]}{pathlib.Path(file.filename).suffix or '.bin'}"
     dest.write_bytes(await file.read())
-    return {"job": enqueue(dest, file.filename, language_of(language), two_tracks, precise,
+    original = take(dest, file.filename)
+    return {"job": enqueue(original, file.filename, language_of(language), two_tracks, precise,
                            voices and voices_installed())}
+
+
+@app.post("/api/uploads")
+async def api_upload(file: UploadFile = File(...)):
+    """Adds a recording without transcribing it: it waits in the list.
+
+    Works without the model too: adding is only keeping a file.
+    """
+    dest = INCOMING / f"{uuid.uuid4().hex[:8]}{pathlib.Path(file.filename).suffix or '.bin'}"
+    dest.write_bytes(await file.read())
+    original = take(dest, file.filename)
+    write_info(original.parent, {"original": original.name, "status": "waiting",
+                                 "uploaded_at": time.strftime("%Y-%m-%d %H:%M"),
+                                 "duration_s": probe_seconds(original)})
+    return {"folder": original.parent.name}
+
+
+@app.post("/api/transcribe/{name}")
+async def api_transcribe_added(name: str, request: Request):
+    """Transcribes a recording added before, with the choices made now."""
+    d = folder(name)
+    if not d.is_dir() or not (d / "info.json").exists():
+        return JSONResponse({"error": "not found"}, 404)
+    refused = refuse_if_off()
+    if refused:
+        return refused
+    if busy(d):
+        return JSONResponse({"error": "it is already being transcribed"}, 409)
+    if next(d.glob("*.txt"), None) is not None:
+        return JSONResponse({"error": "it is already transcribed"}, 409)
+    audio = audio_in(d)
+    if audio is None:
+        return JSONResponse({"error": "the recording is not in the folder"}, 404)
+    body = await request.json() if await request.body() else {}
+    info = read_info(d)
+    return {"job": enqueue(d / audio, info.get("title") or audio,
+                           language_of(body.get("language")),
+                           two_tracks=bool(body.get("two_tracks")),
+                           precise=bool(body.get("precise")),
+                           voices=bool(body.get("voices")) and voices_installed())}
 
 
 @app.get("/api/job/{job_id}")
@@ -429,7 +533,8 @@ async def api_recording_finish(rid: str, request: Request):
     dest = INCOMING / f"{rid}.webm"
     shutil.move(str(f), dest)
     meta_f.unlink(missing_ok=True)
-    return {"job": enqueue(dest, name, language, two_tracks=True,
+    original = take(dest, name)
+    return {"job": enqueue(original, name, language, two_tracks=True,
                            precise=bool(body.get("precise")),
                            voices=bool(body.get("voices")) and voices_installed())}
 
@@ -463,6 +568,7 @@ def api_recording_delete(rid: str):
 @app.get("/api/history")
 def api_history():
     out = []
+    running = {j["folder"]: j for j in jobs.values() if j["state"] == "running" and j.get("folder")}
     for d in DATA.iterdir():
         if not d.is_dir() or not (d / "info.json").exists():
             continue
@@ -477,10 +583,18 @@ def api_history():
         _, segments = read_call(d, data.get("duration_s"))
         data["words"] = sum(len(s["text"].split()) for s in segments)
         data.pop("speech", None)        # the map is for the strip, not the list
+        data["name"] = data.get("title") or data.get("original") or d.name
+        data["status"] = data.get("status") or "done"
+        j = running.get(d.name)
+        if j:
+            data["status"] = "queued" if j["stage"].startswith("queued") else "transcribing"
+            data.update(stage=j["stage"], expected=j.get("expected", 0),
+                        elapsed=round(time.time() - j["started"]))
         out.append({"folder": d.name, **data})
-    # Newest first by when it was transcribed. Folder names only carry the
-    # day: two calls of the same day would otherwise sort by their titles.
-    out.sort(key=lambda e: (e.get("transcribed_at") or "", e["folder"]), reverse=True)
+    # Newest first by when it was transcribed, or added. Folder names only
+    # carry the day: two calls of the same day would otherwise sort by title.
+    out.sort(key=lambda e: (e.get("transcribed_at") or e.get("uploaded_at") or "", e["folder"]),
+             reverse=True)
     return {"history": out}
 
 
@@ -591,13 +705,28 @@ def api_open(name: str):
         return JSONResponse({"error": "not found"}, 404)
     data = read_info(d)
     txt, segments = read_call(d, data.get("duration_s"))
-    if txt is None:
-        return JSONResponse({"error": "transcript missing"}, 404)
     audio = audio_in(d)
+    if txt is None:
+        # Added and not transcribed yet (or failed): what the page needs to
+        # show the recording and transcribe it.
+        if data.get("status") in ("waiting", "queued", "transcribing", "failed"):
+            j = next((j for j in jobs.values() if j["state"] == "running"
+                      and j.get("folder") == d.name), None)
+            status = data["status"]
+            if j:
+                status = "queued" if j["stage"].startswith("queued") else "transcribing"
+            return {"folder": d.name, "pending": True, "status": status, "audio": audio,
+                    "name": data.get("title") or data.get("original") or d.name,
+                    "duration": data.get("duration_s") or 0,
+                    "uploaded_at": data.get("uploaded_at"), "error": data.get("error"),
+                    "stage": j["stage"] if j else None,
+                    "expected": j.get("expected", 0) if j else 0,
+                    "elapsed": round(time.time() - j["started"]) if j else 0}
+        return JSONResponse({"error": "transcript missing"}, 404)
     summary_md = d / "summary.md"
     names = data.get("speaker_names") or {}
     return {"folder": d.name, "stem": txt.stem, "audio": audio,
-            "name": data.get("original", txt.stem),
+            "name": data.get("title") or data.get("original", txt.stem),
             "language": data.get("language"),
             "two_tracks": bool(data.get("two_tracks")),
             "word_times": data.get("word_times"),
@@ -714,6 +843,78 @@ def api_correct(name: str, body: dict):
     write_words(d, segments)
     _write_md(d, txt)
     return {"saved": True, "words": s.get("words")}
+
+
+@app.post("/api/history/{name}/rename")
+def api_rename(name: str, body: dict):
+    """A new name for a call: its folder and its files follow.
+
+    The day the folder started with stays: it is when the call happened, or
+    was added, and the list sorts by it.
+    """
+    d = folder(name)
+    if not d.is_dir() or not (d / "info.json").exists():
+        return JSONResponse({"error": "not found"}, 404)
+    if busy(d):
+        return JSONResponse({"error": "it is being transcribed: rename it when it is done"}, 409)
+    title = " ".join(str(body.get("name") or "").split())
+    if not title:
+        return JSONResponse({"error": "the name is empty"}, 400)
+    if len(title) > 120:
+        return JSONResponse({"error": "a name is at most 120 characters"}, 400)
+    stem = clean(title)
+    day = d.name.split("_", 1)[0] if re.match(r"^\d{4}-\d{2}-\d{2}_", d.name) else f"{date.today():%Y-%m-%d}"
+    target = DATA / f"{day}_{stem}"
+    if target.name.lower() != d.name.lower() and target.exists():
+        return JSONResponse({"error": "another call already has that name"}, 409)
+    info = read_info(d)
+    txt = next(d.glob("*.txt"), None)
+    audio = audio_in(d)
+    old = txt.stem if txt else (pathlib.Path(audio).stem if audio else None)
+    try:
+        if target != d:
+            d.rename(target)               # first: if a file is in use, nothing moved
+            d = target
+        for f in list(d.iterdir()):
+            if f.is_file() and old and f.stem == old and (f.suffix.lower() in AUDIO
+                                                          or f.suffix in (".txt", ".md")):
+                f.rename(f.with_name(stem + f.suffix))
+    except OSError:
+        return JSONResponse({"error": "a file of this call is in use (is it playing?): "
+                                      "stop it and try again"}, 409)
+    if audio:
+        info["original"] = stem + pathlib.Path(audio).suffix
+    info["title"] = title
+    write_info(d, info)
+    txt = next(d.glob("*.txt"), None)
+    if txt is not None:
+        _write_md(d, txt)
+    return {"folder": d.name, "name": title}
+
+
+@app.delete("/api/history/{name}")
+def api_delete(name: str):
+    """Deletes a call by moving its folder to _deleted/, not by erasing it.
+
+    These are client recordings: a wrong tap must be recoverable, from the
+    file explorer. Emptying _deleted/ is left to you.
+    """
+    d = folder(name)
+    if not d.is_dir() or not (d / "info.json").exists():
+        return JSONResponse({"error": "not found"}, 404)
+    if busy(d):
+        return JSONResponse({"error": "it is being transcribed: wait for it to finish"}, 409)
+    bin_ = DATA / "_deleted"
+    bin_.mkdir(exist_ok=True)
+    dest = bin_ / d.name
+    if dest.exists():
+        dest = bin_ / f"{d.name} ({time.strftime('%Y-%m-%d %H.%M.%S')})"
+    try:
+        shutil.move(str(d), str(dest))
+    except OSError:
+        return JSONResponse({"error": "a file of this call is in use (is it playing?): "
+                                      "stop it and try again"}, 409)
+    return {"deleted": True, "kept_in": f"_deleted/{dest.name}"}
 
 
 def _write_md(d: pathlib.Path, txt: pathlib.Path):
