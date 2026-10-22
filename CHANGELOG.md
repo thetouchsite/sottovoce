@@ -4,6 +4,10 @@ What changed in each release, newest first. The format follows [Keep a Changelog
 
 ## [Unreleased]
 
+### Added
+
+- `--lan` opens the page to other devices on your network, to read, correct and send recordings from a phone. Off by default, and the server says at every start that there is no password. `Start.bat` now passes its arguments on, like `start.sh`.
+
 ### Changed
 
 - The choices made before transcribing (language, **Separate voices**, **Precise word timings**) are now a **Before you start** panel above files and recording, each with a switch and a line saying what it does, instead of two small checkboxes whose explanation was only in a tooltip.

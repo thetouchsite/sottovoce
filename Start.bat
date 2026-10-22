@@ -11,5 +11,5 @@ echo.
 echo   Sottovoce - starting...
 echo.
 start "" http://127.0.0.1:8200
-".venv\Scripts\python.exe" server.py
+".venv\Scripts\python.exe" server.py %*
 pause

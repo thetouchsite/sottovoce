@@ -74,6 +74,10 @@ python server.py
 
 Su Mac non c'è CUDA: gira sulla CPU, circa dieci volte più lento.
 
+### Dal telefono
+
+`python server.py --lan` (oppure `Start.bat --lan`, `./start.sh --lan`) rende la pagina raggiungibile dagli altri dispositivi della stessa rete: stampa l'indirizzo da aprire sul telefono. Da lì leggi, ascolti, cerchi, correggi, dai i nomi alle voci e mandi una registrazione dal telefono da trascrivere sul PC. Registrare una call funziona solo sul computer stesso. **Non c'è password**: chiunque sia su quel Wi-Fi può leggere le tue call, quindi usalo a casa o in ufficio, mai su una rete pubblica. Senza `--lan` il server risponde solo su `127.0.0.1`.
+
 ## Provalo in un minuto, senza GPU
 
 La cartella [`examples/`](examples/) contiene quattro call inventate, già trascritte: una in italiano, una registrata su due tracce. Le sfogli senza scaricare il modello:

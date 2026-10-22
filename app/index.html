@@ -878,8 +878,14 @@ function drawRecordIdle(c){
   c.textContent = '';
   if (!canRecord()){
     const v = el('p', 'empty');
-    v.textContent = 'Recording needs Chrome or Edge on a computer: this browser cannot '
-      + 'capture the sound of another tab.';
+    // Opened from another device (--lan), the browser refuses the microphone
+    // and tab capture on a plain http address: that is the reason then, not
+    // the browser.
+    v.textContent = !window.isSecureContext
+      ? 'Recording works on the computer running Sottovoce, at 127.0.0.1. From here '
+        + 'you can read, listen, search, correct and send recordings to transcribe.'
+      : 'Recording needs Chrome or Edge on a computer: this browser cannot '
+        + 'capture the sound of another tab.';
     c.append(v);
     return;
   }

@@ -72,6 +72,10 @@ python server.py
 
 On a Mac there's no CUDA: it runs on the CPU, about ten times slower.
 
+### From your phone
+
+`python server.py --lan` (or `Start.bat --lan`, `./start.sh --lan`) makes the page reachable from other devices on the same network: it prints the address to open on your phone. From there you can read, listen, search, correct, name voices, and send a recording from the phone to be transcribed on the PC. Recording a call works only on the computer itself. **There's no password**: anyone on that Wi-Fi can read your calls, so use it at home or in the office, never on a public network. Without `--lan` the server answers only on `127.0.0.1`.
+
 ## Try it in a minute, no GPU
 
 The [`examples/`](examples/) folder has four fictional calls, already transcribed: one in Italian, one recorded on two tracks. Browse them without downloading the model:

@@ -3,6 +3,7 @@
     python server.py                         then  http://127.0.0.1:8200
     python server.py --port 8300 --data D:\\calls --glossary D:\\calls\\names.txt
     python server.py --no-model              browse transcripts, no GPU needed
+    python server.py --lan                   also open it from a phone on the same Wi-Fi
 
 Why a server and not a script you drop files on: the model weighs 2.88 GB and
 loading it from disk into VRAM takes about twenty seconds. Here that is paid
@@ -1085,6 +1086,9 @@ if __name__ == "__main__":
                     help="the name glossary (default: ./glossary.txt)")
     ap.add_argument("--no-model", action="store_true",
                     help="browse transcripts without loading Whisper (no GPU needed)")
+    ap.add_argument("--lan", action="store_true",
+                    help="reachable from other devices on your network, e.g. your phone "
+                         "(no password: only on a network you trust)")
     args = ap.parse_args()
 
     start(args.data, args.glossary, model=not args.no_model)
@@ -1094,6 +1098,28 @@ if __name__ == "__main__":
     print(f"  API reference: http://127.0.0.1:{args.port}/docs")
     print("  browsing only: Whisper is not loaded (--no-model)\n" if args.no_model else
           "  (the first start loads 2.88 GB into VRAM: about twenty seconds)\n")
-    # 127.0.0.1 only: the server hands out client recordings and transcripts
-    # to whoever asks, and must not be reachable from the rest of the network.
-    uvicorn.run(app, host="127.0.0.1", port=args.port, log_level="warning")
+    # 127.0.0.1 by default: the server hands out client recordings and
+    # transcripts to whoever asks, with no password. --lan opens it to the
+    # local network on purpose, for reading and uploading from a phone, and
+    # says so every time it starts.
+    host = "127.0.0.1"
+    if args.lan:
+        import socket
+        host = "0.0.0.0"
+        # The address of the interface that leads to the network. A UDP
+        # "connect" only picks the route: no packet is sent. Listing every
+        # address instead also shows virtual adapters (WSL, Hyper-V) that a
+        # phone can't reach.
+        ips = []
+        try:
+            with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+                s.connect(("192.0.2.1", 9))
+                ips = [s.getsockname()[0]]
+        except OSError:
+            pass
+        print("  ON YOUR NETWORK, with no password: anyone on this Wi-Fi can read")
+        print("  and change your calls. Use it at home or in the office, not on public Wi-Fi.")
+        for ip in ips or ["<this computer's IP>"]:
+            print(f"  from your phone:  http://{ip}:{args.port}")
+        print("  Windows may ask whether Python can use private networks: say yes.\n")
+    uvicorn.run(app, host=host, port=args.port, log_level="warning")
