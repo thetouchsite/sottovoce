@@ -178,11 +178,5 @@
    621.92
   ]
  ],
- "summary": {
-  "model": "gemma-4-e4b-it",
-  "via": "LM Studio",
-  "tokens_read": 1353,
-  "seconds": 20.3,
-  "at": "2026-10-22 17:31"
- }
+ "word_times": "estimated"
 }

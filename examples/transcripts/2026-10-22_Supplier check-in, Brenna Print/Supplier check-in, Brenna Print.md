@@ -1,0 +1,29 @@
+# Supplier check-in, Brenna Print
+
+*1 min · 146 words · transcribed locally with openai/whisper-large-v3*
+
+**00:00 · Me** — Hi Tomasz, thanks for picking up. Do you have five minutes on the print order?
+
+**00:06 · Them** — Sure, I have the file open. Brenna Print got your artwork this morning.
+
+**00:13 · Me** — Great. Is the cardboard for the boxes still the same as last time?
+
+**00:19 · Them** — Same board, but the price went up by about four percent since the summer.
+
+**00:27 · Me** — Okay. Can you put that in writing, with the new unit price?
+
+**00:32 · Them** — Yes, I'll send an updated quote today.
+
+**00:37 · Me** — And the delivery date? We need them before the launch on the eighteenth.
+
+**00:44 · Them** — If you approve the proof by Thursday, we deliver on the fifteenth.
+
+**00:52 · Me** — Thursday works. Send the proof to me and I'll forward it to the client.
+
+**01:00 · Them** — Will do. One more thing: the logo file is low resolution, the edges will look soft.
+
+**01:10 · Me** — Right, I'll ask Northpine for the vector version.
+
+**01:15 · Them** — Perfect. Then we're set. Talk soon.
+
+**01:19 · Me** — Thanks Tomasz, bye.

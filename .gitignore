@@ -15,3 +15,6 @@ __pycache__/
 
 # Screenshots from design checks: taken on real calls.
 .taste-skill/
+
+# Test runs
+.pytest_cache/

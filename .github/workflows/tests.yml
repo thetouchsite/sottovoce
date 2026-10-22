@@ -1,0 +1,37 @@
+name: tests
+
+on:
+  push:
+  pull_request:
+
+# No GPU and no model on GitHub's machines: everything is tested on the
+# fictional calls in examples/, with the server started --no-model.
+# Transcription itself is checked by hand, on a machine with a GPU.
+
+jobs:
+  engine-and-api:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        python: ["3.10", "3.14"]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - run: python -m pip install -r requirements-dev.txt
+      - run: python -m py_compile server.py transcribe.py summary.py research/benchmark.py research/compare.py
+      - run: python -m pytest tests/test_engine.py tests/test_api.py -q
+
+  page:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m pip install -r requirements-dev.txt playwright
+      - run: python -m playwright install --with-deps chromium
+      - run: python -m pytest tests/test_page.py -q

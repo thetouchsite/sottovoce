@@ -5,14 +5,19 @@
 <title>Sottovoce</title>
 
 <!--
-  THE QUESTION THIS SCREEN ANSWERS: what was said in this call, and where is
-  the text uncertain?
+  TWO SCREENS, TWO QUESTIONS.
 
-  Everything else follows. The biggest block is the transcript, because it is
-  the answer. Above it sits THE CALL STRIP, the one thing no other
-  transcription tool shows: the real duration of the recording as a single
-  band, with speech, silence, the invented phrases that were dropped and the
-  lines corrected by hand. Click it and the audio jumps there.
+  The page opens on NEW TRANSCRIPTION: "what do I want to turn into text?".
+  Its two big blocks are the two ways in: files you already have, or a call
+  you are about to have. Below them, what is running and the latest calls.
+  It never opens a call by itself: a page that greets you with someone else's
+  transcript makes starting a new one feel like a detour.
+
+  A CALL answers "what was said, and where is the text uncertain?". The
+  biggest block is the transcript, because it is the answer. Above it sits
+  THE CALL STRIP: the real duration of the recording as a single band, with
+  speech, silence, the invented phrases that were dropped and the lines
+  corrected. Click it and the audio jumps there.
 
   THE FONTS ARE IN THE REPO, not on Google Fonts. A page that calls an outside
   server when it opens contradicts the one promise of this program (nothing
@@ -22,7 +27,7 @@
   GRID ARITHMETIC at 1440, written down so it can be checked:
       1440 - 50 (rail) - 318 (call list) = 1072 canvas
       1072 - 2 x 32 (padding)            = 1008 usable
-      1008 = 664 + 24 + 320    and   664 = 2 x 320 + 24
+      1008 = 664 + 24 + 320    and   1008 = 492 + 24 + 492
   One gap value, 24, horizontally and vertically.
 -->
 
@@ -61,11 +66,13 @@
   button,select{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
   a{color:inherit}
   :focus-visible{outline:1px solid var(--accent);outline-offset:2px}
+  [hidden]{display:none !important}
 
   /* ---- the rail: the mark, two views, shutdown at the bottom ------------ */
   .rail{border-right:1px solid var(--border);display:flex;flex-direction:column;
     align-items:center;padding:14px 0 12px;gap:4px}
-  .rail .mark{display:block;margin-bottom:18px}
+  .rail .mark{display:grid;margin-bottom:18px}
+  .rail .mark svg{width:22px;height:22px;fill:initial;stroke:none}
   .rail button{width:34px;height:34px;display:grid;place-items:center;
     color:var(--muted);border-radius:var(--radius-card);position:relative}
   .rail button:hover{color:var(--text)}
@@ -87,6 +94,8 @@
     color:var(--muted);margin:5px 0 0}
   .light{width:6px;height:6px;border-radius:50%;background:var(--warning);flex:none}
   .light.ok{background:var(--positive)} .light.no{background:var(--negative)}
+  .new-row{padding:0 16px 10px}
+  .new-row .secondary{width:100%;justify-content:center;color:var(--text)}
   .search-row{padding:0 16px 12px}
   #search{width:100%;height:var(--control-h);background:var(--surface);
     color:var(--text);border:1px solid var(--control);
@@ -104,6 +113,7 @@
     white-space:nowrap;font-weight:500}
   .item .meta{display:block;font-size:var(--fs-small);color:var(--muted);margin-top:2px}
   .item .meta .dropped{color:var(--warning)}
+  .item.running .meta{color:var(--text)}
   .group{font-size:var(--fs-small);color:var(--muted);padding:14px 8px 6px;margin:0}
   .hit{display:flex;gap:10px;padding:5px 8px;border-radius:var(--radius-card);
     width:100%;text-align:left;line-height:1.4}
@@ -120,6 +130,14 @@
     border:1px solid var(--accent);pointer-events:none}
   .inner{max-width:1008px}
 
+  /* The way back, where the eye looks for it: above the title. */
+  .crumbs{display:flex;align-items:center;gap:8px;font-size:var(--fs-small);color:var(--muted);
+    margin:-8px 0 10px}
+  .crumbs button{color:var(--muted);padding:2px 0}
+  .crumbs button:hover{color:var(--text)}
+  .crumbs svg{width:12px;height:12px;fill:none;stroke:currentColor;stroke-width:1.8;
+    stroke-linecap:round;stroke-linejoin:round;margin-right:4px;vertical-align:-1px}
+  .crumbs span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .title-row{display:flex;align-items:flex-start;gap:var(--gap);margin-bottom:var(--gap)}
   .title-row>div:first-child{min-width:0;flex:1}
   h1{font-size:var(--fs-title);letter-spacing:-.01em;overflow-wrap:anywhere}
@@ -129,14 +147,22 @@
     height:var(--control-h);padding:0 16px;border-radius:var(--radius-control)}
   /* Disabled but readable, and the label says why. */
   .primary:disabled{background:var(--raised);color:var(--muted);cursor:default}
+  .primary.stop{background:var(--negative);color:#fff}
   .secondary{border:1px solid var(--control);height:var(--control-h);
     padding:0 14px;border-radius:var(--radius-control);display:inline-flex;
-    align-items:center;text-decoration:none;color:var(--muted)}
+    align-items:center;gap:8px;text-decoration:none;color:var(--muted)}
   .secondary:hover{color:var(--text);border-color:var(--text)}
+  .secondary svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:1.8;
+    stroke-linecap:round;stroke-linejoin:round}
   select.secondary{background:var(--surface);padding:0 12px}
   select.secondary option{background:var(--surface);color:var(--text)}
+  .toggle{display:flex;align-items:center;gap:8px;color:var(--muted);font-size:var(--fs-small);
+    cursor:pointer;height:var(--control-h);white-space:nowrap}
+  .toggle input{accent-color:var(--accent);width:15px;height:15px;margin:0}
+  .toggle:hover{color:var(--text)}
   .text-button{color:var(--muted);text-decoration:none}
   .text-button:hover{color:var(--text)}
+  .text-button.danger:hover{color:var(--negative)}
 
   /* No border on the panels: on a dark ground the separation is the shadow,
      as the style prescribes. Never a border AND a shadow. */
@@ -148,6 +174,67 @@
   .panel>header .right{margin-left:auto;display:flex;align-items:baseline;
     gap:14px;font-size:var(--fs-small);color:var(--muted)}
   .content{padding:20px}
+
+  /* ---- the download menu: it floats, so it may cast a shadow ------------ */
+  .menu{position:relative}
+  .menu>summary{list-style:none;cursor:pointer}
+  .menu>summary::-webkit-details-marker{display:none}
+  .menu-list{position:absolute;right:0;top:calc(100% + 6px);z-index:10;min-width:230px;
+    background:var(--raised);border-radius:var(--radius-card);padding:6px;
+    box-shadow:0 16px 40px rgba(0,0,0,.45)}
+  .menu-list a{display:flex;justify-content:space-between;gap:14px;padding:8px 10px;
+    border-radius:4px;text-decoration:none}
+  .menu-list a:hover{background:var(--control)}
+  .menu-list a span{color:var(--muted);font-size:var(--fs-small)}
+
+  /* ---- the new transcription screen -------------------------------------- */
+  .split2{display:grid;grid-template-columns:1fr 1fr;gap:var(--gap);align-items:stretch;
+    margin-bottom:var(--gap)}
+  .split2>.panel{margin-bottom:0;display:flex;flex-direction:column}
+  .split2 .content{flex:1;display:flex;flex-direction:column}
+  .drop{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;
+    text-align:center;padding:40px 24px;border:1px dashed var(--control);
+    border-radius:var(--radius-card);cursor:pointer;min-height:236px}
+  .drop:hover,.canvas.dragover .drop{border-color:var(--accent)}
+  .drop b{display:block;font-size:18px;font-weight:600;margin-bottom:8px}
+  .drop span{color:var(--muted);line-height:1.6}
+  .drop .primary{margin-top:18px}
+  .steps{margin:0 0 16px;padding-left:20px;color:var(--muted);line-height:1.6}
+  .steps li{margin-bottom:6px}
+  .steps b{color:var(--text);font-weight:500}
+  .rec-foot{margin-top:auto;display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+  .rec-note{color:var(--muted);font-size:var(--fs-small);line-height:1.5;margin:14px 0 0}
+  .field{display:flex;flex-direction:column;gap:6px;margin:0 0 16px}
+  .field label{font-size:var(--fs-small);color:var(--muted)}
+  .field input{height:38px;background:var(--surface);color:var(--text);
+    border:1px solid var(--control);border-radius:8px;padding:0 12px;font:inherit}
+  .field input:focus{outline:none;border-color:var(--accent)}
+  .live{display:flex;align-items:baseline;gap:12px;margin-bottom:14px}
+  .live .dot{width:8px;height:8px;border-radius:50%;background:var(--negative);flex:none;
+    align-self:center;animation:blink 1.2s ease-in-out infinite}
+  @keyframes blink{50%{opacity:.25}}
+  .live .clock{font-size:28px;font-variant-numeric:tabular-nums}
+  .meter{display:grid;grid-template-columns:110px 1fr;gap:10px;align-items:center;margin-bottom:10px}
+  .meter span{color:var(--muted);font-size:var(--fs-small)}
+  .meter .track{height:6px;border-radius:3px;background:var(--raised);overflow:hidden}
+  .meter .track i{display:block;height:100%;width:0;background:var(--chart-1);transition:width .08s linear}
+  .meter.quiet-tab .track i{background:var(--warning)}
+
+  .queue-row{display:grid;grid-template-columns:1fr auto;gap:6px 16px;padding:12px 0;
+    border-top:1px solid var(--rule);align-items:center}
+  .queue-row:first-child{border-top:0;padding-top:0}
+  .queue-row .qname{font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .queue-row .qstage{grid-column:1/-1;color:var(--muted);font-size:var(--fs-small)}
+  .queue-row .bar{grid-column:1/-1}
+
+  .recent{width:100%;border-collapse:collapse}
+  .recent td{padding:10px 0;border-top:1px solid var(--rule);vertical-align:middle}
+  .recent tr:first-child td{border-top:0}
+  .recent tr{cursor:pointer}
+  .recent tr:hover td{color:var(--text)}
+  .recent td.n{text-align:right;color:var(--muted);font-variant-numeric:tabular-nums;
+    white-space:nowrap;padding-left:20px}
+  .recent td:first-child{font-weight:500}
 
   /* the legend: every key is the mark itself, smaller */
   .legend{display:flex;gap:14px;font-size:var(--fs-small);color:var(--muted);
@@ -177,19 +264,14 @@
   .figures dt{font-size:var(--fs-small);color:var(--muted)}
   .figures dd{margin:4px 0 0;font-size:var(--fs-kpi);font-weight:400;
     font-variant-numeric:tabular-nums}
-  .figures dd u{text-decoration:none;font-size:var(--fs-small);
-    color:var(--muted);margin-left:3px}
+  .figures dd u{text-decoration:none;font-size:var(--fs-small);color:var(--muted);margin-left:3px}
   .figures dd.none{color:var(--muted)}
 
   /* Left, what is read, at a reading measure: 664px is about 75 characters at
      15px. Right, a rail with the call's details that stays in view while the
-     text scrolls.
-
-     Summary and transcript are three views of the SAME panel. Stacked, the
-     summary pushed the transcript, which is the answer, below the fold. And
-     before that they were two side-by-side columns that never balanced: their
-     height depends on how long each call is. A rail does not have to end
-     level with the column next to it. */
+     text scrolls. Summary and transcript are three views of the SAME panel,
+     so the transcript is never pushed below the fold. A rail does not have to
+     end level with the column next to it. */
   .split{display:grid;grid-template-columns:664px 320px;gap:var(--gap);align-items:start}
   .split>*{min-width:0}
   .side{position:sticky;top:0}
@@ -240,20 +322,24 @@
   .lines p.playing{border-left-color:var(--accent);background:var(--raised)}
   .lines time{color:var(--muted);flex:none;width:44px;font-size:var(--fs-small);
     font-variant-numeric:tabular-nums;padding-top:4px}
+  .lines .who{flex:none;width:40px;font-size:var(--fs-small);padding-top:4px;color:var(--muted)}
+  .lines .who.me{color:var(--accent)}
   .lines.paras p{padding-top:9px;padding-bottom:9px}
+  .lines .w{cursor:pointer;border-bottom:1px solid transparent}
+  .lines .w:hover{border-bottom-color:var(--control)}
+  .lines .w.now{border-bottom-color:var(--accent)}
   .lines span[contenteditable]{border-bottom:1px solid var(--accent)}
+  .lines span[contenteditable] .w{border-bottom:0}
   .lines span[contenteditable]:focus{outline:none}
   .lines p.saved{background:var(--raised)}
 
-  .help{padding:0 20px 16px;color:var(--muted);font-size:var(--fs-small);
-    margin:0;line-height:1.6}
+  .help{padding:0 20px 16px;color:var(--muted);font-size:var(--fs-small);margin:0;line-height:1.6}
   .help kbd{border:1px solid var(--control);border-radius:3px;padding:0 5px;font:inherit}
 
-  /* ---- a running job: it takes the strip's place ------------------------- */
+  /* ---- progress ---------------------------------------------------------- */
   .stage{color:var(--muted);margin:0 0 12px}
   .bar{height:4px;background:var(--raised);border-radius:2px;overflow:hidden}
-  .bar i{display:block;height:100%;background:var(--chart-1);width:0;
-    transition:width .9s linear}
+  .bar i{display:block;height:100%;background:var(--chart-1);width:0;transition:width .9s linear}
   .bar.indeterminate i{width:30%;animation:slide 1.5s ease-in-out infinite}
   @keyframes slide{0%{margin-left:-30%}100%{margin-left:100%}}
 
@@ -264,22 +350,16 @@
   td{padding:11px 0;border-top:1px solid var(--rule);vertical-align:top}
   td.n{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
   td.variants{color:var(--muted)}
-  .form-row{display:grid;grid-template-columns:1fr 1fr auto;gap:12px;
-    margin-top:22px;align-items:end}
+  .form-row{display:grid;grid-template-columns:1fr 1fr auto;gap:12px;margin-top:22px;align-items:end}
   .form-row label{display:block;font-size:var(--fs-small);color:var(--muted);margin-bottom:7px}
-  .form-row input{width:100%;height:38px;background:var(--surface);
-    color:var(--text);border:1px solid var(--control);border-radius:8px;
-    padding:0 12px;font:inherit}
+  .form-row input{width:100%;height:38px;background:var(--surface);color:var(--text);
+    border:1px solid var(--control);border-radius:8px;padding:0 12px;font:inherit}
   .form-row input::placeholder{color:var(--muted)}
   .form-row input:focus{outline:none;border-color:var(--accent)}
 
   .empty{border:1px dashed var(--control);border-radius:var(--radius-card);
     padding:14px 16px;color:var(--muted);line-height:1.55;margin:0}
   .error{color:var(--negative)}
-  .drop{text-align:center;padding:78px 24px;border:1px dashed var(--control);
-    border-radius:var(--radius-card)}
-  .drop b{display:block;font-size:18px;font-weight:600;margin-bottom:9px}
-  .drop span{color:var(--muted);line-height:1.6}
   input[type=file]{display:none}
 
   /* ---- tablet: the rail becomes a bar, the list a drawer ----------------- */
@@ -287,7 +367,7 @@
     body{grid-template-columns:1fr;grid-template-rows:48px 1fr}
     .rail{flex-direction:row;border-right:0;border-bottom:1px solid var(--border);
       padding:0 12px;align-items:center;gap:6px}
-    .rail .mark{margin:0 10px 0 0}
+    .rail .mark{margin:0 6px 0 0}
     .rail button[aria-current=page]::after{right:5px;left:5px;top:auto;
       bottom:-1px;width:auto;height:1px}
     .rail .bottom{margin:0 0 0 auto}
@@ -297,7 +377,6 @@
       transition:transform .18s ease} /* taste-skill-ignore */
     .sidebar.open{transform:none}
     .canvas.dragover::after{inset:48px 0 0 0}
-    /* One column: reading first, then the rail, which stops staying put. */
     .split{grid-template-columns:1fr}
     .side{position:static}
     .figures{grid-template-columns:repeat(3,1fr)}
@@ -311,7 +390,8 @@
     :root{--pad:16px}
     .title-row{flex-direction:column;gap:14px}
     .actions{width:100%;flex-wrap:wrap}
-    .primary{flex:1}
+    .split2{grid-template-columns:1fr}
+    .drop{min-height:180px}
     .figures{grid-template-columns:repeat(2,1fr)}
     .figures>div{border-left:1px solid var(--rule)}
     .figures>div:nth-child(odd){border-left:0}
@@ -324,30 +404,33 @@
     .legend{margin-left:0;width:100%;flex-wrap:wrap}
     .form-row{grid-template-columns:1fr}
     #strip{height:60px}
+    .lines .who{width:34px}
   }
 
   @media (prefers-reduced-motion:reduce){
     .bar.indeterminate i{animation:none;width:100%;opacity:.35}
-    .bar i{transition:none}
+    .bar i,.meter .track i{transition:none}
     .sidebar{transition:none}
+    .live .dot{animation:none}
   }
 </style>
 
 <nav class="rail" aria-label="Views">
   <!-- The mark: a voice, three strokes of different amplitude. Drawn for this
        program, not a square with a letter in it. -->
-  <svg class="mark" width="22" height="22" viewBox="0 0 22 22" role="img"
-       aria-label="Sottovoce">
-    <rect x="3" y="7" width="2.6" height="8" rx="1.3" fill="#4a8ad6"/>
-    <rect x="9.7" y="3" width="2.6" height="16" rx="1.3" fill="#4a8ad6"/>
-    <rect x="16.4" y="9" width="2.6" height="4" rx="1.3" fill="#4a8ad6"/>
-  </svg>
+  <button class="mark" id="mark" type="button" title="Sottovoce: home" aria-label="Sottovoce, home">
+    <svg width="22" height="22" viewBox="0 0 22 22" aria-hidden="true">
+      <rect x="3" y="7" width="2.6" height="8" rx="1.3" fill="#4a8ad6"/>
+      <rect x="9.7" y="3" width="2.6" height="16" rx="1.3" fill="#4a8ad6"/>
+      <rect x="16.4" y="9" width="2.6" height="4" rx="1.3" fill="#4a8ad6"/>
+    </svg>
+  </button>
 
   <button id="open-list" type="button" title="Calls" aria-label="Open the call list">
     <svg viewBox="0 0 20 20"><path d="M3 5h14M3 10h14M3 15h9"/></svg>
   </button>
-  <button id="v-calls" type="button" aria-current="page" title="Calls" aria-label="Calls">
-    <svg viewBox="0 0 20 20"><path d="M4 3.5h12v13H4z"/><path d="M7 7h6M7 10h6M7 13h3.5"/></svg>
+  <button id="v-home" type="button" aria-current="page" title="Home: new transcription and latest calls" aria-label="Home">
+    <svg viewBox="0 0 20 20"><path d="M3.5 9.5L10 4l6.5 5.5"/><path d="M5.5 8.5v7.5h9V8.5"/></svg>
   </button>
   <button id="v-glossary" type="button" title="Name glossary" aria-label="Name glossary">
     <svg viewBox="0 0 20 20"><path d="M3.5 4.5a1 1 0 0 1 1-1h11v13h-11a1 1 0 0 1-1-1z"/><path d="M3.5 13.5h12M7 7h5"/></svg>
@@ -362,6 +445,11 @@
     <h2>Calls</h2>
     <p class="engine"><i class="light"></i><span id="engine-text">loading the model</span></p>
   </header>
+  <div class="new-row">
+    <button class="secondary" id="new-button" type="button">
+      <svg viewBox="0 0 14 14"><path d="M7 2v10M2 7h10"/></svg>New transcription
+    </button>
+  </div>
   <div class="search-row">
     <input type="search" id="search" placeholder="Search every call">
   </div>
@@ -372,7 +460,7 @@
   <div class="inner" id="inner"></div>
 </main>
 
-<input type="file" id="file" accept="audio/*,video/*">
+<input type="file" id="file" accept="audio/*,video/*" multiple>
 
 <script>
 "use strict";
@@ -387,6 +475,7 @@ const thousands = n => (n === null || n === undefined ? '—' : Number(n).toLoca
 const secondsOf = m => { const p = /^(\d+):(\d+)$/.exec(String(m == null ? '' : m).trim());
   return p ? (+p[1]) * 60 + (+p[2]) : null; };
 const plural = (n, one, many) => n + ' ' + (n === 1 ? one : many);
+const megabytes = b => (b / 1048576).toFixed(1) + ' MB';
 
 // Whisper language codes. "auto" lets the model detect it from the audio; a
 // fixed language is safer when a call opens with silence or a foreign word.
@@ -401,15 +490,20 @@ const languageName = c => {
   const f = LANGUAGES.find(x => x[0] === c);
   return f ? f[1] : c.toUpperCase();
 };
-// The choice is remembered in this browser only: a convenience, never data.
+// Choices remembered in this browser only: a convenience, never data.
 const store = {
   get(k){ try{ return localStorage.getItem(k); } catch(e){ return null; } },
   set(k, v){ try{ localStorage.setItem(k, v); } catch(e){} },
 };
+const currentLanguage = () => store.get('sottovoce-language') || 'auto';
+const precise = () => store.get('sottovoce-precise') === '1';
 
-let ready = false, off = false, openNow = null, calls = [], llm = null;
+let ready = false, off = false, openNow = null, calls = [], llm = null, view = 'home';
+// Jobs started from this page: { id, name, state, stage, expected, elapsed, duration, folder, error }
+const queue = [];
+let rec = null;            // the recording in progress, if any
 
-/* ========================== engine and calls ========================== */
+/* ========================== engine and history ========================== */
 
 async function checkEngine(){
   try{
@@ -420,17 +514,14 @@ async function checkEngine(){
     if (d.off){
       off = true;
       t.textContent = 'browsing only, Whisper not loaded';
-      document.querySelectorAll('.primary[data-label]').forEach(b => b.textContent = 'Transcription off');
+      refreshHomeButtons();
       return;
     }
     if (d.ready){
       ready = true;
       light.className = 'light ok';
       t.textContent = d.model.split('/').pop() + ' · ready';
-      document.querySelectorAll('.primary[data-label]').forEach(b => {
-        b.disabled = false;
-        b.textContent = b.dataset.label;
-      });
+      refreshHomeButtons();
     } else setTimeout(checkEngine, 1500);
   } catch(e){ setTimeout(checkEngine, 2000); }
 }
@@ -440,25 +531,36 @@ async function checkLLM(){
   catch(e){ llm = {available:false}; }
 }
 
-async function loadHistory(){
+async function loadCalls(){
   try{ calls = (await (await fetch('/api/history')).json()).history || []; }
   catch(e){ return; }
   drawList();
+  if (view === 'home') drawRecent();
 }
 
 function drawList(){
   const l = $('#list');
+  if ($('#search').value.trim().length >= 2) return;      // a search is on screen
   l.textContent = '';
-  if (!calls.length){
+  // What is being transcribed right now comes first: it is the newest call.
+  for (const j of queue.filter(j => j.state === 'running')){
+    const b = el('button', 'item running');
+    b.type = 'button';
+    b.innerHTML = '<span class="name">' + esc(j.name) + '</span><span class="meta">'
+      + esc(jobStageText(j)) + '</span>';
+    b.onclick = showHome;
+    l.append(b);
+  }
+  if (!calls.length && !queue.length){
     const p = el('p', 'quiet');
-    p.textContent = 'No calls yet. Drop one on the page.';
+    p.textContent = 'No calls yet.';
     l.append(p);
     return;
   }
   for (const v of calls){
     const b = el('button', 'item');
     b.type = 'button';
-    if (v.folder === openNow) b.setAttribute('aria-current', 'true');
+    if (view === 'call' && v.folder === openNow) b.setAttribute('aria-current', 'true');
     const n = el('span', 'name');
     n.textContent = v.original || v.folder;
     // A count only on what asks to be looked at, and it names what it counts:
@@ -466,7 +568,7 @@ function drawList(){
     const dropped = (v.phantoms_dropped || []).length;
     const m = el('span', 'meta');
     m.innerHTML = '<span class="num">' + esc((v.transcribed_at || '').slice(0, 10)) + '</span>'
-      + ' · <span class="num">' + Math.round((v.duration_s || 0) / 60) + '</span> min'
+      + ' · <span class="num">' + Math.max(1, Math.round((v.duration_s || 0) / 60)) + '</span> min'
       + ' · <span class="num">' + thousands(v.words) + '</span> words'
       + (dropped ? ' · <span class="dropped">' + esc(plural(dropped, 'phrase dropped', 'phrases dropped')) + '</span>' : '');
     b.append(n, m);
@@ -531,6 +633,589 @@ function highlight(s, q){
   return out.join('');
 }
 
+/* ========================= the new transcription screen ================= */
+// The page opens here, never on a call. The two ways in sit side by side,
+// the same size: files you already have, and a call you are about to have.
+
+function setView(v){
+  view = v;
+  $('#v-home').toggleAttribute('aria-current', v === 'home');
+  $('#v-glossary').toggleAttribute('aria-current', v === 'glossary');
+  if (v === 'home') $('#v-home').setAttribute('aria-current', 'page');
+  if (v === 'glossary') $('#v-glossary').setAttribute('aria-current', 'page');
+  $('#sidebar').classList.remove('open');
+}
+
+function languagePicker(){
+  const s = el('select', 'secondary');
+  s.id = 'language';
+  s.setAttribute('aria-label', 'Language of the recording');
+  s.title = 'Language of the recording';
+  const saved = currentLanguage();
+  for (const [code, name] of LANGUAGES){
+    const o = el('option');
+    o.value = code;
+    o.textContent = name;
+    if (code === saved) o.selected = true;
+    s.append(o);
+  }
+  s.onchange = () => store.set('sottovoce-language', s.value);
+  return s;
+}
+
+// Precise word timings cost twice the time (measured: 395 s instead of 200
+// on a 27-minute call), so they are a choice, remembered, and never a default.
+function preciseToggle(){
+  const l = el('label', 'toggle');
+  l.title = 'Every word lands exactly where it was said, so a click plays from that word. '
+    + 'Takes about twice as long: 27 minutes in about 7 instead of 4.';
+  const c = el('input');
+  c.type = 'checkbox';
+  c.checked = precise();
+  c.onchange = () => store.set('sottovoce-precise', c.checked ? '1' : '0');
+  l.append(c, 'Precise word timings');
+  return l;
+}
+
+function crumbs(here){
+  const n = el('nav', 'crumbs');
+  n.setAttribute('aria-label', 'Where you are');
+  const b = el('button');
+  b.type = 'button';
+  b.innerHTML = '<svg viewBox="0 0 12 12"><path d="M7.5 2.5L4 6l3.5 3.5"/></svg>Sottovoce';
+  b.title = 'Back to the start (Esc)';
+  b.onclick = showHome;
+  const sep = el('span');
+  sep.textContent = '/';
+  const h = el('span');
+  h.textContent = here;
+  n.append(b, sep, h);
+  return n;
+}
+
+function panel(title){
+  const p = el('div', 'panel');
+  const h = el('header');
+  if (title){ const t = el('h2'); t.textContent = title; h.append(t); }
+  p.append(h);
+  return p;
+}
+
+function showHome(){
+  setView('home');
+  openNow = null;
+  drawList();
+  const d = $('#inner');
+  d.textContent = '';
+
+  const tr = el('div', 'title-row');
+  const left = el('div');
+  const h1 = el('h1');
+  h1.textContent = 'New transcription';
+  const fd = el('p', 'finding');
+  fd.textContent = 'Drop recordings you already have, or record a call as it happens. '
+    + 'Everything is transcribed on this machine.';
+  left.append(h1, fd);
+  const act = el('div', 'actions');
+  act.append(preciseToggle(), languagePicker());
+  tr.append(left, act);
+  d.append(tr);
+
+  const unfinished = el('div');
+  unfinished.id = 'home-unfinished';
+  d.append(unfinished);
+
+  const two = el('div', 'split2');
+  two.append(filesPanel(), recordPanel());
+  d.append(two);
+
+  const q = el('div');
+  q.id = 'home-queue';
+  d.append(q);
+
+  const recent = el('div');
+  recent.id = 'home-recent';
+  d.append(recent);
+
+  drawQueue();
+  drawRecent();
+  drawUnfinished();
+}
+
+function filesPanel(){
+  const p = panel('Transcribe files');
+  const c = el('div', 'content');
+  const drop = el('div', 'drop');
+  drop.id = 'drop';
+  drop.setAttribute('role', 'button');
+  drop.tabIndex = 0;
+  drop.innerHTML = '<b>Drop recordings here</b><span>mp4, m4a, mp3, wav, ogg, opus, 3gp, '
+    + 'and anything else ffmpeg can open. Several at once is fine: they run one '
+    + 'after the other.</span>';
+  const b = el('button', 'primary');
+  b.type = 'button';
+  b.dataset.need = 'model';
+  b.textContent = 'Choose files';
+  b.onclick = e => { e.stopPropagation(); if (ready) $('#file').click(); };
+  drop.append(b);
+  drop.onclick = () => ready && $('#file').click();
+  drop.onkeydown = e => { if ((e.key === 'Enter' || e.key === ' ') && ready){ e.preventDefault(); $('#file').click(); } };
+  c.append(drop);
+  p.append(c);
+  return p;
+}
+
+// Recording needs the browser to share a tab's sound: Chrome and Edge on a
+// computer do, Firefox and Safari do not.
+const canRecord = () => !!(navigator.mediaDevices && navigator.mediaDevices.getDisplayMedia
+  && window.MediaRecorder && window.AudioContext);
+
+function recordPanel(){
+  const p = panel('Record a call');
+  p.id = 'record-panel';
+  const c = el('div', 'content');
+  c.id = 'record-body';
+  p.append(c);
+  drawRecordIdle(c);
+  return p;
+}
+
+function drawRecordIdle(c){
+  c = c || $('#record-body');
+  if (!c) return;
+  c.textContent = '';
+  if (!canRecord()){
+    const v = el('p', 'empty');
+    v.textContent = 'Recording needs Chrome or Edge on a computer: this browser cannot '
+      + 'capture the sound of another tab.';
+    c.append(v);
+    return;
+  }
+  const ol = el('ol', 'steps');
+  ol.innerHTML = '<li>Open your call in a browser tab: <b>Google Meet</b>, Zoom or Teams on the web.</li>'
+    + '<li>Press <b>Start recording</b> and pick that tab. Leave <b>Also share tab audio</b> on.</li>'
+    + '<li>Talk. When the call ends, press <b>Stop and transcribe</b>.</li>';
+  const f = el('div', 'field');
+  f.innerHTML = '<label for="rec-name">Name of the call</label>'
+    + '<input id="rec-name" placeholder="e.g. Weekly sync with Northpine">';
+  const foot = el('div', 'rec-foot');
+  const b = el('button', 'primary');
+  b.type = 'button';
+  b.dataset.need = 'nothing';
+  b.textContent = 'Start recording';
+  b.onclick = () => startRecording($('#rec-name').value.trim());
+  foot.append(b);
+  const note = el('p', 'rec-note');
+  note.textContent = 'Your microphone and the call are saved on two separate tracks, so '
+    + 'the transcript says who spoke. Use headphones, and tell the others you are recording.';
+  c.append(ol, f, foot, note);
+}
+
+function refreshHomeButtons(){
+  document.querySelectorAll('[data-need=model]').forEach(b => {
+    b.disabled = !ready;
+    b.textContent = ready ? 'Choose files' : (off ? 'Transcription off' : 'Loading the model…');
+  });
+}
+
+function drawRecent(){
+  const box = $('#home-recent');
+  if (!box) return;
+  box.textContent = '';
+  const p = panel('Latest calls');
+  const right = el('div', 'right');
+  if (calls.length){
+    const minutes = calls.reduce((s, v) => s + (v.duration_s || 0) / 60, 0);
+    right.textContent = plural(calls.length, 'call', 'calls') + ' · '
+      + Math.round(minutes) + ' minutes in all';
+  }
+  p.querySelector('header').append(right);
+  const c = el('div', 'content');
+  if (!calls.length){
+    const v = el('p', 'empty');
+    v.textContent = 'No calls yet. The ones you transcribe appear here and in the list on the left.';
+    c.append(v);
+  } else {
+    const t = el('table', 'recent');
+    for (const v of calls.slice(0, 6)){
+      const r = el('tr');
+      r.tabIndex = 0;
+      r.innerHTML = '<td>' + esc(v.original || v.folder) + '</td>'
+        + '<td class="n">' + esc(languageName(v.language) || '—') + '</td>'
+        + '<td class="n">' + Math.max(1, Math.round((v.duration_s || 0) / 60)) + ' min</td>'
+        + '<td class="n">' + esc((v.transcribed_at || '').slice(0, 16)) + '</td>';
+      r.onclick = () => openCall(v.folder);
+      r.onkeydown = e => { if (e.key === 'Enter') openCall(v.folder); };
+      t.append(r);
+    }
+    c.append(t);
+  }
+  p.append(c);
+  box.append(p);
+}
+
+/* ------------------------- recordings left half-way --------------------- */
+
+async function drawUnfinished(){
+  const box = $('#home-unfinished');
+  if (!box) return;
+  let r;
+  try{ r = (await (await fetch('/api/recordings')).json()).recordings || []; }
+  catch(e){ return; }
+  // The one being recorded right now is not "interrupted".
+  r = r.filter(x => !(rec && rec.id === x.id));
+  box.textContent = '';
+  if (!r.length) return;
+  const p = panel('Interrupted recordings');
+  const c = el('div', 'content');
+  const n = el('p', 'note');
+  n.textContent = 'The page was closed while recording. What was recorded until then is safe: '
+    + 'transcribe it, or delete it.';
+  c.append(n);
+  for (const x of r){
+    const row = el('div', 'queue-row');
+    row.innerHTML = '<span class="qname">' + esc(x.name) + '</span>';
+    const acts = el('span', 'actions');
+    const go = el('button', 'secondary');
+    go.type = 'button';
+    go.textContent = 'Transcribe';
+    go.disabled = !ready;
+    go.onclick = async () => {
+      const j = await (await fetch('/api/recordings/' + x.id + '/finish', {method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({language: currentLanguage(), precise: precise()})})).json();
+      if (j.error) return alert(j.error);
+      track(j.job, x.name + '.webm');
+      drawUnfinished();
+    };
+    const del = el('button', 'text-button danger');
+    del.type = 'button';
+    del.textContent = 'Delete';
+    del.onclick = async () => {
+      if (!confirm('Delete this recording? It cannot be recovered.')) return;
+      await fetch('/api/recordings/' + x.id, {method:'DELETE'});
+      drawUnfinished();
+    };
+    acts.append(go, del);
+    row.append(acts);
+    const st = el('span', 'qstage');
+    st.textContent = 'started ' + x.started_at + ' · ' + megabytes(x.bytes);
+    row.append(st);
+    c.append(row);
+  }
+  p.append(c);
+  box.append(p);
+}
+
+/* =============================== the queue ============================== */
+// Every file dropped, and every recording stopped, becomes a job here. They
+// run one at a time on the server; this only follows them.
+
+function jobStageText(j){
+  if (j.state === 'error') return j.error || 'failed';
+  if (j.state === 'done') return 'done';
+  if (j.expected){
+    const left = Math.max(0, j.expected - j.elapsed);
+    return j.stage + ' · ' + Math.max(1, Math.round(j.duration / 60)) + ' min of audio · '
+      + (left > 0 ? 'about ' + left + ' s left' : 'almost done');
+  }
+  return j.stage + '…';
+}
+
+function track(id, name){
+  queue.push({id, name, state:'running', stage:'queued', expected:0, elapsed:0, duration:0});
+  drawQueue();
+  drawList();
+  poll();
+}
+
+let polling = null;
+function poll(){
+  if (polling) return;
+  polling = setInterval(async () => {
+    const running = queue.filter(j => j.state === 'running');
+    if (!running.length){ clearInterval(polling); polling = null; return; }
+    let finished = null;
+    for (const j of running){
+      let s;
+      try{ s = await (await fetch('/api/job/' + j.id)).json(); } catch(e){ continue; }
+      if (s.error && !s.state){ j.state = 'error'; j.error = s.error; continue; }
+      Object.assign(j, {state: s.state, stage: s.stage, expected: s.expected || 0,
+                        elapsed: s.elapsed || 0, duration: s.duration || 0,
+                        folder: s.folder, error: s.error});
+      if (s.state === 'done') finished = j;
+    }
+    if (finished) await loadCalls();
+    drawQueue();
+    drawList();
+    // One file dropped and waited for: open it as soon as it is ready. With
+    // several, or if you went to read something else, the queue keeps an
+    // "Open" link instead of pulling the screen away.
+    if (finished && view === 'home' && !rec && queue.length === 1){
+      queue.length = 0;
+      openCall(finished.folder);
+    }
+  }, 1000);
+}
+
+function drawQueue(){
+  const box = $('#home-queue');
+  if (!box) return;
+  box.textContent = '';
+  if (!queue.length) return;
+  const p = panel('Transcribing');
+  const right = el('div', 'right');
+  const running = queue.filter(j => j.state === 'running').length;
+  right.textContent = running ? plural(running, 'job', 'jobs') + ' left, one at a time' : 'all done';
+  if (!running){
+    const clear = el('button', 'text-button');
+    clear.type = 'button';
+    clear.textContent = 'Clear';
+    clear.onclick = () => { queue.length = 0; drawQueue(); };
+    right.append(clear);
+  }
+  p.querySelector('header').append(right);
+  const c = el('div', 'content');
+  for (const j of queue){
+    const row = el('div', 'queue-row');
+    const name = el('span', 'qname');
+    name.textContent = j.name;
+    row.append(name);
+    if (j.state === 'done' && j.folder){
+      const o = el('button', 'secondary');
+      o.type = 'button';
+      o.textContent = 'Open';
+      o.onclick = () => openCall(j.folder);
+      row.append(o);
+    } else row.append(el('span'));
+    const st = el('span', 'qstage' + (j.state === 'error' ? ' error' : ''));
+    st.textContent = jobStageText(j);
+    row.append(st);
+    if (j.state === 'running'){
+      const bar = el('div', 'bar' + (j.expected ? '' : ' indeterminate'));
+      const i = el('i');
+      if (j.expected) i.style.width = (Math.min(0.97, j.elapsed / j.expected) * 100).toFixed(0) + '%';
+      bar.append(i);
+      row.append(bar);
+    }
+    c.append(row);
+  }
+  p.append(c);
+  box.append(p);
+}
+
+async function sendFiles(files){
+  if (!ready) return;
+  const language = currentLanguage();
+  if (view !== 'home') showHome();
+  for (const file of files){
+    const form = new FormData();
+    form.append('file', file);
+    form.append('language', language);
+    form.append('precise', precise() ? 'true' : 'false');
+    try{
+      const r = await (await fetch('/api/transcribe', {method:'POST', body:form})).json();
+      if (r.error) throw new Error(r.error);
+      track(r.job, file.name);
+    } catch(e){
+      queue.push({id:null, name:file.name, state:'error', error:e.message});
+      drawQueue();
+    }
+  }
+}
+
+/* ============================ recording a call ========================== */
+// Two tracks: your microphone on the left channel, the call's tab on the
+// right. The server tells who spoke from them (transcribe.label_speakers).
+// Pieces go to the server every five seconds, so a closed tab or a crashed
+// browser loses seconds, not the call.
+
+async function startRecording(name){
+  const body = $('#record-body');
+  const fail = msg => {
+    drawRecordIdle(body);
+    const v = el('p', 'rec-note error');
+    v.textContent = msg;
+    body.append(v);
+  };
+  let display, mic;
+  try{
+    display = await navigator.mediaDevices.getDisplayMedia({
+      video: true,
+      audio: {echoCancellation:false, noiseSuppression:false, autoGainControl:false},
+      selfBrowserSurface: 'exclude', surfaceSwitching: 'include', systemAudio: 'include'});
+  } catch(e){ return fail('Nothing was shared, so nothing is being recorded.'); }
+  const tab = display.getAudioTracks()[0];
+  if (!tab){
+    display.getTracks().forEach(t => t.stop());
+    return fail('The share came without sound. Pick the tab of your call and leave '
+      + '“Also share tab audio” on.');
+  }
+  try{
+    mic = await navigator.mediaDevices.getUserMedia(
+      {audio:{echoCancellation:true, noiseSuppression:true, autoGainControl:true}});
+  } catch(e){
+    display.getTracks().forEach(t => t.stop());
+    return fail('The microphone was not allowed: without it your voice would be missing.');
+  }
+
+  const ctx = new AudioContext();
+  const merger = ctx.createChannelMerger(2);
+  const micSrc = ctx.createMediaStreamSource(mic);
+  const tabSrc = ctx.createMediaStreamSource(new MediaStream([tab]));
+  micSrc.connect(merger, 0, 0);
+  tabSrc.connect(merger, 0, 1);
+  const dest = ctx.createMediaStreamDestination();
+  dest.channelCount = 2;
+  merger.connect(dest);
+  const meters = [micSrc, tabSrc].map(src => {
+    const a = ctx.createAnalyser();
+    a.fftSize = 1024;
+    src.connect(a);
+    return a;
+  });
+
+  let id;
+  try{
+    id = (await (await fetch('/api/recordings', {method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({name, language: currentLanguage()})})).json()).id;
+  } catch(e){
+    display.getTracks().forEach(t => t.stop()); mic.getTracks().forEach(t => t.stop()); ctx.close();
+    return fail('The server did not answer: is it still running?');
+  }
+
+  const recorder = new MediaRecorder(dest.stream, {mimeType: 'audio/webm;codecs=opus',
+                                                   audioBitsPerSecond: 64000});
+  rec = {id, name, recorder, ctx, display, mic, meters, started: Date.now(), pending: [],
+         sending: false, sent: 0, quietTab: 0};
+
+  // Pieces are sent in order, one at a time; a piece that fails stays at the
+  // head of the line and is sent again with the next one.
+  recorder.ondataavailable = e => { if (e.data && e.data.size){ rec.pending.push(e.data); flush(); } };
+  async function flush(){
+    if (!rec || rec.sending) return;
+    rec.sending = true;
+    while (rec.pending.length){
+      try{
+        const r = await fetch('/api/recordings/' + id + '/chunk', {method:'POST', body: rec.pending[0]});
+        if (!r.ok) throw new Error('chunk refused');
+        rec.sent += rec.pending.shift().size;
+      } catch(e){ break; }
+    }
+    rec.sending = false;
+  }
+  rec.flush = flush;
+
+  // Ending the share from the browser's own bar ends the recording too.
+  tab.addEventListener('ended', () => rec && stopRecording(true));
+  recorder.start(5000);
+  window.addEventListener('beforeunload', warnLeaving);
+  drawRecordLive();
+  drawList();
+}
+
+function warnLeaving(e){ e.preventDefault(); e.returnValue = ''; }
+
+function drawRecordLive(){
+  const c = $('#record-body');
+  if (!c || !rec) return;
+  c.textContent = '';
+  const live = el('div', 'live');
+  live.innerHTML = '<i class="dot"></i><span class="clock num" id="rec-clock">00:00</span>'
+    + '<span class="note" id="rec-sent"></span>';
+  const m1 = el('div', 'meter');
+  m1.innerHTML = '<span>You (microphone)</span><div class="track"><i id="lvl-0"></i></div>';
+  const m2 = el('div', 'meter');
+  m2.id = 'meter-tab';
+  m2.innerHTML = '<span>The call (tab)</span><div class="track"><i id="lvl-1"></i></div>';
+  const hint = el('p', 'rec-note');
+  hint.id = 'rec-hint';
+  hint.textContent = (rec.name ? '“' + rec.name + '” · ' : '')
+    + 'Keep this page open. Switching to the call’s tab is fine.';
+  const foot = el('div', 'rec-foot');
+  foot.style.marginTop = '16px';
+  const stop = el('button', 'primary stop');
+  stop.type = 'button';
+  stop.textContent = 'Stop and transcribe';
+  stop.onclick = () => stopRecording(true);
+  const cancel = el('button', 'text-button danger');
+  cancel.type = 'button';
+  cancel.textContent = 'Discard';
+  cancel.onclick = () => { if (confirm('Discard this recording? Nothing will be kept.')) stopRecording(false); };
+  foot.append(stop, cancel);
+  c.append(live, m1, m2, hint, foot);
+  tickRecording();
+}
+
+function tickRecording(){
+  if (!rec) return;
+  const clock = $('#rec-clock');
+  if (clock) clock.textContent = mmss((Date.now() - rec.started) / 1000);
+  const sent = $('#rec-sent');
+  if (sent) sent.textContent = megabytes(rec.sent) + ' saved';
+  const buf = new Float32Array(1024);
+  rec.meters.forEach((a, i) => {
+    a.getFloatTimeDomainData(buf);
+    let sum = 0;
+    for (const v of buf) sum += v * v;
+    const level = Math.min(1, Math.sqrt(sum / buf.length) * 6);
+    const bar = $('#lvl-' + i);
+    if (bar) bar.style.width = (level * 100).toFixed(0) + '%';
+    if (i === 1) rec.quietTab = level < 0.01 ? rec.quietTab + 1 : 0;
+  });
+  // Twenty seconds of nothing from the tab: the wrong tab, or its sound off.
+  const hint = $('#rec-hint'), mt = $('#meter-tab');
+  if (hint && rec.quietTab > 1200){
+    hint.textContent = 'No sound from the call yet. If the others are talking, the tab may be the '
+      + 'wrong one, or shared without its audio.';
+    if (mt) mt.classList.add('quiet-tab');
+  } else if (mt) mt.classList.remove('quiet-tab');
+  requestAnimationFrame(tickRecording);
+}
+
+async function stopRecording(keep){
+  const r = rec;
+  if (!r || r.stopping) return;
+  r.stopping = true;
+  const stopped = new Promise(res => r.recorder.onstop = res);
+  if (r.recorder.state !== 'inactive') r.recorder.stop();
+  await stopped;
+  // Wait for the last pieces to reach the server.
+  for (let i = 0; i < 100 && (r.pending.length || r.sending); i++){
+    await r.flush();
+    await new Promise(res => setTimeout(res, 100));
+  }
+  r.display.getTracks().forEach(t => t.stop());
+  r.mic.getTracks().forEach(t => t.stop());
+  r.ctx.close();
+  window.removeEventListener('beforeunload', warnLeaving);
+  rec = null;
+
+  if (!keep){
+    await fetch('/api/recordings/' + r.id, {method:'DELETE'});
+    drawRecordIdle();
+    return;
+  }
+  const name = (r.name || 'Call ' + new Date(r.started).toISOString().slice(0, 16).replace('T', ' ')
+    .replace(':', '.'));
+  try{
+    const j = await (await fetch('/api/recordings/' + r.id + '/finish', {method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({name, language: currentLanguage(), precise: precise()})})).json();
+    if (j.error) throw new Error(j.error);
+    if (view !== 'home') showHome();
+    drawRecordIdle();
+    track(j.job, name + '.webm');
+  } catch(e){
+    if (view !== 'home') showHome();
+    drawRecordIdle();
+    drawUnfinished();
+    alert('The recording is saved, but could not be sent to transcription: ' + e.message
+      + '. It is listed under “Interrupted recordings”.');
+  }
+}
+
 /* ============================ the call strip ============================ */
 // The element no other transcription tool has: the real duration as one band.
 // Inside: where people speak, where an invented phrase was dropped, where a
@@ -565,15 +1250,9 @@ function drawStrip(svg, axis, l){
   // pixel and disappears. Line width is counted in real pixels.
   const line = Math.max(1, W / Math.max(1, svg.getBoundingClientRect().width || W));
 
-  // The band's ground is silence; speech is laid on top of it.
-  //
-  // Speech comes from the AUDIO (l.speech, measured with ffmpeg: pauses over a
-  // second below -35 dB), not from the text. The text cannot tell: the .txt
-  // only stores where each line starts, the end is the start of the next one,
-  // so lines touch by construction. Drawn from the text, every call looked
-  // spoken from the first second to the last.
-  //
-  // If the measurement is missing the band stays empty and the legend does not
+  // The band's ground is silence; speech is laid on top of it. Speech comes
+  // from the AUDIO (l.speech, measured with ffmpeg), not from the text. If the
+  // measurement is missing the band stays empty and the legend does not
   // mention speech: nothing is better than a full band that means nothing.
   svg.append(sv('rect', {x:0, y:TOP, width:W, height:BAND, fill:'#0e0d11'}));
   for (const t of (l.speech || [])){
@@ -581,9 +1260,7 @@ function drawStrip(svg, axis, l){
     svg.append(sv('rect', {x:a, y:TOP, width:Math.max(line, b - a), height:BAND,
                            fill:'#f2f2f3', 'fill-opacity':'.62'}));
   }
-
-  // Dropped phrases: a line the full height, in the colour of a fault. These
-  // are the places where the model had invented.
+  // Dropped phrases: a line the full height, in the colour of a fault.
   for (const f of (l.phantoms || [])){
     const s = secondsOf(f.minute);
     if (s === null) continue;
@@ -591,21 +1268,18 @@ function drawStrip(svg, axis, l){
   }
   // Corrected lines: the same line in the accent, from the bottom.
   for (const c of (l.corrections || [])){
-    svg.append(sv('rect', {x:x(c.seconds), y:TOP + BAND - 15, width:line,
-                           height:21, fill:'#4a8ad6'}));
+    svg.append(sv('rect', {x:x(c.seconds), y:TOP + BAND - 15, width:line, height:21, fill:'#4a8ad6'}));
   }
-
   const head = sv('rect', {x:0, y:0, width:line, height:TOP + BAND + 6, fill:'#ffffff'});
   head.style.display = 'none';
   svg.append(head);
 
   // The axis: a round step inside the duration, and the real duration at the
-  // end. On a phone every other label is hidden.
+  // end. A tick is kept if there is room before the end label: 6% of the
+  // width is about 58px on a desktop, enough for two labels side by side.
   axis.textContent = '';
   const step = axisStep(duration);
   const ticks = [];
-  // A tick is kept if there is room before the end label: 6% of the width is
-  // about 58px on a desktop, enough for two labels side by side.
   for (let s = 0; s <= duration - Math.max(step * 0.25, duration * 0.06); s += step) ticks.push(s);
   ticks.push(duration);
   ticks.forEach((s, i) => {
@@ -619,35 +1293,38 @@ function drawStrip(svg, axis, l){
       e.classList.add('minor');
     axis.append(e);
   });
-
-  return {svg:svg, head:head, x:x, duration:duration};
+  return {svg, head, x, duration};
 }
 
 /* ============================= opening a call =========================== */
 
 async function openCall(name, jump){
+  setView('call');
   openNow = name;
-  callsView();
   drawList();
-  $('#sidebar').classList.remove('open');
   $('#inner').innerHTML = '<p class="quiet">opening…</p>';
   let l;
   try{
     l = await (await fetch('/api/history/' + encodeURIComponent(name))).json();
     if (l.error) throw new Error(l.error);
   } catch(e){ return failure(e.message); }
+  if (openNow !== name) return;                    // another call was clicked meanwhile
   show(l, jump);
 }
 
 function failure(msg){
-  $('#inner').innerHTML = '<h1>It does not open</h1><p class="finding error">'
-    + esc(msg) + '</p>';
+  $('#inner').innerHTML = '<h1>It does not open</h1><p class="finding error">' + esc(msg) + '</p>';
 }
 
 // The finding: the fact about THIS call to look at first. A bare number is not
 // a finding, and every figure here says what it is counting.
 function finding(l){
   const d = [];
+  if (l.two_tracks){
+    const me = l.segments.filter(s => s.speaker === 'Me').length;
+    d.push('recorded on two tracks: ' + plural(me, 'line', 'lines') + ' from you, '
+      + (l.segments.length - me) + ' from the others');
+  }
   const dropped = (l.phantoms || []).length;
   if (dropped) d.push(plural(dropped, 'invented phrase dropped from silence',
                                       'invented phrases dropped from silence'));
@@ -669,14 +1346,6 @@ function cell(label, v, unit){
     + (none ? '—' : esc(v) + (unit ? ' <u>' + unit + '</u>' : '')) + '</dd></div>';
 }
 
-function panel(title){
-  const p = el('div', 'panel');
-  const h = el('header');
-  if (title){ const t = el('h2'); t.textContent = title; h.append(t); }
-  p.append(h);
-  return p;
-}
-
 // The legend names only the marks actually on the strip: a key without its
 // mark sends you looking for something that is not there.
 function legend(l){
@@ -689,37 +1358,29 @@ function legend(l){
   return e;
 }
 
-// The main job's button. While the model loads it is off, and it says so in
-// words instead of sitting there as a mute grey shape.
-function primaryButton(label){
-  const b = el('button', 'primary');
-  b.type = 'button';
-  b.dataset.label = label;
-  b.textContent = ready ? label : (off ? 'Transcription off' : 'Loading the model…');
-  b.disabled = !ready;
-  b.onclick = () => ready && $('#file').click();
-  return b;
-}
-
-function languagePicker(){
-  const s = el('select', 'secondary');
-  s.id = 'language';
-  s.setAttribute('aria-label', 'Language of the recording');
-  s.title = 'Language of the recording';
-  const saved = store.get('sottovoce-language') || 'auto';
-  for (const [code, name] of LANGUAGES){
-    const o = el('option');
-    o.value = code;
-    o.textContent = name;
-    if (code === saved) o.selected = true;
-    s.append(o);
+function downloadMenu(l){
+  const base = '/api/history/' + encodeURIComponent(l.folder) + '/download';
+  const m = el('details', 'menu');
+  const s = el('summary', 'secondary');
+  s.innerHTML = '<svg viewBox="0 0 14 14"><path d="M7 2v7M4 6l3 3 3-3M2.5 12h9"/></svg>Download';
+  const list = el('div', 'menu-list');
+  for (const [fmt, what] of [['md', 'to read, in paragraphs'], ['txt', 'line by line, timestamps'],
+                             ['srt', 'subtitles'], ['vtt', 'subtitles for the web'],
+                             ['json', 'lines and word timings']]){
+    const a = el('a');
+    a.href = base + '.' + fmt;
+    a.innerHTML = '.' + fmt + '<span>' + what + '</span>';
+    a.onclick = () => m.removeAttribute('open');
+    list.append(a);
   }
-  s.onchange = () => store.set('sottovoce-language', s.value);
-  return s;
+  m.append(s, list);
+  return m;
 }
+document.addEventListener('click', e => {
+  document.querySelectorAll('details.menu[open]').forEach(m => { if (!m.contains(e.target)) m.removeAttribute('open'); });
+});
 
 function show(l, jump){
-  const base = '/api/history/' + encodeURIComponent(l.folder) + '/download';
   // Totals come from the parts as shown: if a line was corrected, the count
   // written in info.json is one correction old.
   const words = l.segments.reduce((s, p) =>
@@ -728,8 +1389,8 @@ function show(l, jump){
 
   const d = $('#inner');
   d.textContent = '';
+  d.append(crumbs(l.name));
 
-  /* --- the title row --- */
   const tr = el('div', 'title-row');
   const left = el('div');
   const h1 = el('h1');
@@ -738,19 +1399,10 @@ function show(l, jump){
   fd.textContent = finding(l);
   left.append(h1, fd);
   const act = el('div', 'actions');
-  const md = el('a', 'secondary');
-  md.href = base + '.md';
-  md.textContent = '.md';
-  md.title = 'Download the text in paragraphs';
-  const tx = el('a', 'secondary');
-  tx.href = base + '.txt';
-  tx.textContent = '.txt';
-  tx.title = 'Download the text line by line, with timestamps';
-  act.append(languagePicker(), primaryButton('Transcribe a recording'), md, tx);
+  act.append(downloadMenu(l));
   tr.append(left, act);
   d.append(tr);
 
-  /* --- the strip: the leading element --- */
   const ps = panel('The call, minute by minute');
   ps.querySelector('header').append(legend(l));
   const svg = sv('svg', {id:'strip', role:'img', 'aria-label':
@@ -764,7 +1416,6 @@ function show(l, jump){
   d.append(ps);
   const st = drawStrip(svg, axis, l);
 
-  /* --- the figures: one divided container, no tiles --- */
   const pf = el('div', 'panel');
   const dl = el('dl', 'figures');
   dl.innerHTML = cell('Duration', mmss(l.duration))
@@ -777,7 +1428,6 @@ function show(l, jump){
   pf.append(dl);
   d.append(pf);
 
-  /* --- left the reading, right the call's rail --- */
   const split = el('div', 'split');
   split.append(readingPanel(l, st, jump), sidePanel(l, st));
   d.append(split);
@@ -849,19 +1499,20 @@ function sidePanel(l, st){
   col.append(p);
 
   /* the glossary in this call: which names weigh in it and how much, because
-     those are the ones to look after: a name said eleven times and garbled
-     ruins the reading, one said once does not. Below it, a way to apply the
-     table again when it grew after the transcription. */
+     those are the ones to look after. Below it, a way to apply the table
+     again when it grew after the transcription. */
   const g = panel('Glossary');
   const gc = el('div', 'content glossary-body');
   const many = l.names_corrected || 0;
+  const names = l.names || [];
   const line = el('p', 'note');
+  // Found is not the same as corrected: a name Whisper got right is in the
+  // table below without anything having been fixed.
   line.textContent = many
     ? plural(many, 'name', 'names') + ' corrected in this transcript.'
-    : 'No name corrected in this transcript.';
+    : names.length ? 'Names from the glossary in this call, all heard right:'
+                   : 'No name corrected in this transcript.';
   gc.append(line);
-
-  const names = l.names || [];
   if (names.length){
     const t = el('table');
     const tb = el('tbody');
@@ -878,7 +1529,6 @@ function sidePanel(l, st){
     v.textContent = 'None of the names in the glossary appears in this call.';
     gc.append(v);
   }
-
   const b = el('button', 'secondary foot-action');
   b.type = 'button';
   b.textContent = 'Apply the glossary again';
@@ -886,26 +1536,26 @@ function sidePanel(l, st){
     b.disabled = true;
     b.textContent = 'applying…';
     try{
-      const r = await (await fetch('/api/reapply/' + encodeURIComponent(l.folder),
-        {method:'POST'})).json();
+      const r = await (await fetch('/api/reapply/' + encodeURIComponent(l.folder), {method:'POST'})).json();
       if (r.error) throw new Error(r.error);
       if (!r.corrected){ b.textContent = 'Already up to date'; return; }
-      await loadHistory();
+      await loadCalls();
       openCall(l.folder);
     } catch(e){ b.textContent = e.message; }
   };
   gc.append(b);
   g.append(gc);
   col.append(g);
-
   return col;
 }
 
 /* ============================ the reading panel ========================= */
 // Three views of the same panel: the summary, the text to read, the text line
-// by line. The summary is the starting view when there is one, because it is
-// the first thing you read after a call; the transcript is one click away, in
-// the same place, instead of below the fold.
+// by line. The summary is the starting view when there is one; the transcript
+// is one click away, in the same place, instead of below the fold.
+//
+// When the words have their timings, each word can be clicked to play from
+// it, and the word being said is underlined as the audio plays.
 
 function readingPanel(l, st, jump){
   const p = panel(null);
@@ -914,13 +1564,12 @@ function readingPanel(l, st, jump){
   const tabs = el('div', 'tabs');
   tabs.setAttribute('role', 'tablist');
   const buttons = {};
-  for (const [k, name] of [['summary', 'Summary'], ['read', 'Read'],
-                           ['lines', 'Line by line']]){
+  for (const [k, name] of [['summary', 'Summary'], ['read', 'Read'], ['lines', 'Line by line']]){
     const b = el('button');
     b.type = 'button';
     b.setAttribute('role', 'tab');
     b.textContent = name;
-    b.onclick = () => view(k);
+    b.onclick = () => view_(k);
     buttons[k] = b;
     tabs.append(b);
   }
@@ -963,12 +1612,12 @@ function readingPanel(l, st, jump){
   p.append(box);
   const help = el('p', 'help');
   help.hidden = true;
-  help.innerHTML = 'Double-click a line to correct it · <kbd>Enter</kbd> saves · '
-    + '<kbd>Esc</kbd> cancels. Every correction is kept with its before and after: '
-    + 'it is the material a model can one day learn your calls from.';
+  help.innerHTML = 'Click a word to listen from it · double-click a line to correct it · '
+    + '<kbd>Enter</kbd> saves · <kbd>Esc</kbd> cancels. Every correction is kept with its '
+    + 'before and after: it is the material a model can one day learn your calls from.';
   p.append(help);
 
-  let current = null, summaryText = l.summary || null, last = null;
+  let current = null, summaryText = l.summary || null, last = null, lastWord = null;
 
   // play() returns a promise and the browser may reject it: a codec it cannot
   // read, or autoplay blocked. Unhandled, the button does nothing and the
@@ -979,15 +1628,34 @@ function readingPanel(l, st, jump){
     if (c) c.textContent = 'cannot play this file';
   }
 
+  // A line's text, as clickable words when their timings are known.
+  function textOf(x){
+    const sp = el('span');
+    sp.className = 'text';
+    if (x.words && x.words.length){
+      x.words.forEach((w, i) => {
+        if (i) sp.append(' ');
+        const s = el('span', 'w');
+        s.dataset.w = w[0];
+        s.textContent = w[2];
+        sp.append(s);
+      });
+    } else sp.textContent = x.text;
+    return sp;
+  }
   const row = (x, i) => {
     const e = el('p');
     e.dataset.t = x.start || 0;
     if (i !== undefined) e.dataset.i = i;
     const tm = el('time');
     tm.textContent = mmss(x.start);
-    const sp = el('span');
-    sp.textContent = x.text;
-    e.append(tm, sp);
+    e.append(tm);
+    if (l.two_tracks){
+      const who = el('span', 'who' + (x.speaker === 'Me' ? ' me' : ''));
+      who.textContent = x.speaker === 'Me' ? 'You' : (x.speaker ? 'Them' : '');
+      e.append(who);
+    }
+    e.append(textOf(x));
     return e;
   };
   function fill(items, dense){
@@ -996,12 +1664,12 @@ function readingPanel(l, st, jump){
     for (let i = 0; i < items.length; i++) box.append(row(items[i], dense ? i : undefined));
   }
 
-  function view(k){
+  function view_(k){
     current = k;
     for (const q in buttons) buttons[q].setAttribute('aria-selected', String(q === k));
     help.hidden = (k !== 'lines');
     context.textContent = '';
-    last = null;
+    last = null; lastWord = null;
     if (k === 'read') fill(l.paragraphs, false);
     else if (k === 'lines') fill(l.segments, true);
     else showSummary();
@@ -1038,8 +1706,7 @@ function readingPanel(l, st, jump){
       box.append(v, b);
     } else {
       v.textContent = 'A summary needs a language model running on this machine: '
-        + 'LM Studio, Ollama or llama-server. None is answering, so there is '
-        + 'nothing to ask.';
+        + 'LM Studio, Ollama or llama-server. None is answering, so there is nothing to ask.';
       box.append(v);
     }
   }
@@ -1074,9 +1741,10 @@ function readingPanel(l, st, jump){
 
   /* --- copying: whatever view you are looking at --- */
   copy.onclick = async () => {
+    const who = x => x.speaker ? (x.speaker === 'Me' ? 'You: ' : 'Them: ') : '';
     const t = current === 'summary' ? (summaryText || '')
       : (current === 'lines' ? l.segments : l.paragraphs)
-          .map(x => '[' + mmss(x.start) + '] ' + x.text)
+          .map(x => '[' + mmss(x.start) + '] ' + who(x) + x.text)
           .join(current === 'lines' ? '\n' : '\n\n');
     if (!t) return;
     await navigator.clipboard.writeText(t);
@@ -1084,16 +1752,18 @@ function readingPanel(l, st, jump){
     setTimeout(() => copy.textContent = 'Copy', 1500);
   };
 
-  /* --- clicking a line plays from there --- */
+  /* --- clicking plays: from the word if it has a time, else from the line --- */
   box.addEventListener('click', e => {
+    if (!audio || e.target.closest('[contenteditable=true]')) return;
+    const w = e.target.closest('.w');
     const r = e.target.closest('p[data-t]');
-    if (!r || !audio) return;
-    audio.currentTime = parseFloat(r.dataset.t);
+    if (!r) return;
+    audio.currentTime = parseFloat(w ? w.dataset.w : r.dataset.t);
     audio.play().catch(cannotPlay);
   });
 
-  /* and the line playing stays marked with the same 1px line as everything
-     else: one kind of selection, one mark */
+  /* and what is playing stays marked with the same 1px line as everything
+     else: the line on its left edge, the word underneath */
   function follow(){
     if (!audio || (audio.currentTime === 0 && audio.paused)) return;
     const t = audio.currentTime;
@@ -1108,16 +1778,24 @@ function readingPanel(l, st, jump){
       if (pick) pick.classList.add('playing');
       last = pick;
     }
+    let word = null;
+    if (pick) for (const w of pick.querySelectorAll('.w')){
+      if (parseFloat(w.dataset.w) <= t + 0.05) word = w; else break;
+    }
+    if (word !== lastWord){
+      if (lastWord) lastWord.classList.remove('now');
+      if (word) word.classList.add('now');
+      lastWord = word;
+    }
   }
 
   /* --- the strip is also the audio's scrub bar --- */
   // Scrolls inside the panel, not the page: clicking the strip at the top must
   // not make the screen jump.
   st.go = s => {
-    if (current === 'summary') view('read');
+    if (current === 'summary') view_('read');
     if (audio){ audio.currentTime = s; audio.play().catch(cannotPlay); }
-    const r = [...box.querySelectorAll('p[data-t]')].reverse()
-      .find(x => parseFloat(x.dataset.t) <= s);
+    const r = [...box.querySelectorAll('p[data-t]')].reverse().find(x => parseFloat(x.dataset.t) <= s);
     if (r) box.scrollTop = Math.max(0, r.offsetTop - box.clientHeight / 2);
   };
   st.svg.onclick = e => {
@@ -1129,96 +1807,51 @@ function readingPanel(l, st, jump){
   box.addEventListener('dblclick', e => {
     const r = e.target.closest('p[data-i]');
     if (!r) return;
-    const s = r.querySelector('span');
+    const s = r.querySelector('span.text');
     if (s.isContentEditable) return;
     const before = s.textContent;
     s.contentEditable = 'true';
     s.focus();
     const close = async save => {
       s.contentEditable = 'false';
-      const after = s.textContent.trim();
-      if (!save || after === before.trim()){ s.textContent = before; return; }
+      const after = s.textContent.replace(/\s+/g, ' ').trim();
+      const i = +r.dataset.i;
+      if (!save || after === before.replace(/\s+/g, ' ').trim()){ r.replaceWith(row(l.segments[i], i)); return; }
       try{
         const q = await (await fetch('/api/correct/' + encodeURIComponent(l.folder), {
           method:'POST', headers:{'Content-Type':'application/json'},
-          body: JSON.stringify({index: +r.dataset.i, text: after})})).json();
+          body: JSON.stringify({index: i, text: after})})).json();
         if (q.error) throw new Error(q.error);
-        r.classList.add('saved');
-        setTimeout(() => r.classList.remove('saved'), 900);
         // The paragraph view must see the correction too: read it again from
         // disk, which is the source, instead of rebuilding it here.
         const fresh = await (await fetch('/api/history/' + encodeURIComponent(l.folder))).json();
         if (!fresh.error){ l.segments = fresh.segments; l.paragraphs = fresh.paragraphs; }
-      } catch(err){ s.textContent = before; }
+        const nr = row(l.segments[i], i);
+        nr.classList.add('saved');
+        r.replaceWith(nr);
+        setTimeout(() => nr.classList.remove('saved'), 900);
+      } catch(err){ r.replaceWith(row(l.segments[i], i)); }
     };
     s.onkeydown = x => {
       if (x.key === 'Enter'){ x.preventDefault(); close(true); }
-      if (x.key === 'Escape'){ x.preventDefault(); close(false); }
+      // Stopped here: Esc on a line cancels the correction, and must not
+      // also travel up to the page and leave the call.
+      if (x.key === 'Escape'){ x.preventDefault(); x.stopPropagation(); close(false); }
     };
     s.onblur = () => close(true);
   });
 
-  view(summaryText && !jump ? 'summary' : 'read');
+  view_(summaryText && !jump ? 'summary' : 'read');
   if (jump) setTimeout(() => st.go(jump), 60);
   return p;
-}
-
-/* ========================== the screen with no call ===================== */
-
-function showEmpty(){
-  openNow = null;
-  callsView();
-  drawList();
-  const d = $('#inner');
-  d.textContent = '';
-  const minutes = calls.reduce((s, v) => s + (v.duration_s || 0) / 60, 0);
-  const words = calls.reduce((s, v) => s + (v.words || 0), 0);
-  const dropped = calls.reduce((s, v) => s + (v.phantoms_dropped || []).length, 0);
-
-  const tr = el('div', 'title-row');
-  const left = el('div');
-  const h1 = el('h1');
-  h1.textContent = 'Calls';
-  const fd = el('p', 'finding');
-  fd.textContent = calls.length
-    ? plural(calls.length, 'call', 'calls') + ' transcribed, '
-      + Math.round(minutes) + ' minutes of recording in ' + thousands(words)
-      + ' words. Pick one on the left.'
-    : 'Nothing yet. Drop a recording here and the text comes back in a few minutes.';
-  left.append(h1, fd);
-  const act = el('div', 'actions');
-  act.append(languagePicker(), primaryButton('Transcribe a recording'));
-  tr.append(left, act);
-  d.append(tr);
-
-  const p = el('div', 'panel');
-  const c = el('div', 'content');
-  const drop = el('div', 'drop');
-  drop.innerHTML = '<b>Drop the recording here</b><span>mp4, m4a, mp3, wav, '
-    + 'opus, 3gp, and anything else ffmpeg can open.<br>'
-    + 'The file never leaves this machine: it is converted, normalized and '
-    + 'transcribed here.</span>';
-  c.append(drop);
-  p.append(c);
-  d.append(p);
-
-  if (calls.length){
-    const n = el('div', 'panel');
-    const dl = el('dl', 'figures');
-    dl.style.gridTemplateColumns = 'repeat(3,1fr)';
-    dl.innerHTML = cell('Calls', calls.length)
-      + cell('Minutes recorded', Math.round(minutes))
-      + cell('Invented phrases dropped', dropped);
-    n.append(dl);
-    d.append(n);
-  }
 }
 
 /* ============================== the glossary ============================ */
 
 async function showGlossary(){
-  $('#v-calls').removeAttribute('aria-current');
-  $('#v-glossary').setAttribute('aria-current', 'page');
+  setView('glossary');
+  openNow = null;
+  drawList();
   const d = $('#inner');
   d.innerHTML = '<p class="quiet">opening…</p>';
   let g;
@@ -1226,7 +1859,9 @@ async function showGlossary(){
     g = await (await fetch('/api/glossary')).json();
     if (g.error) throw new Error(g.error);
   } catch(e){ return failure(e.message); }
+  if (view !== 'glossary') return;
   d.textContent = '';
+  d.append(crumbs('Name glossary'));
 
   const used = g.rules.filter(r => r.count).length;
   const tr = el('div', 'title-row');
@@ -1262,7 +1897,6 @@ async function showGlossary(){
     t.append(tb);
     c.append(t);
   }
-
   const form = el('form', 'form-row');
   form.innerHTML = '<div><label for="g-right">Right name</label>'
     + '<input id="g-right" required placeholder="e.g. Kubernetes"></div>'
@@ -1277,7 +1911,7 @@ async function showGlossary(){
     try{
       const r = await (await fetch('/api/glossary', {method:'POST',
         headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({right:right, variants:variants})})).json();
+        body: JSON.stringify({right, variants})})).json();
       if (r.error) throw new Error(r.error);
       showGlossary();
     } catch(err){ alert(err.message); }
@@ -1287,95 +1921,36 @@ async function showGlossary(){
   d.append(p);
 }
 
-function callsView(){
-  $('#v-glossary').removeAttribute('aria-current');
-  $('#v-calls').setAttribute('aria-current', 'page');
-}
+/* ============================== wiring ================================== */
 
+$('#v-home').onclick = showHome;
+$('#mark').onclick = showHome;
+// Esc goes back to the start, unless a line is being corrected (there it
+// cancels the correction) or a menu is open (there it closes the menu).
+document.addEventListener('keydown', e => {
+  if (e.key !== 'Escape' || view === 'home') return;
+  if (document.activeElement && (document.activeElement.isContentEditable
+      || /INPUT|SELECT|TEXTAREA/.test(document.activeElement.tagName))) return;
+  const menu = document.querySelector('details.menu[open]');
+  if (menu){ menu.removeAttribute('open'); return; }
+  showHome();
+});
+$('#new-button').onclick = showHome;
 $('#v-glossary').onclick = showGlossary;
-$('#v-calls').onclick = () => { if (openNow) openCall(openNow); else showEmpty(); };
 $('#open-list').onclick = () => $('#sidebar').classList.toggle('open');
-
-/* ============================= sending a file =========================== */
 
 const canvas = $('#canvas');
 canvas.addEventListener('dragover', e => { e.preventDefault(); if (ready) canvas.classList.add('dragover'); });
-canvas.addEventListener('dragleave', () => canvas.classList.remove('dragover'));
+canvas.addEventListener('dragleave', e => { if (!canvas.contains(e.relatedTarget)) canvas.classList.remove('dragover'); });
 canvas.addEventListener('drop', e => {
   e.preventDefault();
   canvas.classList.remove('dragover');
-  if (ready && e.dataTransfer.files[0]) send(e.dataTransfer.files[0]);
+  if (ready && e.dataTransfer.files.length) sendFiles([...e.dataTransfer.files]);
 });
-$('#file').onchange = e => e.target.files[0] && send(e.target.files[0]);
-
-async function send(file){
-  const language = ($('#language') && $('#language').value) || store.get('sottovoce-language') || 'auto';
-  openNow = null;
-  callsView();
-  drawList();
-  const d = $('#inner');
-  d.textContent = '';
-  const tr = el('div', 'title-row');
-  const left = el('div');
-  const h1 = el('h1');
-  h1.textContent = file.name;
-  const fd = el('p', 'finding');
-  fd.textContent = 'transcribing on this machine'
-    + (language === 'auto' ? ', language detected from the audio' : ', in ' + languageName(language));
-  left.append(h1, fd);
-  tr.append(left);
-  d.append(tr);
-
-  // The running job sits where the strip will be: when it ends, the page does
-  // not jump.
-  const p = panel('The call, minute by minute');
-  const c = el('div', 'content');
-  const stage = el('p', 'stage');
-  stage.textContent = 'uploading the file…';
-  const bar = el('div', 'bar indeterminate');
-  bar.append(el('i'));
-  c.append(stage, bar);
-  p.append(c);
-  d.append(p);
-
-  const form = new FormData();
-  form.append('file', file);
-  form.append('language', language);
-  let r;
-  try{ r = await (await fetch('/api/transcribe', {method:'POST', body:form})).json(); }
-  catch(e){ return failed(stage, bar, e.message); }
-  if (r.error) return failed(stage, bar, r.error);
-
-  const tick = setInterval(async () => {
-    let j;
-    try{ j = await (await fetch('/api/job/' + r.job)).json(); } catch(e){ return; }
-    if (j.state === 'error'){ clearInterval(tick); return failed(stage, bar, j.error); }
-    if (j.state === 'done'){
-      clearInterval(tick);
-      await loadHistory();
-      openCall(j.folder);
-      return;
-    }
-    if (j.expected){
-      bar.classList.remove('indeterminate');
-      bar.querySelector('i').style.width =
-        (Math.min(0.97, j.elapsed / j.expected) * 100).toFixed(0) + '%';
-      const left = Math.max(0, j.expected - j.elapsed);
-      stage.textContent = j.stage + ' · ' + Math.round(j.duration / 60)
-        + ' minutes of audio · ' + (left > 0 ? 'about ' + left + ' s left' : 'almost done');
-    } else stage.textContent = j.stage + '…';
-  }, 1000);
-}
-
-function failed(stage, bar, msg){
-  stage.className = 'stage error';
-  stage.textContent = msg;
-  bar.remove();
-}
-
-/* ================================ shutdown ============================== */
+$('#file').onchange = e => { if (e.target.files.length) sendFiles([...e.target.files]); e.target.value = ''; };
 
 $('#shutdown').onclick = async () => {
+  if (rec){ alert('A call is being recorded: stop it first.'); return; }
   if (!confirm('Stop the server? The VRAM is freed; start it again with Start.bat.')) return;
   try{
     const r = await (await fetch('/api/shutdown', {method:'POST'})).json();
@@ -1393,11 +1968,13 @@ $('#shutdown').onclick = async () => {
 };
 
 /* ================================= start ================================ */
+// The new transcription screen is drawn at once, before any answer from the
+// server: the page is never blank, even while the model loads or the GPU is
+// busy with another job.
 
-(async () => {
-  checkEngine();
-  await Promise.all([loadHistory(), checkLLM()]);
-  if (calls.length) openCall(calls[0].folder); else showEmpty();
-})();
+showHome();
+checkEngine();
+checkLLM();
+loadCalls();
 </script>
 </html>

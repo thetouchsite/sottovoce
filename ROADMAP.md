@@ -6,21 +6,31 @@ The ideas come from projects that do this job well: [whisper.cpp](https://github
 
 ---
 
-## 1. Word-level timestamps
+## Done in 1.1
 
-**Why.** A timestamp currently belongs to a segment, so clicking a line jumps to where the segment starts, not to the word. In a 30-minute call, landing within 10 seconds of a word and landing on the word is the difference between searching and finding.
+**Recording a call from the page.** The Vibe idea, done in the browser instead of natively: the call's tab and the microphone on two tracks, sent to the server every five seconds so an interrupted recording is offered again instead of lost. Checked on a synthetic two-track recording made from a real call: the two voices labelled correctly, with the other side bleeding into the microphone at -25 dB.
 
-**How.** The WhisperX idea: after Whisper, run forced alignment with a small phonetic model over the text that's already there. It moves the timings and leaves the words alone.
+**Who spoke, for calls recorded here.** It falls out of the two tracks, with no speaker-recognition model: each word goes to the track that is louder than usual at that moment, and lines split where the speaker changes.
 
-**Done when** clicking a word on the page plays from that word, less than half a second off.
+**Word timings.** By default each line's time is shared among its words, at no cost. Precise timings come from Whisper's own alignment, with no second model, at twice the transcription time (395 s instead of 200 on the 27-minute call, same quality). Not yet checked against a hand-timed reference: the "less than half a second off" criterion is still open.
 
-## 2. Record straight from the PC
+**Exports** (`.srt`, `.vtt`, `.json`), **several files at once**, **tests and CI** (engine, API and page, on every push, Ubuntu and Windows, Python 3.10 and 3.14).
 
-**Why.** It fixes the problem at the root instead of fixing what it causes. Today the call is recorded with a phone on the desk: one voice near the mic, the others from the speaker, mean -29.8 dB with peaks at -0.9. **Everything** we compensate for comes from that: loudness normalization, garbled names, phrases invented on silence. Recording the PC's audio output gets clean audio, and most of that work stops being needed.
+## 1. Record calls from desktop apps
 
-**How.** The Vibe idea: capture system audio (WASAPI loopback on Windows) and the microphone as two separate tracks. Which also gives **speaker separation for free**: whoever comes out of the speaker isn't you.
+**Why.** Recording from the page covers calls in a browser tab. Teams, Zoom and Webex desktop apps, and phone calls through the PC, don't have a tab to share.
 
-**Done when** a "record" button on the page produces a transcript with fewer non-existent words than the same call recorded with a phone.
+**How.** System-wide loopback capture (WASAPI on Windows), plus the microphone, on the same two tracks. Probably a small native helper, since a web page can't capture the whole system's sound on its own.
+
+**Done when** a call in the Teams desktop app is recorded and transcribed with *You* and *Them*, without a browser tab.
+
+## 2. Check precise word timings against a reference
+
+**Why.** Precise mode promises a click lands on the word. Nobody has measured how close it lands.
+
+**How.** Time by hand the words of two minutes of a real call, and compare.
+
+**Done when** the median offset is under half a second, or the README says what it really is.
 
 ## 3. Fine-tune on your own corrections
 
@@ -32,9 +42,9 @@ The ideas come from projects that do this job well: [whisper.cpp](https://github
 
 And a rule learned the hard way, on another project: **never decide on a single training run.** The variance between two identical runs changes the result more than almost any real improvement. Use three seeds, and report the mean and the spread.
 
-## 4. Speaker labels, optionally
+## 4. Speaker labels for calls recorded elsewhere
 
-**Why.** On calls with several people, "who said it" sometimes matters. Item 2 solves it for two-sided calls without any model.
+**Why.** A phone recording has one track, so who spoke can't be measured. On calls with several people it sometimes matters.
 
 **How.** `pyannote` on top of the transcript, as an opt-in. It needs a Hugging Face token and accepting a licence, so it stays off by default.
 
@@ -42,6 +52,6 @@ And a rule learned the hard way, on another project: **never decide on a single 
 
 ## 5. Linux and macOS launchers
 
-**Why.** The Python code is cross-platform, but only Windows is tested and has double-click launchers.
+**Why.** The Python code is cross-platform and the tests run on Ubuntu, but only Windows has double-click launchers.
 
 **Done when** `install.sh` and `start.sh` work on a clean Ubuntu machine with an NVIDIA GPU, checked by someone who isn't the author.

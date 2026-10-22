@@ -1,0 +1,67 @@
+{
+ "original": "Supplier check-in, Brenna Print.webm",
+ "transcribed_at": "2026-10-22 10:40",
+ "model": "openai/whisper-large-v3",
+ "language": "en",
+ "language_requested": "auto",
+ "duration_s": 84.0,
+ "seconds_taken": 22,
+ "silence_s": 27,
+ "names_corrected": 0,
+ "names_by_name": {},
+ "phantoms_dropped": [],
+ "words": 146,
+ "segments": 13,
+ "speech": [
+  [
+   0,
+   11.0
+  ],
+  [
+   13,
+   18.0
+  ],
+  [
+   19,
+   24.38
+  ],
+  [
+   27,
+   34.69
+  ],
+  [
+   37,
+   42.0
+  ],
+  [
+   44,
+   48.62
+  ],
+  [
+   52,
+   57.38
+  ],
+  [
+   60,
+   66.15
+  ],
+  [
+   70,
+   73.08
+  ],
+  [
+   75,
+   77.31
+  ],
+  [
+   79,
+   80.5
+  ]
+ ],
+ "word_times": "estimated",
+ "two_tracks": true,
+ "lines_by_speaker": {
+  "Me": 7,
+  "Them": 6
+ }
+}

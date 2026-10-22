@@ -1,0 +1,17 @@
+# For the tests: no GPU, no PyTorch, no model. They run on the fictional
+# calls in examples/ with the server started --no-model.
+#
+#     pip install -r requirements-dev.txt
+#     pytest tests/test_engine.py tests/test_api.py
+#
+# The page tests also need a browser:
+#
+#     pip install playwright && playwright install chromium
+#     pytest tests/test_page.py
+
+fastapi>=0.110
+uvicorn>=0.30
+python-multipart>=0.0.9
+numpy>=1.24
+httpx>=0.27
+pytest>=8
