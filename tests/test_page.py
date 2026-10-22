@@ -146,7 +146,7 @@ def test_download_menu_offers_every_format(page):
     open_call(page, SUPPLIER)
     page.locator(".menu:not(.more) summary").click()
     links = page.locator(".menu-list a").evaluate_all("a => a.map(x => x.getAttribute('href'))")
-    assert [h.rsplit(".", 1)[1] for h in links] == ["md", "txt", "srt", "vtt", "json"]
+    assert [h.rsplit(".", 1)[1] for h in links] == ["notes", "md", "txt", "srt", "vtt", "json"]
 
 
 def test_glossary_view(page):
@@ -199,7 +199,7 @@ def test_on_a_phone_a_line_is_corrected_with_taps(site, data):
         p.locator("#open-list").tap()
         p.locator(".item", has_text="Supplier check-in").tap()
         p.wait_for_selector(".reader")
-        assert p.locator(".jumps button").all_inner_texts()[:2] == ["Transcript", "Voices"]
+        assert p.locator(".jumps button").all_inner_texts()[:3] == ["Transcript", "Email", "Voices"]
         p.locator(".tabs button").nth(2).tap()
         assert p.locator(".tabs button").nth(2).inner_text() == "Lines"
         p.get_by_role("button", name="Correct").tap()
@@ -295,4 +295,12 @@ def test_the_page_in_italian_leaves_the_calls_as_they_are(site):
         assert p.locator("html").get_attribute("lang") == "en"
         assert errors == []
         browser.close()
+
+
+def test_a_call_offers_notes_and_a_follow_up_email(page):
+    open_call(page, NORTHPINE)
+    page.locator(".menu:not(.more) summary").click()
+    assert page.locator(".menu-list a").first.get_attribute("href").endswith("/download.notes")
+    page.keyboard.press("Escape")
+    assert page.locator("#p-followup h2").inner_text() == "Follow-up email"
 

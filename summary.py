@@ -1,4 +1,4 @@
-"""The summary of a call, written by an LLM running on this machine.
+"""The summary of a call, and the follow-up email, written by an LLM running on this machine.
 
 NOTHING NEW TO DOWNLOAD. We do not load a second model ourselves: we speak the
 OpenAI protocol to a local server that is already there (LM Studio, Ollama,
@@ -61,6 +61,32 @@ REQUEST = (
 )
 
 
+FOLLOWUP_INSTRUCTIONS = (
+    "You write the follow-up email after a business call, on behalf of the "
+    "person who recorded it. Write in the same language as the transcript. "
+    "Do not invent anything: no dates, prices, names or commitments that were "
+    "not said. Where a detail would be needed but is missing, write a "
+    "placeholder in square brackets, like [date]. The transcript is automatic "
+    "and contains errors: where a name looks garbled, leave it as it is."
+)
+
+FOLLOWUP_REQUEST = (
+    "This is the automatic transcript of a business call. {who}\n\n"
+    "Write the follow-up email that {sender} sends to {recipient} after the "
+    "call, in the language of the transcript:\n"
+    "- first line: the subject, introduced by the word for 'Subject' in that "
+    "language (for example 'Oggetto:' in Italian)\n"
+    "- a greeting and one line of thanks for the call\n"
+    "- what was decided, as a short list\n"
+    "- the next steps: who does what and by when, only as it was said\n"
+    "- what is still open, if anything\n"
+    "- a short closing, signed {signature}\n"
+    "Keep it short, and in the tone of the call: formal if they spoke "
+    "formally, informal if not. Plain text: no markdown, no headings.\n\n"
+    "--- TRANSCRIPT ---\n{text}\n--- END ---"
+)
+
+
 def _post(url: str, body: dict, timeout: float):
     req = urllib.request.Request(
         url, data=json.dumps(body).encode("utf-8"),
@@ -93,12 +119,12 @@ def who_answers() -> dict | None:
     return None
 
 
-def summarize(text: str, model: str | None = None) -> dict:
-    """The summary, or an explained error.
+def ask(instructions: str, request: str, model: str | None = None) -> dict:
+    """One answer from the local LLM, or an explained error.
 
-    Never raises towards the web server: a summary that does not come is an
-    inconvenience, not a failure. The transcript, which is the real work, is
-    already on disk.
+    Never raises towards the web server: a summary or an email that does not
+    come is an inconvenience, not a failure. The transcript, which is the
+    real work, is already on disk.
     """
     server = who_answers()
     if server is None:
@@ -108,8 +134,8 @@ def summarize(text: str, model: str | None = None) -> dict:
         reply = _post(
             f"http://127.0.0.1:{server['port']}/v1/chat/completions",
             {"model": model or server["model"],
-             "messages": [{"role": "system", "content": INSTRUCTIONS},
-                          {"role": "user", "content": REQUEST.format(text=text)}],
+             "messages": [{"role": "system", "content": instructions},
+                          {"role": "user", "content": request}],
              "temperature": 0.3, "max_tokens": MAX_TOKENS, "stream": False},
             JOB_TIMEOUT)
     except (urllib.error.URLError, OSError, TimeoutError) as e:
@@ -135,6 +161,35 @@ def summarize(text: str, model: str | None = None) -> dict:
             "program": server["program"],
             "tokens_read": usage.get("prompt_tokens"),
             "tokens_written": usage.get("completion_tokens")}
+
+
+def summarize(text: str, model: str | None = None) -> dict:
+    """The summary: a few lines, then Decided, To do, Open."""
+    return ask(INSTRUCTIONS, REQUEST.format(text=text), model)
+
+
+def followup(text: str, me: str | None = None, others: list[str] | None = None,
+             known: bool = False, model: str | None = None) -> dict:
+    """The follow-up email, from whoever recorded the call to the others.
+
+    `known` says whether the lines carry who said them. Without it the model
+    is told that it is not marked, rather than left to guess who promised
+    what.
+    """
+    if known:
+        who = (f"Lines starting with '{me}:' are the person who recorded the call, "
+               "who sends the email; the others are the other side.") if me else (
+               "Each line starts with who said it.")
+    else:
+        who = "It is not marked who said each line."
+    sender = me or "the person who recorded the call"
+    recipient = ", ".join(others) if others else "the other people on the call"
+    signature = (f"with the name {me}" if me else
+                 "with a placeholder for the sender's name in square brackets, written in "
+                 "the language of the transcript (for example [il tuo nome] in Italian)")
+    return ask(FOLLOWUP_INSTRUCTIONS,
+               FOLLOWUP_REQUEST.format(who=who, sender=sender, recipient=recipient,
+                                       signature=signature, text=text), model)
 
 
 if __name__ == "__main__":

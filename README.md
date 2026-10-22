@@ -234,9 +234,15 @@ Matching ignores case and respects word boundaries. You can edit the file, or us
 
 `glossary.txt` is git-ignored, because it holds your clients' names. The repo ships `glossary.example.txt`.
 
+## The follow-up email
+
+Under the transcript, **Write the follow-up** asks the same local LLM as the summary for the email to send after the call: from you to the others (by the names you gave the voices), in the call's language and tone, with what was decided, the next steps and who takes them, and what is still open. It is told not to invent: a missing date or price comes out as a `[placeholder]`. Edit it in place (the changes are saved), copy it, or on a phone share it straight to Mail or WhatsApp. On the example calls the small Gemma 4 E4B wrote it in 5 to 17 seconds.
+
 ## Downloads
 
-Every call downloads as `.md` (paragraphs, to read or paste), `.txt` (line by line, with timestamps), `.srt` and `.vtt` (subtitles), and `.json` (lines, speakers and word timings, for other programs). The last three are written from the transcript as it is now, corrections included. Voices you named appear by name in all of them.
+**Notes** is the one file to keep in a client's folder: date, length and who took part, the summary (if you asked for one), then the whole transcript with names and minutes, with its headings in the language of the call. Ready to sit next to the client's other documents, or to be read by an assistant working on that client.
+
+Every call also downloads as `.md` (paragraphs, to read or paste), `.txt` (line by line, with timestamps), `.srt` and `.vtt` (subtitles), and `.json` (lines, speakers and word timings, for other programs). The last three are written from the transcript as it is now, corrections included. Voices you named appear by name in all of them.
 
 ## What a call looks like on disk
 
@@ -250,6 +256,7 @@ transcripts/
     info.json                    duration, language, timings, what was dropped, speech map, voice names
     corrections.jsonl            every corrected line, before and after
     summary.md                   if you asked for one
+    followup.md                  the follow-up email, if you asked for one
 ```
 
 `transcripts/` is git-ignored. Your recordings and your clients stay on your machine.

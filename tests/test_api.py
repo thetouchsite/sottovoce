@@ -316,3 +316,48 @@ def test_the_pin_is_kept_and_a_new_one_logs_everyone_out(client, monkeypatch, tm
     server.pin_setup("135790")                                      # changed
     assert phone.get("/api/history").status_code == 401
 
+
+# --- notes and the follow-up email ---------------------------------------------------
+
+def test_notes_put_summary_and_transcript_in_one_file_in_the_calls_language(client):
+    r = client.get(f"/api/history/{NORTHPINE}/download.notes")
+    assert "Northpine%20launch%20sync%20-%20notes.md" in r.headers["content-disposition"]
+    t = r.text
+    assert t.startswith("# Northpine launch sync\n")
+    assert "## Summary" in t and "### Decided" in t and "## Transcript" in t
+    assert "People: Voice 1 (02:24), Voice 2 (01:42), Voice 3 (01:19)" in t
+    assert "**00:00 · Voice 1** — Okay, I think everyone's here." in t
+    it = client.get("/api/history/2026-10-17_Kickoff Halden Studio/download.notes")
+    assert "appunti.md" in it.headers["content-disposition"]
+    assert "## Riassunto" in it.text and "## Trascrizione" in it.text and "Nessun riassunto" in it.text
+
+
+def test_the_follow_up_is_written_saved_edited_and_dropped_when_the_lines_change(client, data, monkeypatch):
+    import summary
+    asked = {}
+
+    def fake(text, me=None, others=None, known=False, model=None):
+        asked.update(me=me, others=others, known=known, text=text)
+        return {"text": "Subject: next steps\n\nHi Tomasz", "model": "m", "program": "p"}
+
+    monkeypatch.setattr(summary, "followup", fake)
+    client.post(f"/api/speakers/{SUPPLIER}", json={"names": {"Me": "Daniel", "Them": "Tomasz"}})
+    r = client.post(f"/api/followup/{SUPPLIER}").json()
+    assert r["text"].startswith("Subject: next steps")
+    assert asked["me"] == "Daniel" and asked["others"] == ["Tomasz"] and asked["known"]
+    assert asked["text"].startswith("Daniel: Hi Tomasz")
+    assert client.get(f"/api/history/{SUPPLIER}").json()["followup"].startswith("Subject")
+    assert client.post(f"/api/followup/{SUPPLIER}").json()["from_disk"]           # not rewritten
+    client.post(f"/api/followup/{SUPPLIER}", json={"text": "Subject: mine"})      # edited by hand
+    assert client.get(f"/api/history/{SUPPLIER}").json()["followup"] == "Subject: mine\n"
+    client.post(f"/api/reapply/{SUPPLIER}")
+    # the glossary did not change this call: the email stays
+    assert (data / "transcripts" / SUPPLIER / "followup.md").exists()
+
+
+def test_without_an_llm_the_follow_up_explains_itself(client, monkeypatch):
+    import summary
+    monkeypatch.setattr(summary, "who_answers", lambda: None)
+    r = client.post(f"/api/followup/{NORTHPINE}")
+    assert r.status_code == 503 and "no LLM" in r.json()["error"]
+

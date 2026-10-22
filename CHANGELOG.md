@@ -4,6 +4,11 @@ What changed in each release, newest first. The format follows [Keep a Changelog
 
 ## [Unreleased]
 
+### Added
+
+- **Notes**, first in the Download menu: one Markdown file for the client's folder, with date, length and who took part, the summary, and the whole transcript with names and minutes, its headings in the language of the call.
+- **The follow-up email.** Under the transcript, **Write the follow-up** asks the local LLM for the email to send after the call, from you to the others by name, in the call's language and tone: what was decided, next steps and who takes them, what is open, with `[placeholders]` instead of invented details. Edit it in place (saved), copy it, share it from a phone, or write it again. Kept as `followup.md`, and dropped when the lines change, like the summary.
+
 ## [1.3.0] - 2026-10-23
 
 Use it from your phone, in Italian, and decide when a recording is transcribed.

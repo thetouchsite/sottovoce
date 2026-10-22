@@ -208,6 +208,12 @@
   .reader.fixing p[data-i]{cursor:text}
   .reader.fixing p[data-i]:hover{background:var(--raised)}
   .voices-cta .primary{margin-top:14px}
+  .followup textarea{width:100%;min-height:340px;resize:vertical;background:var(--surface);
+    color:var(--text);border:1px solid var(--control);border-radius:8px;padding:14px 16px;
+    font:inherit;font-size:15px;line-height:1.6}
+  .followup textarea:focus{outline:none;border-color:var(--accent)}
+  .followup .row{display:flex;gap:14px;align-items:center;flex-wrap:wrap;margin-top:12px}
+  .left-col{min-width:0}
   .voices-cta .bar{margin-top:14px}
   .voices-cta .rec-note{margin-top:8px}
   .text-button{color:var(--muted);text-decoration:none}
@@ -787,6 +793,14 @@ const IT = {
   'None of the names in the glossary appears in this call.': 'Nessuno dei nomi del glossario compare in questa call.',
   'Apply the glossary again': 'Riapplica il glossario', 'applying…': 'applico…', 'Already up to date': 'Già aggiornata',
 
+  // notes and the follow-up email
+  'Notes': 'Appunti', "summary and transcript, for the client's folder": 'riassunto e trascrizione, per la cartella del cliente',
+  'Follow-up email': 'Email di follow-up', 'Email': 'Email', 'Share': 'Condividi', 'Write it again': 'Riscrivila',
+  'Write the follow-up': 'Scrivi il follow-up', 'Changes saved.': 'Modifiche salvate.',
+  'the model is writing the email…': "il modello sta scrivendo l'email…",
+  'The follow-up email needs a language model running on this machine, like the summary: LM Studio, Ollama or llama-server. None is answering.':
+    "Per l'email di follow-up serve un modello linguistico acceso su questa macchina, come per il riassunto: LM Studio, Ollama o llama-server. Nessuno risponde.",
+
   // the glossary view
   'The table': 'La tabella', 'Right name': 'Nome giusto', 'How it gets written wrong': 'Come viene scritto male',
   'Found in your calls': 'Trovato nelle tue call', 'How it gets written wrong, comma separated': 'Come viene scritto male, separati da virgole',
@@ -878,6 +892,8 @@ const IT_RULES = [
       + (dl ? ', più 32 MB da scaricare la prima volta' : '') + '.'],
   [/^Not asked for yet\. (.+) will write it, here on this machine, in about twenty seconds\.$/,
     (_, m) => 'Non ancora chiesto. Lo scriverà ' + m + ', qui su questa macchina, in una ventina di secondi.'],
+  [/^An email to send after the call: thanks, what was decided, next steps, what is still open\. Written by (.+) on this machine, in the language of the call, in about twenty seconds\. Missing details are left as \[placeholders\], never invented\.$/,
+    (_, m) => "Un'email da mandare dopo la call: ringraziamento, cosa si è deciso, prossimi passi, cosa resta aperto. La scrive " + m + ' su questa macchina, nella lingua della call, in una ventina di secondi. I dettagli mancanti restano come [segnaposto], mai inventati.'],
   [/^No call mentions “(.*)”\.$/, (_, q) => 'Nessuna call contiene “' + q + '”.'],
   [/^(\d+) names?, (\d+) of them found in your calls\. Names are corrected after transcription, not suggested before: given to Whisper as a prompt, they made the text worse instead of better\.$/,
     (_, a, b) => n1(a, 'nome', 'nomi') + ', ' + b + ' trovati nelle tue call. I nomi si correggono dopo la trascrizione, non si suggeriscono prima: dati a Whisper come prompt, peggioravano il testo invece di migliorarlo.'],
@@ -2041,6 +2057,12 @@ function downloadMenu(l){
   const s = el('summary', 'secondary');
   s.innerHTML = '<svg viewBox="0 0 14 14"><path d="M7 2v7M4 6l3 3 3-3M2.5 12h9"/></svg>Download';
   const list = el('div', 'menu-list');
+  // Notes first: the one file for the client's folder, summary and all.
+  const notes = el('a');
+  notes.href = base + '.notes';
+  notes.innerHTML = 'Notes<span>summary and transcript, for the client\'s folder</span>';
+  notes.onclick = () => m.removeAttribute('open');
+  list.append(notes);
   for (const [fmt, what] of [['md', 'to read, in paragraphs'], ['txt', 'line by line, timestamps'],
                              ['srt', 'subtitles'], ['vtt', 'subtitles for the web'],
                              ['json', 'lines and word timings']]){
@@ -2110,6 +2132,7 @@ function show(l, jump){
     jumps.append(b);
   };
   addJump('Transcript', 'p-reading');
+  addJump('Email', 'p-followup');
   if ((l.speakers || []).length || (voicesAvail && l.audio)) addJump('Voices', 'p-voices');
   const sus = (l.suspicious || []).length;
   addJump('To check', 'p-check', sus ? String(sus) : '');
@@ -2129,8 +2152,104 @@ function show(l, jump){
   d.append(pf);
 
   const split = el('div', 'split');
-  split.append(readingPanel(l, st, jump), sidePanel(l, st));
+  const leftCol = el('div', 'left-col');
+  leftCol.append(readingPanel(l, st, jump), followupPanel(l));
+  split.append(leftCol, sidePanel(l, st));
   d.append(split);
+}
+
+// The email to send after the call, written by the local LLM from the
+// transcript: from you, to the others, in the call's language. Yours to
+// change: what you edit is saved when you leave the box.
+function followupPanel(l){
+  const p = panel('Follow-up email');
+  p.id = 'p-followup';
+  p.classList.add('followup');
+  const c = el('div', 'content');
+  p.append(c);
+  const api = '/api/followup/' + encodeURIComponent(l.folder);
+
+  function showText(text){
+    c.textContent = '';
+    const box = el('textarea');
+    box.value = text;
+    box.setAttribute('aria-label', 'Follow-up email');
+    box.classList.add('data');
+    let saved = text;
+    box.onblur = async () => {
+      if (box.value === saved) return;
+      try{
+        const r = await (await fetch(api, {method:'POST', headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({text: box.value})})).json();
+        if (!r.error){ saved = box.value; note.textContent = 'Changes saved.'; }
+      } catch(e){ /* kept in the box; the next blur tries again */ }
+    };
+    const row = el('div', 'row');
+    const copy = el('button', 'secondary');
+    copy.type = 'button';
+    copy.textContent = 'Copy';
+    copy.onclick = async () => {
+      await navigator.clipboard.writeText(box.value);
+      copy.textContent = 'Copied';
+      setTimeout(() => copy.textContent = 'Copy', 1500);
+    };
+    row.append(copy);
+    // On a phone: straight into Mail, WhatsApp, or wherever it goes.
+    if (navigator.share){
+      const sh = el('button', 'secondary');
+      sh.type = 'button';
+      sh.textContent = 'Share';
+      sh.onclick = () => navigator.share({text: box.value}).catch(() => {});
+      row.append(sh);
+    }
+    if (llm && llm.available){
+      const redo = el('button', 'text-button');
+      redo.type = 'button';
+      redo.textContent = 'Write it again';
+      redo.onclick = () => write(true);
+      row.append(redo);
+    }
+    const note = el('span', 'rec-note');
+    row.append(note);
+    c.append(box, row);
+  }
+
+  async function write(redo){
+    c.textContent = '';
+    const w = el('p', 'quiet');
+    w.textContent = 'the model is writing the email…';
+    c.append(w);
+    try{
+      const r = await (await fetch(api + (redo ? '?redo=true' : ''), {method:'POST'})).json();
+      if (r.error) throw new Error(r.error);
+      l.followup = r.text;
+      showText(r.text);
+    } catch(e){
+      c.textContent = '';
+      const v = el('p', 'empty error');
+      v.textContent = e.message;
+      c.append(v);
+    }
+  }
+
+  if (l.followup) showText(l.followup);
+  else if (llm && llm.available){
+    const v = el('p', 'note');
+    v.textContent = 'An email to send after the call: thanks, what was decided, next steps, what is '
+      + 'still open. Written by ' + llm.model + ' on this machine, in the language of the call, '
+      + 'in about twenty seconds. Missing details are left as [placeholders], never invented.';
+    const b = el('button', 'primary foot-action');
+    b.type = 'button';
+    b.textContent = 'Write the follow-up';
+    b.onclick = () => write(false);
+    c.append(v, b);
+  } else {
+    const v = el('p', 'empty');
+    v.textContent = 'The follow-up email needs a language model running on this machine, like the '
+      + 'summary: LM Studio, Ollama or llama-server. None is answering.';
+    c.append(v);
+  }
+  return p;
 }
 
 // Rename and delete, for a call transcribed or waiting.

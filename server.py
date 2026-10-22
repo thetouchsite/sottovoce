@@ -26,6 +26,7 @@ ONE FOLDER PER TRANSCRIPTION, with everything inside:
                              the names given to the voices
         corrections.jsonl    every line corrected, with before and after
         summary.md           if you asked for one
+        followup.md          the follow-up email, if you asked for one
 
 The original is kept: if you lose it from your phone or your Downloads, the
 copy is here next to its transcript.
@@ -59,6 +60,7 @@ import shutil
 import subprocess
 import threading
 import time
+import urllib.parse
 import uuid
 from datetime import date
 
@@ -847,6 +849,8 @@ def api_open(name: str):
             "segments": segments, "paragraphs": T.paragraphs(segments),
             "suspicious": T.suspicious(segments),
             "summary": summary_md.read_text(encoding="utf-8") if summary_md.exists() else None,
+            "followup": (d / "followup.md").read_text(encoding="utf-8")
+                        if (d / "followup.md").exists() else None,
             "names_corrected": data.get("names_corrected") or 0,
             # For the strip: where a phrase was dropped and where a line was
             # corrected. These are the places where the text was touched, and
@@ -855,6 +859,49 @@ def api_open(name: str):
             "corrections": corrections_of(d),
             "names": names_in(txt),
             "speech": speech_of(d, data, audio)}
+
+
+def notes(d: pathlib.Path, info: dict, stem: str, segments) -> tuple[str, str]:
+    """The notes of a call, as one Markdown file for the client's folder.
+
+    Who, when and how long; the summary, if there is one; then the whole
+    transcript with names and minutes. Written in the language of the call:
+    a file meant to sit next to the client's other documents, and to be read
+    by whoever (or whatever) works on that client next.
+    """
+    it = info.get("language") == "it"
+    t = (lambda i, e: i if it else e)
+    names = info.get("speaker_names") or {}
+    title = info.get("title") or stem
+    day = d.name.split("_", 1)[0] if "_" in d.name else ""
+    out = [f"# {title}", ""]
+    facts = [f"{t('Data', 'Date')}: {day}" if day else None,
+             f"{t('Durata', 'Duration')}: {T.mmss(info.get('duration_s') or 0)}",
+             f"{t('Lingua', 'Language')}: {info.get('language') or '?'}"]
+    out.append(" · ".join(x for x in facts if x))
+    people = speakers_of(segments, names)
+    if people:
+        def label(x):
+            if x["name"]:
+                return x["name"] + (t(" (io)", " (me)") if x["tag"] == "Me" else "")
+            return {"Me": t("Io", "Me"), "Them": t("Loro", "Them")}.get(x["tag"], x["tag"])
+        out.append(f"{t('Partecipanti', 'People')}: "
+                   + ", ".join(f"{label(x)} ({T.mmss(x['seconds'])})" for x in people))
+    out += ["", f"## {t('Riassunto', 'Summary')}", ""]
+    summary_md = d / "summary.md"
+    if summary_md.exists():
+        # one level down, under this file's own title
+        body = re.sub(r"^(#{1,5}) ", lambda m: "#" + m[1] + " ",
+                      summary_md.read_text(encoding="utf-8").strip(), flags=re.M)
+        out.append(body)
+    else:
+        out.append(t("_Nessun riassunto: si può chiedere dalla pagina della call._",
+                     "_No summary yet: it can be asked for on the call's page._"))
+    out += ["", f"## {t('Trascrizione', 'Transcript')}", ""]
+    for p in T.paragraphs(segments):
+        by = f" · {T.who(p, names)}" if p.get("speaker") else ""
+        out.append(f"**{T.mmss(p['start'])}{by}** — {p['text']}\n")
+    return "\n".join(out).rstrip() + "\n", t("appunti", "notes")
 
 
 @app.get("/api/history/{name}/download.{fmt}")
@@ -867,6 +914,16 @@ def api_download(name: str, fmt: str):
     the download says who Voice 2 is.
     """
     d = folder(name)
+    if fmt == "notes" and d.is_dir() and (d / "info.json").exists():
+        info = read_info(d)
+        txt, segments = read_call(d, info.get("duration_s"))
+        if txt is None:
+            return JSONResponse({"error": "not found"}, 404)
+        body, word = notes(d, info, txt.stem, segments)
+        filename = f"{txt.stem} - {word}.md"
+        return Response(body, media_type="text/markdown; charset=utf-8",
+                        headers={"Content-Disposition": "attachment; filename*=UTF-8''"
+                                 + urllib.parse.quote(filename)})
     if fmt not in T.FORMATS or not d.is_dir():
         return JSONResponse({"error": "not found"}, 404)
     names = names_of(d)
@@ -1148,6 +1205,7 @@ def api_voices(name: str):
         write_info(d, info)
         _write_md(d, txt)
         (d / "summary.md").unlink(missing_ok=True)
+        (d / "followup.md").unlink(missing_ok=True)
         return {"speakers_found": found, "changed": True, "lines": len(lines)}
     finally:
         _voices_busy.release()
@@ -1211,6 +1269,42 @@ def api_summary(name: str, redo: bool = False):
     return {**r, "seconds": secs, "from_disk": False}
 
 
+@app.post("/api/followup/{name}")
+def api_followup(name: str, body: dict | None = None, redo: bool = False):
+    """The follow-up email of the call, saved next to it as followup.md.
+
+    Written by the local LLM, from you to the others, in the call's language.
+    With {"text": ...} it saves your edited version instead: the email is
+    yours to change, and a draft kept only in the page would be lost at the
+    next click.
+    """
+    d = folder(name)
+    if not d.is_dir():
+        return JSONResponse({"error": "not found"}, 404)
+    done = d / "followup.md"
+    if body and isinstance(body.get("text"), str):
+        done.write_text(body["text"].strip() + "\n", encoding="utf-8")
+        return {"text": done.read_text(encoding="utf-8"), "saved": True}
+    if done.exists() and not redo:
+        return {"text": done.read_text(encoding="utf-8"), "from_disk": True}
+    txt, segments = read_call(d)
+    if txt is None:
+        return JSONResponse({"error": "transcript missing"}, 404)
+    names = names_of(d)
+    known = any(s.get("speaker") for s in segments)
+    text = "\n".join((f"{T.who(s, names)}: " if s.get("speaker") else "") + s["text"]
+                     for s in segments)
+    me = names.get("Me") or ("Me" if any(s.get("speaker") == "Me" for s in segments) else None)
+    others = [T.who({"speaker": x["tag"]}, names) for x in speakers_of(segments, names)
+              if x["tag"] != "Me"]
+    t0 = time.time()
+    r = S.followup(text, me, others, known)
+    if "error" in r:
+        return JSONResponse(r, 503)
+    done.write_text(r["text"] + "\n", encoding="utf-8")
+    return {**r, "seconds": round(time.time() - t0, 1), "from_disk": False}
+
+
 # --- the glossary -------------------------------------------------------------
 # The table of names is a text file, and stays a text file: it opens in any
 # editor and reads the same in two years. The page is a convenient way to
@@ -1268,6 +1362,7 @@ def api_reapply(name: str):
 
     # The summary was written on the old text: it no longer holds.
     (d / "summary.md").unlink(missing_ok=True)
+    (d / "followup.md").unlink(missing_ok=True)
     return {"corrected": sum(names.values()), "lines": len(changes), "names": names}
 
 

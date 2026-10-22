@@ -236,9 +236,15 @@ Il confronto ignora maiuscole e minuscole e rispetta i confini delle parole. Puo
 
 `glossary.txt` è escluso da git, perché contiene i nomi dei tuoi clienti. La repo include invece `glossary.example.txt`.
 
+## L'email di follow-up
+
+Sotto la trascrizione, **Scrivi il follow-up** chiede allo stesso LLM locale del riassunto l'email da mandare dopo la call: da te agli altri (coi nomi che hai dato alle voci), nella lingua e nel tono della call, con cosa si è deciso, i prossimi passi e chi li fa, e cosa resta aperto. Gli è detto di non inventare: una data o un prezzo che mancano escono come `[segnaposto]`. La modifichi lì (le modifiche si salvano), la copi, o dal telefono la condividi direttamente su Mail o WhatsApp. Sulle call d'esempio il piccolo Gemma 4 E4B l'ha scritta in 5-17 secondi.
+
 ## Download
 
-Ogni call si scarica in `.md` (paragrafi, da leggere o incollare), `.txt` (riga per riga, coi minuti), `.srt` e `.vtt` (sottotitoli), e `.json` (righe, chi parla e tempi delle parole, per altri programmi). Gli ultimi tre si scrivono dalla trascrizione com'è in quel momento, correzioni comprese. Le voci a cui hai dato un nome compaiono col loro nome in tutti.
+**Appunti** è il file unico da tenere nella cartella del cliente: data, durata e chi c'era, il riassunto (se l'hai chiesto), poi la trascrizione completa con nomi e minuti, con i titoli nella lingua della call. Pronto da mettere accanto agli altri documenti del cliente, o da far leggere a un assistente che lavora su quel cliente.
+
+Ogni call si scarica anche in `.md` (paragrafi, da leggere o incollare), `.txt` (riga per riga, coi minuti), `.srt` e `.vtt` (sottotitoli), e `.json` (righe, chi parla e tempi delle parole, per altri programmi). Gli ultimi tre si scrivono dalla trascrizione com'è in quel momento, correzioni comprese. Le voci a cui hai dato un nome compaiono col loro nome in tutti.
 
 ## Com'è fatta una call sul disco
 
@@ -252,6 +258,7 @@ transcripts/
     info.json                    durata, lingua, tempi, cosa è stato buttato, mappa del parlato, nomi delle voci
     corrections.jsonl            ogni riga corretta, col prima e col dopo
     summary.md                   se l'hai chiesto
+    followup.md                  l'email di follow-up, se l'hai chiesta
 ```
 
 `transcripts/` è escluso da git: le registrazioni e i clienti restano sulla tua macchina.
