@@ -214,9 +214,11 @@ Deve stampare una versione che finisce in `+cu130` e `True`.
 
 ## Riassunti
 
-I riassunti li scrive un LLM che hai già acceso sulla tua macchina, interrogato tramite l'API compatibile con OpenAI. Sottovoce lo cerca su queste porte: LM Studio `1234`, Ollama `11434`, llama-server `8080`. Niente da installare in più, e nessuna VRAM occupata quando non ti serve: Whisper prende 3 GB, un LLM utile altri 5-16. Quando si sa chi parla (due tracce, o voci separate) il modello sa chi ha detto ogni riga, coi nomi che hai dato, quindi *Da fare* può dire chi fa cosa.
+Riassunti ed email di follow-up non richiedono niente in più. Senza altre impostazioni c'è un piccolo modello **incorporato**, come Whisper: Qwen3 4B Instruct (Apache-2.0, senza account), scaricato da Hugging Face la prima volta che lo chiedi (8 GB, una volta sola), caricato sulla GPU quando serve e tolto dopo dieci minuti senza uso, così la VRAM torna a Whisper. Servono circa 9 GB liberi su una GPU NVIDIA oltre a Whisper. Sulle call d'esempio ha scritto un follow-up in circa 30 s (caricamento compreso) e il riassunto di una call di 11 minuti in 16 s.
 
-Con LM Studio:
+Se sulla tua macchina è già acceso un server LLM, si usa quello, tramite l'API compatibile con OpenAI: Sottovoce lo cerca su LM Studio `1234`, Ollama `11434`, llama-server `8080`. È la strada per un modello più veloce o più grande, o per una GPU troppo piccola per tutti e due. `--no-llm` spegne il modello incorporato; `SOTTOVOCE_LLM=<id hugging face>` ne sceglie un altro. Quando si sa chi parla (due tracce, o voci separate) il modello sa chi ha detto ogni riga, coi nomi che hai dato, quindi *Da fare* può dire chi fa cosa.
+
+Con LM Studio, se lo preferisci:
 
 ```sh
 %USERPROFILE%\.lmstudio\bin\lms.exe server start

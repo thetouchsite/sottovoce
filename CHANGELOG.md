@@ -7,6 +7,7 @@ What changed in each release, newest first. The format follows [Keep a Changelog
 ### Added
 
 - **Notes**, first in the Download menu: one Markdown file for the client's folder, with date, length and who took part, the summary, and the whole transcript with names and minutes, its headings in the language of the call.
+- **A small LLM built in.** With no LM Studio or Ollama running, summaries and follow-up emails are written by Qwen3 4B Instruct (Apache-2.0), downloaded the first time (8 GB), loaded on the GPU when asked and unloaded after ten minutes unused. Nothing to install for whoever clones the repo. A running LLM server is still used first. `--no-llm` turns it off.
 - **The follow-up email.** Under the transcript, **Write the follow-up** asks the local LLM for the email to send after the call, from you to the others by name, in the call's language and tone: what was decided, next steps and who takes them, what is open, with `[placeholders]` instead of invented details. Edit it in place (saved), copy it, share it from a phone, or write it again. Kept as `followup.md`, and dropped when the lines change, like the summary.
 
 ## [1.3.0] - 2026-10-23

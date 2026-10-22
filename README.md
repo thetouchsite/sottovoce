@@ -212,9 +212,11 @@ It should print a version ending in `+cu130` and `True`.
 
 ## Summaries
 
-Summaries come from an LLM that's already running on your machine, spoken to over the OpenAI-compatible API. Sottovoce looks for one on these ports: LM Studio `1234`, Ollama `11434`, llama-server `8080`. Nothing extra to install. And no VRAM held when you don't need it: Whisper takes 3 GB, a useful LLM another 5 to 16. When who spoke is known (two tracks, or voices told apart) the model is told who said each line, with the names you gave, so *To do* can say who does what.
+Summaries and follow-up emails need nothing extra. With no other setup, a small model is **built in**, the way Whisper is: Qwen3 4B Instruct (Apache-2.0, no account), downloaded from Hugging Face the first time you ask (8 GB, once), loaded on the GPU when asked and unloaded after ten minutes unused, so the VRAM goes back to Whisper. It needs about 9 GB free on an NVIDIA GPU next to Whisper. On the example calls it wrote a follow-up in about 30 s (loading included) and the summary of an 11-minute call in 16 s.
 
-With LM Studio:
+If an LLM server is already running on your machine, it is used instead, over the OpenAI-compatible API: Sottovoce looks on LM Studio `1234`, Ollama `11434`, llama-server `8080`. That's the way to a faster or larger model, or to a GPU too small for both. `--no-llm` turns the built-in model off; `SOTTOVOCE_LLM=<hugging face id>` picks another one. When who spoke is known (two tracks, or voices told apart) the model is told who said each line, with the names you gave, so *To do* can say who does what.
+
+With LM Studio, if you prefer it:
 
 ```sh
 %USERPROFILE%\.lmstudio\bin\lms.exe server start
