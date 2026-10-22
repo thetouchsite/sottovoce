@@ -62,7 +62,7 @@ AUDIO = (".mp4", ".m4a", ".mp3", ".wav", ".opus", ".ogg", ".3gp", ".aac",
 
 app = FastAPI(title="Sottovoce")
 
-engine_state = {"ready": False, "error": None}
+engine_state = {"ready": False, "error": None, "off": False}
 jobs: dict[str, dict] = {}
 line_up: queue.Queue = queue.Queue()
 
@@ -171,8 +171,12 @@ def counter():
             line_up.task_done()
 
 
-def start(data: pathlib.Path, glossary: pathlib.Path | None = None):
-    """Startup side effects, run once from __main__ after the options are read."""
+def start(data: pathlib.Path, glossary: pathlib.Path | None = None, model: bool = True):
+    """Startup side effects, run once from __main__ after the options are read.
+
+    With model=False the page browses existing transcripts and nothing is
+    loaded: a way to try the interface, or read old calls, without a GPU.
+    """
     global DATA, INCOMING
     if glossary is not None:
         T.GLOSSARY = glossary.resolve()
@@ -180,7 +184,10 @@ def start(data: pathlib.Path, glossary: pathlib.Path | None = None):
     INCOMING = DATA / "_incoming"
     DATA.mkdir(parents=True, exist_ok=True)
     sweep()
-    threading.Thread(target=warm_up, daemon=True).start()
+    if model:
+        threading.Thread(target=warm_up, daemon=True).start()
+    else:
+        engine_state["off"] = True
     threading.Thread(target=counter, daemon=True).start()
 
 
@@ -193,6 +200,8 @@ def api_status():
 
 @app.post("/api/transcribe")
 async def api_transcribe(file: UploadFile = File(...), language: str = Form("auto")):
+    if engine_state["off"]:
+        return JSONResponse({"error": "transcription is off: the server was started with --no-model"}, 503)
     if not engine_state["ready"]:
         return JSONResponse(
             {"error": engine_state["error"] or "the model is still loading"}, 503)
@@ -264,6 +273,9 @@ def api_history():
             data["words"] = sum(len(s["text"].split()) for s in read_txt(txt))
         data.pop("speech", None)        # the map is for the strip, not the list
         out.append({"folder": d.name, **data})
+    # Newest first by when it was transcribed. Folder names only carry the
+    # day: two calls of the same day would otherwise sort by their titles.
+    out.sort(key=lambda e: (e.get("transcribed_at") or "", e["folder"]), reverse=True)
     return {"history": out}
 
 
@@ -677,7 +689,7 @@ def font(name: str):
 
 @app.get("/health", response_class=PlainTextResponse)
 def health():
-    return "ok" if engine_state["ready"] else "loading"
+    return "ok" if engine_state["ready"] or engine_state["off"] else "loading"
 
 
 @app.post("/api/shutdown")
@@ -713,13 +725,16 @@ if __name__ == "__main__":
                     help="where transcriptions are kept (default: ./transcripts)")
     ap.add_argument("--glossary", type=pathlib.Path, default=None,
                     help="the name glossary (default: ./glossary.txt)")
+    ap.add_argument("--no-model", action="store_true",
+                    help="browse transcripts without loading Whisper (no GPU needed)")
     args = ap.parse_args()
 
-    start(args.data, args.glossary)
+    start(args.data, args.glossary, model=not args.no_model)
     print(f"\n  Sottovoce on  http://127.0.0.1:{args.port}")
     print(f"  model: {T.MODEL}")
     print(f"  transcripts in: {DATA}")
-    print("  (the first start loads 2.88 GB into VRAM: about twenty seconds)\n")
+    print("  browsing only: Whisper is not loaded (--no-model)\n" if args.no_model else
+          "  (the first start loads 2.88 GB into VRAM: about twenty seconds)\n")
     # 127.0.0.1 only: the server hands out client recordings and transcripts
     # to whoever asks, and must not be reachable from the rest of the network.
     uvicorn.run(app, host="127.0.0.1", port=args.port, log_level="warning")

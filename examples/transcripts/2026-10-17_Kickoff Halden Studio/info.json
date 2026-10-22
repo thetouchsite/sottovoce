@@ -1,0 +1,49 @@
+{
+ "original": "Kickoff Halden Studio.mp4",
+ "transcribed_at": "2026-10-17 09:15",
+ "model": "openai/whisper-large-v3",
+ "language": "it",
+ "language_requested": "auto",
+ "duration_s": 64.0,
+ "seconds_taken": 12,
+ "silence_s": 20,
+ "names_corrected": 0,
+ "names_by_name": {},
+ "phantoms_dropped": [],
+ "words": 111,
+ "segments": 10,
+ "speech": [
+  [
+   0,
+   1.92
+  ],
+  [
+   4,
+   9.38
+  ],
+  [
+   12,
+   19.31
+  ],
+  [
+   21,
+   30.38
+  ],
+  [
+   33,
+   37.62
+  ],
+  [
+   41,
+   42.92
+  ],
+  [
+   45,
+   54.85
+  ],
+  [
+   57,
+   60.85
+  ]
+ ]
+}

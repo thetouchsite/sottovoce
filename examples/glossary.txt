@@ -1,0 +1,4 @@
+# Demo glossary: fictional names
+Northpine <- North pine, Nord pine
+Trailhead <- Trail head, Trail-head
+Lena <- Lina

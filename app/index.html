@@ -407,7 +407,7 @@ const store = {
   set(k, v){ try{ localStorage.setItem(k, v); } catch(e){} },
 };
 
-let ready = false, openNow = null, calls = [], llm = null;
+let ready = false, off = false, openNow = null, calls = [], llm = null;
 
 /* ========================== engine and calls ========================== */
 
@@ -416,6 +416,13 @@ async function checkEngine(){
     const d = await (await fetch('/api/status')).json();
     const light = $('.light'), t = $('#engine-text');
     if (d.error){ light.className = 'light no'; t.textContent = d.error; return; }
+    // Started with --no-model: reading old calls, nothing to transcribe with.
+    if (d.off){
+      off = true;
+      t.textContent = 'browsing only, Whisper not loaded';
+      document.querySelectorAll('.primary[data-label]').forEach(b => b.textContent = 'Transcription off');
+      return;
+    }
     if (d.ready){
       ready = true;
       light.className = 'light ok';
@@ -688,7 +695,7 @@ function primaryButton(label){
   const b = el('button', 'primary');
   b.type = 'button';
   b.dataset.label = label;
-  b.textContent = ready ? label : 'Loading the model…';
+  b.textContent = ready ? label : (off ? 'Transcription off' : 'Loading the model…');
   b.disabled = !ready;
   b.onclick = () => ready && $('#file').click();
   return b;

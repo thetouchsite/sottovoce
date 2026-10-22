@@ -1,0 +1,65 @@
+{
+ "original": "Pricing review, Okafor and Lund.m4a",
+ "transcribed_at": "2026-10-20 11:30",
+ "model": "openai/whisper-large-v3",
+ "language": "en",
+ "language_requested": "auto",
+ "duration_s": 196.0,
+ "seconds_taken": 31,
+ "silence_s": 121,
+ "names_corrected": 0,
+ "names_by_name": {},
+ "phantoms_dropped": [],
+ "words": 189,
+ "segments": 15,
+ "speech": [
+  [
+   0,
+   4.62
+  ],
+  [
+   6,
+   9.85
+  ],
+  [
+   11,
+   18.31
+  ],
+  [
+   20,
+   26.15
+  ],
+  [
+   29,
+   37.23
+  ],
+  [
+   41,
+   53.0
+  ],
+  [
+   72,
+   79.31
+  ],
+  [
+   82,
+   87.77
+  ],
+  [
+   91,
+   96.0
+  ],
+  [
+   160,
+   165.0
+  ],
+  [
+   168,
+   174.46
+  ],
+  [
+   181,
+   184.46
+  ]
+ ]
+}

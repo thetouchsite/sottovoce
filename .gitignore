@@ -3,12 +3,12 @@
 
 # Uploaded recordings and their transcripts: they are data, and they are
 # conversations with clients. They must never end up in a repository.
-transcripts/
-research/transcripts/
+/transcripts/
+/research/transcripts/
 
 # Your glossary holds your clients' and products' names. The repo ships
 # glossary.example.txt instead.
-glossary.txt
+/glossary.txt
 
 __pycache__/
 *.pyc

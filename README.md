@@ -1,43 +1,62 @@
 # Sottovoce
 
-**Drop a recorded call on a web page. Get back the transcript, a summary, and a map of where the text can't be trusted. Nothing leaves your machine.**
+![sottovoce: your calls, transcribed on your own machine, and honest about what it couldn't hear](docs/images/cover.png)
 
-Local transcription with Whisper large-v3 on your own GPU, built for real business calls: recorded on a phone, full of silences, and full of names no model has ever heard. Every default in it was chosen by measuring on a real call, and this README shows those numbers.
+**Drop a recorded call on a web page. Get back the transcript, a summary, and a map of where the text can't be trusted.** Whisper large-v3 on your own GPU. Nothing leaves your machine.
 
-![Sottovoce showing a fictional 10-minute call: the call strip with speech, silence and corrections, the figures, the summary, and the phrases to check](docs/screenshot.png)
-<sub>A fictional demo call. Nothing in the screenshot is real client data.</sub>
+[Italiano](README.it.md) · [Try it without a GPU](#try-it-in-a-minute-no-gpu) · [What we measured](#what-we-measured) · MIT licence
 
----
+Built by [TouchSite Software](https://www.touchsitesoftware.it).
 
-## What it does
+![Sottovoce with a fictional 10-minute call open: the call strip, the figures, the summary, the phrases to check and the glossary](docs/images/screenshot.png)
+<sub>A fictional demo call. Nothing in these images is real client data.</sub>
 
-- **Transcribes locally.** Drop an mp4, m4a, mp3, wav, opus or 3gp file onto the page. 27 minutes of call take about 4 minutes on an RTX 5090. No upload, no account, no per-minute cost.
-- **Drops what Whisper invents on silence.** Whisper learned from YouTube subtitles, and on quiet stretches it writes *"Thanks for watching"* or *"Subtitles by the Amara.org community"*. These are removed only where the audio is actually silent, so a real "thank you all" stays. Each removal is reported with its timestamp.
-- **Fixes the names it can't know.** Your clients, products and colleagues go in a glossary (`Right name <- how it gets written wrong`). It is applied after transcription, and can be applied again to old calls when the glossary grows.
-- **Shows the call as a strip.** The whole recording as one band: where people speak, where it's silent, where a phrase was dropped, where a line was corrected. Click anywhere to listen from that point.
-- **Summarizes, optionally.** If a local LLM server is running (LM Studio, Ollama, llama-server), you get a summary with what was decided, what's to do, and what's still open, in the language of the call. If none is running, the button doesn't appear.
-- **Lets you correct by hand, and keeps what you fix.** Double-click a line to correct it. Every correction is saved with its *before* and *after*, which is the dataset you'd need to fine-tune a model on your own calls one day.
-- **Searches every call** you've transcribed, and jumps to the exact moment.
-- **Detects the language**, or you pick one. The choice is remembered.
+## Why
 
-Everything is kept as plain files, one folder per call: the original recording, the `.txt` with timestamps, the `.md` to read, and an `info.json`. There's no database, and nothing to export.
+Transcription tools hand you a block of text that looks equally confident everywhere. On a real business call, recorded with a phone on the desk, it isn't. Three mistakes cost the most, and they're the ones you can't see:
+
+- **Sentences nobody said.** On silence, Whisper writes the YouTube subtitles it was trained on: *"Thanks for watching"*, *"Subtitles by the Amara.org community"*.
+- **Names nobody can find again.** Your client's company comes out spelled five different ways, so search misses it and the summary garbles it.
+- **No way to check.** You can't tell which part of the text to doubt without listening to the whole call again.
+
+Sottovoce fixes the first two, and shows you where the third one is.
+
+| Step | What happens | Why it's there |
+| --- | --- | --- |
+| 1 · Prepare | 16 kHz mono, loudness normalized, speech map measured | Whisper gets **35% faster** on normalized phone audio |
+| 2 · Transcribe | Whisper large-v3, long-form, anti-hallucination thresholds | Chunking produced the same words **40 times in a row** |
+| 3 · Clean up | Subtitle phrases dropped *only* where the audio is 12 dB below speech; glossary applied | A real "thank you all" stays, invented ones go |
+| 4 · Read | Summary, paragraphs, line by line, the call strip | Click the strip and listen to the part you doubt |
+
+## What makes it different
+
+- **It tells you where not to trust it.** The *call strip* shows the whole recording as one band: where people speak, where it's silent, where an invented phrase was dropped, where a line was corrected. Click anywhere to listen from there.
+- **Every default was measured.** On a real call, against the alternatives, with the numbers [below](#what-we-measured), including the four approaches that didn't work.
+- **Names are fixed after, not suggested before.** Given to Whisper as a prompt, a glossary made the text *worse*. Here it's a correction table, and it can be applied again to old calls when you add a name.
+- **Your corrections are kept.** Every line you fix is saved with its *before* and *after*: the dataset you'd need to fine-tune a model on your own calls.
+- **Summaries from your own LLM.** If LM Studio, Ollama or llama-server is running, you get *Decided / To do / Open*, in the language of the call. If none is running, the button just isn't there.
+- **Nothing leaves the machine, and nothing is hidden.** The server listens on `127.0.0.1`. The page loads nothing from the internet, not even its font. Every call is a folder of plain files: no database, no account, no telemetry.
+
+![Correcting a line by hand in the line-by-line view, next to the phrases to check and the names found in the call](docs/images/correcting.png)
 
 ## Quick start (Windows)
 
 You need an NVIDIA GPU with about 4 GB of free VRAM, and Python 3.10 or newer (tested on Windows 11, Python 3.14, RTX 5090).
 
-```
+```sh
 git clone https://github.com/thetouchsite/sottovoce
 cd sottovoce
 Install.bat
 Start.bat
 ```
 
-`Install.bat` creates a virtual environment and installs PyTorch with CUDA **before** everything else (see [the PyTorch trap](#the-pytorch-trap)). At the end it prints whether it sees your GPU. `Start.bat` opens <http://127.0.0.1:8200>. The first start downloads the model (2.9 GB, once) and loads it into VRAM in about twenty seconds. Close it with the power button on the page, or `Stop.bat`.
+`Install.bat` creates a virtual environment and installs PyTorch with CUDA **before** everything else (see [the PyTorch trap](#the-pytorch-trap)). At the end it prints whether it sees your GPU. `Start.bat` opens <http://127.0.0.1:8200>. The first start downloads the model (2.9 GB, once) and loads it into VRAM in about twenty seconds. 27 minutes of call then take about 4 minutes.
 
-**Linux and macOS:** the Python code is cross-platform, but only Windows 11 has been tested. The manual install:
+Pick the language from the menu next to **Transcribe a recording**, or leave *Detect language*. Close the server with the power button on the page, or `Stop.bat`.
 
-```
+**Linux and macOS:** the Python code is cross-platform, but only Windows 11 has been tested.
+
+```sh
 python -m venv .venv && source .venv/bin/activate
 pip install torch --index-url https://download.pytorch.org/whl/cu130   # match your CUDA
 pip install -r requirements.txt
@@ -45,7 +64,18 @@ cp glossary.example.txt glossary.txt
 python server.py
 ```
 
-On a Mac there is no CUDA: it runs on the CPU, about ten times slower.
+On a Mac there's no CUDA: it runs on the CPU, about ten times slower.
+
+## Try it in a minute, no GPU
+
+The [`examples/`](examples/) folder has three fictional calls, already transcribed, one of them in Italian. Browse them without downloading the model:
+
+```sh
+pip install fastapi uvicorn python-multipart
+python server.py --no-model --data examples/transcripts --glossary examples/glossary.txt
+```
+
+Then open <http://127.0.0.1:8200>. The strip, the summary, search, corrections and the glossary all work. Only *Transcribe* is switched off.
 
 ## What we measured
 
@@ -115,7 +145,7 @@ The two runs used different models, so this isn't a clean comparison. But a 9B m
 
 Install `transformers` on its own and pip pulls the default PyTorch from PyPI. On RTX 50-series cards (Blackwell, `sm_120`) that build doesn't see the GPU. Everything works, on the CPU, ten times slower, and nothing tells you. Install PyTorch **first**, from the CUDA index, which is what `Install.bat` does. Check with:
 
-```
+```sh
 .venv\Scripts\python.exe -c "import torch; print(torch.__version__, torch.cuda.is_available())"
 ```
 
@@ -127,7 +157,7 @@ Summaries come from an LLM that's already running on your machine, spoken to ove
 
 With LM Studio:
 
-```
+```sh
 %USERPROFILE%\.lmstudio\bin\lms.exe server start
 ```
 
@@ -135,7 +165,7 @@ A summary is saved as `summary.md` in the call's folder and read from disk the n
 
 ## The glossary
 
-```
+```text
 # glossary.txt
 Northpine <- North pine, Nord pine
 Trailhead <- Trail head
@@ -145,9 +175,9 @@ Matching ignores case and respects word boundaries. You can edit the file, or us
 
 `glossary.txt` is git-ignored, because it holds your clients' names. The repo ships `glossary.example.txt`.
 
-## Your data
+## What a call looks like on disk
 
-```
+```text
 transcripts/
   2026-10-21_Northpine launch sync/
     Northpine launch sync.m4a    the original, kept next to its transcript
@@ -158,37 +188,30 @@ transcripts/
     summary.md                   if you asked for one
 ```
 
-The server listens on `127.0.0.1` only. The page loads nothing from the internet, not even its font ([Public Sans](https://github.com/uswds/public-sans), OFL, served from `app/fonts/`). It opens offline, and it doesn't tell anyone when you use it.
+`transcripts/` is git-ignored. Your recordings and your clients stay on your machine.
 
 ## Command line
 
-```
-python transcribe.py "Client call.mp4" --language it     writes .txt and .md next to the file
-python summary.py "Client call.md"                       summarizes with the local LLM
+```sh
+python transcribe.py "Client call.mp4" --language it     # writes .txt and .md next to the file
+python summary.py "Client call.md"                       # summarizes with the local LLM
 python server.py --port 8300 --data D:\calls --glossary D:\calls\names.txt
+python server.py --no-model                              # browse transcripts, no GPU needed
 ```
 
 `--language` takes a Whisper code (`en`, `it`, `de`…). Leave it out to detect the language.
 
-## How it works
+## Repository layout
 
-```
-recording ─► ffmpeg: 16 kHz mono, loudness-normalized
-          ─► speech map (silencedetect) and speech level (volumedetect on speech only)
-          ─► Whisper large-v3, long-form, anti-hallucination thresholds
-          ─► drop subtitle phrases that fall 12 dB below speech
-          ─► glossary corrections
-          ─► .txt  .md  info.json
-```
-
-Four files do the work:
-
-| file | role |
-|---|---|
-| `transcribe.py` | the engine; also a command-line tool |
+| Path | What |
+| --- | --- |
+| `transcribe.py` | The engine: ffmpeg, Whisper, the clean-up. Also a command-line tool |
 | `server.py` | FastAPI, one job at a time (two in parallel slow each other down: 233 s instead of 190) |
-| `summary.py` | the local LLM client |
-| `app/index.html` | the page: one file, no build step, no framework, 84 KB with fonts |
+| `summary.py` | The local LLM client |
+| `app/index.html` | The page: one file, no build step, no framework, 84 KB with its fonts |
+| `examples/` | Three fictional calls, to try the interface with `--no-model` |
+| `research/` | The scripts behind the numbers above: run several models, compare without a reference |
+| `Install.bat`, `Start.bat`, `Stop.bat` | Double-click launchers for Windows |
 
 ## Prior art
 
@@ -198,8 +221,12 @@ Whisper wrappers are everywhere. These four are excellent and shaped this one: [
 
 Word-level timestamps, recording system audio straight from the PC, and fine-tuning on your own corrections. See [ROADMAP.md](ROADMAP.md), with the reasons and how each one will be judged done.
 
-## License
+## Contributing
 
-[MIT](LICENSE). Third-party parts keep their licenses: Whisper large-v3 weights (Apache-2.0, downloaded from Hugging Face on first use), Public Sans (SIL OFL 1.1, [`app/fonts/OFL.md`](app/fonts/OFL.md)), and ffmpeg (bundled by the `imageio-ffmpeg` package that pip installs, not shipped in this repository).
+Issues and pull requests are welcome: see [CONTRIBUTING.md](CONTRIBUTING.md). Especially welcome: the phrases Whisper invents on silence in **your** language (a few lines in `transcribe.py`), and tests on Linux and macOS.
+
+## Licence
+
+[MIT](LICENSE) © 2026 TouchSite Software. Third-party parts keep their licences: Whisper large-v3 weights (Apache-2.0, downloaded from Hugging Face on first use), Public Sans (SIL OFL 1.1, [`app/fonts/OFL.md`](app/fonts/OFL.md)), and ffmpeg (installed by the `imageio-ffmpeg` package, not shipped in this repository).
 
 *Sotto voce* is Italian for "in a low voice". It's what this tool drops, the phrases that fall below the level of speech, and how it works: quietly, on your own machine. It was built for Italian calls first.
