@@ -10,6 +10,8 @@ What changed in each release, newest first. The format follows [Keep a Changelog
 
 ### Changed
 
+- **The page on a phone**, redone for a thumb instead of squeezed from the desktop. The home starts with **Send a recording**; the choices fold into one line that says what is set; the latest calls are a list. On a call, shortcuts to Transcript, Voices, To check and Glossary sit under the title, the figures take two short rows, the tabs and the player stay at the top while the text scrolls, and time and speaker sit above each line so the text has the whole width. Fields are 16 px (iOS no longer zooms in), buttons are thumb-sized, the list drawer closes when you tap beside it, and the stop button is hidden: a server stopped from a phone can't be started from there. Tapping the call strip now scrolls the text to that moment on a phone too.
+- **Correcting a line without a mouse.** A **Correct** button next to Copy turns taps on a line into editing it, with **Save** and **Cancel** buttons (Esc and Enter still work, and so does double-click).
 - The choices made before transcribing (language, **Separate voices**, **Precise word timings**) are now a **Before you start** panel above files and recording, each with a switch and a line saying what it does, instead of two small checkboxes whose explanation was only in a tooltip.
 - On a call, the **Voices** panel comes first in the right column, so separating the voices of a call already transcribed is in view, with a progress bar while it listens. The button is called **Separate voices**, like the option, instead of *Tell the voices apart*.
 

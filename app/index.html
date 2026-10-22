@@ -183,6 +183,22 @@
   .switch:checked{background:var(--accent)}
   .switch:checked::after{transform:translateX(14px)}
   .switch:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+  /* Words that depend on the hand: "click" and "drop" with a mouse, "tap" with
+     a finger. A phone told to drop files or press Esc is told nothing. */
+  .touch-only{display:none}
+  @media (hover:none) and (pointer:coarse){
+    .touch-only{display:revert}
+    .desk-only{display:none !important}
+  }
+  .options-summary{display:none}
+  .tab-short{display:none}
+  .jumps{display:none}
+  .primary.small{height:30px;padding:0 14px;font-size:var(--fs-body)}
+  .lines p.editing{flex-wrap:wrap}
+  .edit-actions{flex-basis:100%;display:flex;align-items:center;gap:16px;margin:8px 0 2px 60px}
+  .lines.whos .edit-actions{margin-left:148px}
+  .reader.fixing p[data-i]{cursor:text}
+  .reader.fixing p[data-i]:hover{background:var(--raised)}
   .voices-cta .primary{margin-top:14px}
   .voices-cta .bar{margin-top:14px}
   .voices-cta .rec-note{margin-top:8px}
@@ -426,25 +442,100 @@
   @media (min-width:1101px){#open-list{display:none}}
 
   /* ---- phone ------------------------------------------------------------- */
+  /* Not the desktop squeezed: on a phone the page is used with a thumb, to
+     read a call, listen to a passage, fix a line or send a recording. What
+     comes first is what is done first, and nothing needs a mouse or a key. */
   @media (max-width:640px){
-    :root{--pad:16px}
-    .title-row{flex-direction:column;gap:14px}
-    .actions{width:100%;flex-wrap:wrap}
-    .split2{grid-template-columns:1fr}
-    .drop{min-height:180px}
-    .figures{grid-template-columns:repeat(2,1fr)}
-    .figures>div{border-left:1px solid var(--rule)}
-    .figures>div:nth-child(odd){border-left:0}
-    .figures>div:nth-child(n+3){border-top:1px solid var(--rule)}
+    :root{--pad:16px;--gap:16px}
+    body{padding-bottom:env(safe-area-inset-bottom)}
     h1{font-size:21px}
-    .reader{max-height:none}
-    .tabs{gap:14px}
-    .axis span.minor{display:none}
+    /* iOS zooms into any field under 16px when it is tapped */
+    input,select,textarea{font-size:16px}
+
+    .rail{gap:2px}
+    .rail button{width:42px;height:42px}
+    .rail svg{width:19px;height:19px}
+    /* The server is stopped from the computer it runs on, not from a phone
+       on the sofa: from here it could not be started again. */
+    #shutdown{display:none}
+
+    .title-row{flex-direction:column;gap:12px}
+    .actions{width:100%;flex-wrap:wrap}
     .panel>header{flex-wrap:wrap;gap:9px}
+    .content{padding:16px}
+    .menu-list{right:auto;left:0}
+
+    /* home: send a recording first, the choices folded into one line, the
+       latest calls as a list, recording (computer only) last */
+    .home{display:flex;flex-direction:column}
+    .home>.split2{display:contents}
+    .home .split2>.panel{margin-bottom:var(--gap)}
+    .home>.title-row{order:0}
+    .home>#home-unfinished{order:1}
+    .home .files-panel{order:2}
+    .home>.options-panel{order:3}
+    .home>#home-queue{order:4}
+    .home>#home-recent{order:5}
+    .home #record-panel{order:6}
+    .drop{min-height:0;padding:22px 16px}
+    .drop b{font-size:17px}
+    .options-panel>header{cursor:pointer}
+    .options-panel>header .right{display:none}
+    .options-summary{display:flex;align-items:center;gap:8px;width:100%;color:var(--muted);
+      font-size:var(--fs-small);text-align:left}
+    .options-summary svg{width:12px;height:12px;flex:none;margin-left:auto;fill:none;
+      stroke:currentColor;stroke-width:1.8;transition:transform .15s}
+    .options-panel.open .options-summary svg{transform:rotate(180deg)}
+    .options-panel:not(.open)>.options{display:none}
+    .options{gap:8px}
+    .option{padding:12px 14px}
+
+    .recent,.recent tbody{display:block}
+    .recent tr{display:grid;grid-template-columns:auto auto 1fr;column-gap:12px;
+      padding:11px 0;border-top:1px solid var(--rule)}
+    .recent tr:first-child{border-top:0}
+    .recent td{border-top:0;padding:0}
+    .recent td:first-child{grid-column:1/-1;margin-bottom:3px}
+    .recent td.n{text-align:left;font-size:var(--fs-small);padding:0}
+    .recent td.n:last-child{text-align:right}
+
+    /* a call: the figures in two short rows, a row of shortcuts to the
+       panels that would otherwise sit below the whole transcript */
+    .jumps{display:flex;gap:8px;flex-wrap:wrap;margin:-4px 0 var(--gap)}
+    .jumps button{height:32px;padding:0 13px;border:1px solid var(--control);
+      border-radius:var(--radius-control);color:var(--muted);font-size:var(--fs-small)}
+    .jumps button b{color:var(--pill-warning-ink);font-weight:500;margin-left:4px}
+    .figures{grid-template-columns:repeat(3,1fr)}
+    .figures>div{padding:10px 12px;border-left:1px solid var(--rule);border-top:0}
+    .figures>div:nth-child(3n+1){border-left:0}
+    .figures>div:nth-child(n+4){border-top:1px solid var(--rule)}
+    .figures dt{font-size:11px}
+    .figures dd{font-size:16px}
+    .axis span.minor{display:none}
     .legend{margin-left:0;width:100%;flex-wrap:wrap}
-    .form-row{grid-template-columns:1fr}
     #strip{height:60px}
-    .lines .who{width:56px}
+
+    /* reading: the tabs and the player stay at hand while the text scrolls */
+    /* The canvas's padding is outside the sticky area: without the negative
+       top, the text shows through a strip above the header. */
+    .reading>header{position:sticky;top:calc(-1 * var(--pad));z-index:3;background:var(--surface);
+      border-radius:0;flex-wrap:nowrap;gap:10px;padding-left:16px;padding-right:12px}
+    .reading>header .right{gap:12px}
+    .reading .player .clock{display:none}
+    .tab-long{display:none}
+    .tab-short{display:inline}
+    .reader{max-height:none;padding:4px 14px 16px}
+    .tabs{gap:16px}
+    .player button{width:36px;height:36px}
+    .player svg{width:12px;height:12px}
+    .lines p{flex-wrap:wrap;column-gap:10px;row-gap:1px;padding:8px 0 8px 9px}
+    .lines time,.lines .who{width:auto;padding-top:0}
+    .lines .who{max-width:60vw}
+    .lines span.text{flex-basis:100%}
+    .edit-actions,.lines.whos .edit-actions{margin-left:0}
+
+    .form-row{grid-template-columns:1fr}
+    .split2{grid-template-columns:1fr}
   }
 
   @media (prefers-reduced-motion:reduce){
@@ -556,6 +647,8 @@ async function checkEngine(){
     const light = $('.light'), t = $('#engine-text');
     voicesAvail = !!d.voices;
     voicesReady = !!d.voices_ready;
+    const os = $('.options-summary span');
+    if (os) os.textContent = optionsSummary();
     const vt = $('#voices-toggle');
     if (vt){
       vt.hidden = !voicesAvail;
@@ -734,8 +827,18 @@ function optionTile(id, title, text, key){
   return l;
 }
 
+// On a phone the three choices fold into one line that says what is set:
+// the recording to send comes first, and the choices are one tap away.
+function optionsSummary(){
+  const parts = [currentLanguage() === 'auto' ? 'Detect language' : languageName(currentLanguage())];
+  if (voicesAvail) parts.push('voices ' + (store.get('sottovoce-voices') === '1' ? 'separated' : 'off'));
+  parts.push(precise() ? 'precise timings' : 'fast timings');
+  return parts.join(' · ');
+}
+
 function optionsPanel(){
   const p = panel('Before you start');
+  p.classList.add('options-panel');
   const r = el('div', 'right');
   r.textContent = 'for files and recordings · remembered';
   p.querySelector('header').append(r);
@@ -763,6 +866,21 @@ function optionsPanel(){
     + '27 minutes in 7 instead of 4.', 'sottovoce-precise');
 
   c.append(lang, v, pr);
+  const sum = el('button', 'options-summary');
+  sum.type = 'button';
+  sum.setAttribute('aria-expanded', 'false');
+  const said = el('span');
+  sum.append(said);
+  sum.insertAdjacentHTML('beforeend', '<svg viewBox="0 0 12 12" aria-hidden="true"><path d="M2.5 4.5L6 8l3.5-3.5"/></svg>');
+  const refresh = () => { said.textContent = optionsSummary(); };
+  refresh();
+  c.addEventListener('change', refresh);
+  p.querySelector('header').append(sum);
+  p.querySelector('header').onclick = e => {
+    if (getComputedStyle(sum).display === 'none') return;
+    p.classList.toggle('open');
+    sum.setAttribute('aria-expanded', String(p.classList.contains('open')));
+  };
   p.append(c);
   return p;
 }
@@ -795,8 +913,11 @@ function showHome(){
   setView('home');
   openNow = null;
   drawList();
-  const d = $('#inner');
-  d.textContent = '';
+  const inner = $('#inner');
+  inner.textContent = '';
+  // One wrapper, so a phone can put the parts in the order a thumb needs.
+  const d = el('div', 'home');
+  inner.append(d);
 
   const tr = el('div', 'title-row');
   const left = el('div');
@@ -836,14 +957,19 @@ function showHome(){
 
 function filesPanel(){
   const p = panel('Transcribe files');
+  p.classList.add('files-panel');
   const c = el('div', 'content');
   const drop = el('div', 'drop');
   drop.id = 'drop';
   drop.setAttribute('role', 'button');
   drop.tabIndex = 0;
-  drop.innerHTML = '<b>Drop recordings here</b><span>mp4, m4a, mp3, wav, ogg, opus, 3gp, '
+  drop.innerHTML = '<b class="desk-only">Drop recordings here</b>'
+    + '<b class="touch-only">Send a recording</b>'
+    + '<span class="desk-only">mp4, m4a, mp3, wav, ogg, opus, 3gp, '
     + 'and anything else ffmpeg can open. Several at once is fine: they run one '
-    + 'after the other.</span>';
+    + 'after the other.</span>'
+    + '<span class="touch-only">A voice memo, a call recorded on the phone, a video: it is '
+    + 'transcribed on the computer, and appears here when it is done.</span>';
   const b = el('button', 'primary');
   b.type = 'button';
   b.dataset.need = 'model';
@@ -1535,6 +1661,28 @@ function show(l, jump){
   d.append(ps);
   const st = drawStrip(svg, axis, l);
 
+  // Phone only: the panels at the side end up below the whole transcript.
+  const jumps = el('nav', 'jumps');
+  jumps.setAttribute('aria-label', 'Go to');
+  const addJump = (label, id, extra) => {
+    const b = el('button');
+    b.type = 'button';
+    b.textContent = label;
+    if (extra){ const x = el('b'); x.textContent = extra; b.append(x); }
+    b.onclick = () => {
+      const t = document.getElementById(id);
+      if (t) t.scrollIntoView({behavior: matchMedia('(prefers-reduced-motion: reduce)').matches
+                                         ? 'auto' : 'smooth', block: 'start'});
+    };
+    jumps.append(b);
+  };
+  addJump('Transcript', 'p-reading');
+  if ((l.speakers || []).length || (voicesAvail && l.audio)) addJump('Voices', 'p-voices');
+  const sus = (l.suspicious || []).length;
+  addJump('To check', 'p-check', sus ? String(sus) : '');
+  addJump('Glossary', 'p-glossary');
+  tr.after(jumps);
+
   const pf = el('div', 'panel');
   const dl = el('dl', 'figures');
   dl.innerHTML = cell('Duration', mmss(l.duration))
@@ -1583,6 +1731,7 @@ function fromMarkdown(t){
 // saying it, so a wrong name is undone by changing one field.
 function voicesPanel(l){
   const p = panel('Voices');
+  p.id = 'p-voices';
   const c = el('div', 'content');
   const speakers = l.speakers || [];
   if (speakers.length){
@@ -1694,6 +1843,7 @@ function sidePanel(l, st){
   if (vp) col.append(vp);
 
   const p = panel('To check');
+  p.id = 'p-check';
   const n = (l.suspicious || []).length;
   if (n){
     const r = el('div', 'right');
@@ -1733,6 +1883,7 @@ function sidePanel(l, st){
      those are the ones to look after. Below it, a way to apply the table
      again when it grew after the transcription. */
   const g = panel('Glossary');
+  g.id = 'p-glossary';
   const gc = el('div', 'content glossary-body');
   const many = l.names_corrected || 0;
   const names = l.names || [];
@@ -1790,6 +1941,8 @@ function sidePanel(l, st){
 
 function readingPanel(l, st, jump){
   const p = panel(null);
+  p.classList.add('reading');
+  p.id = 'p-reading';
   const h = p.querySelector('header');
 
   const tabs = el('div', 'tabs');
@@ -1799,7 +1952,9 @@ function readingPanel(l, st, jump){
     const b = el('button');
     b.type = 'button';
     b.setAttribute('role', 'tab');
-    b.textContent = name;
+    // "Lines" on a phone: the tabs and the player have to share one row.
+    if (k === 'lines') b.innerHTML = '<span class="tab-long">Line by line</span><span class="tab-short">Lines</span>';
+    else b.textContent = name;
     b.onclick = () => view_(k);
     buttons[k] = b;
     tabs.append(b);
@@ -1833,19 +1988,34 @@ function readingPanel(l, st, jump){
     player.append(play, clock);
     right.append(player);
   }
+  // Correcting by hand needs a way in without a mouse: double-click works
+  // with one, and on a phone a double tap is not reliable. "Correct" turns
+  // taps on a line into editing it instead of playing it.
+  const fix = el('button', 'text-button');
+  fix.type = 'button';
+  fix.textContent = 'Correct';
+  fix.hidden = true;
+  let fixing = false;
+  fix.onclick = () => {
+    fixing = !fixing;
+    fix.textContent = fixing ? 'Done' : 'Correct';
+    box.classList.toggle('fixing', fixing);
+  };
   const copy = el('button', 'text-button');
   copy.type = 'button';
   copy.textContent = 'Copy';
-  right.append(copy);
+  right.append(fix, copy);
   h.append(right);
 
   const box = el('div', 'reader');
   p.append(box);
   const help = el('p', 'help');
   help.hidden = true;
-  help.innerHTML = 'Click a word to listen from it · double-click a line to correct it · '
-    + '<kbd>Enter</kbd> saves · <kbd>Esc</kbd> cancels. Every correction is kept with its '
-    + 'before and after: it is the material a model can one day learn your calls from.';
+  help.innerHTML = '<span class="desk-only">Click a word to listen from it · double-click a line, '
+    + 'or press <b>Correct</b>, to fix it · <kbd>Enter</kbd> saves · <kbd>Esc</kbd> cancels.</span>'
+    + '<span class="touch-only">Tap a word to listen from it · press <b>Correct</b>, then tap a '
+    + 'line to fix it.</span> Every correction is kept with its before and after: it is the '
+    + 'material a model can one day learn your calls from.';
   p.append(help);
 
   let current = null, summaryText = l.summary || null, last = null, lastWord = null;
@@ -1892,7 +2062,8 @@ function readingPanel(l, st, jump){
   };
   function fill(items, dense){
     box.textContent = '';
-    box.className = 'reader lines' + (dense ? '' : ' paras');
+    box.className = 'reader lines' + (dense ? '' : ' paras')
+      + ((l.speakers || []).length ? ' whos' : '') + (fixing && dense ? ' fixing' : '');
     for (let i = 0; i < items.length; i++) box.append(row(items[i], dense ? i : undefined));
   }
 
@@ -1900,6 +2071,8 @@ function readingPanel(l, st, jump){
     current = k;
     for (const q in buttons) buttons[q].setAttribute('aria-selected', String(q === k));
     help.hidden = (k !== 'lines');
+    fix.hidden = (k !== 'lines');
+    if (k !== 'lines' && fixing) fix.onclick();
     context.textContent = '';
     last = null; lastWord = null;
     if (k === 'read') fill(l.paragraphs, false);
@@ -1986,6 +2159,11 @@ function readingPanel(l, st, jump){
 
   /* --- clicking plays: from the word if it has a time, else from the line --- */
   box.addEventListener('click', e => {
+    if (fixing){
+      const r = e.target.closest('p[data-i]');
+      if (r && !e.target.closest('.edit-actions')) startEdit(r);
+      return;
+    }
     if (!audio || e.target.closest('[contenteditable=true]')) return;
     const w = e.target.closest('.w');
     const r = e.target.closest('p[data-t]');
@@ -2028,7 +2206,11 @@ function readingPanel(l, st, jump){
     if (current === 'summary') view_('read');
     if (audio){ audio.currentTime = s; audio.play().catch(cannotPlay); }
     const r = [...box.querySelectorAll('p[data-t]')].reverse().find(x => parseFloat(x.dataset.t) <= s);
-    if (r) box.scrollTop = Math.max(0, r.offsetTop - box.clientHeight / 2);
+    if (!r) return;
+    // On a phone the panel does not scroll by itself, the page does.
+    if (box.scrollHeight > box.clientHeight + 4)
+      box.scrollTop = Math.max(0, r.offsetTop - box.clientHeight / 2);
+    else r.scrollIntoView({block: 'center'});
   };
   st.svg.onclick = e => {
     const r = st.svg.getBoundingClientRect();
@@ -2038,13 +2220,32 @@ function readingPanel(l, st, jump){
   /* --- correcting by hand: the operation that builds the dataset --------- */
   box.addEventListener('dblclick', e => {
     const r = e.target.closest('p[data-i]');
-    if (!r) return;
+    if (r) startEdit(r);
+  });
+
+  function startEdit(r){
     const s = r.querySelector('span.text');
     if (s.isContentEditable) return;
     const before = s.textContent;
     s.contentEditable = 'true';
     s.focus();
+    r.classList.add('editing');
+    // Buttons as well as keys: a phone has no Esc. Pressing them must not
+    // take the focus away first, or the blur would save before Cancel.
+    const acts = el('span', 'edit-actions');
+    const ok = el('button', 'primary small');
+    ok.textContent = 'Save';
+    const no = el('button', 'text-button');
+    no.textContent = 'Cancel';
+    for (const b of [ok, no]){ b.type = 'button'; b.onpointerdown = b.onmousedown = x => x.preventDefault(); }
+    ok.onclick = () => close(true);
+    no.onclick = () => close(false);
+    acts.append(ok, no);
+    r.append(acts);
+    let closed = false;
     const close = async save => {
+      if (closed) return;
+      closed = true;
       s.contentEditable = 'false';
       const after = s.textContent.replace(/\s+/g, ' ').trim();
       const i = +r.dataset.i;
@@ -2071,7 +2272,7 @@ function readingPanel(l, st, jump){
       if (x.key === 'Escape'){ x.preventDefault(); x.stopPropagation(); close(false); }
     };
     s.onblur = () => close(true);
-  });
+  }
 
   view_(summaryText && !jump ? 'summary' : 'read');
   if (jump) setTimeout(() => st.go(jump), 60);
@@ -2170,6 +2371,12 @@ document.addEventListener('keydown', e => {
 $('#new-button').onclick = showHome;
 $('#v-glossary').onclick = showGlossary;
 $('#open-list').onclick = () => $('#sidebar').classList.toggle('open');
+// A drawer closes when you tap beside it, as drawers do.
+document.addEventListener('click', e => {
+  const sb = $('#sidebar');
+  if (sb.classList.contains('open') && !sb.contains(e.target) && !e.target.closest('#open-list'))
+    sb.classList.remove('open');
+});
 
 const canvas = $('#canvas');
 canvas.addEventListener('dragover', e => { e.preventDefault(); if (ready) canvas.classList.add('dragover'); });

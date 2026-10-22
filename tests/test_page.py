@@ -165,6 +165,58 @@ def test_phone_width(site):
         assert p.locator("#sidebar").bounding_box()["x"] < 0             # folded away
         p.locator("#open-list").click()
         p.wait_for_function("document.getElementById('sidebar').classList.contains('open')")
+        p.mouse.click(375, 700)                                        # a tap beside it
+        p.wait_for_function("!document.getElementById('sidebar').classList.contains('open')")
+        browser.close()
+
+
+def test_on_a_phone_the_recording_comes_first_and_the_choices_fold(site):
+    with playwright.sync_playwright() as pw:
+        browser = launch(pw)
+        ctx = browser.new_context(viewport={"width": 390, "height": 844}, is_mobile=True, has_touch=True)
+        p = ctx.new_page()
+        p.goto(site)
+        p.wait_for_selector("#drop")
+        assert p.locator(".drop b:visible").all_inner_texts() == ["Send a recording"]
+        drop_y = p.locator("#drop").bounding_box()["y"]
+        assert drop_y < p.locator(".options-panel").bounding_box()["y"]
+        assert not p.locator(".options").is_visible()
+        assert "Detect language" in p.locator(".options-summary").inner_text()
+        p.locator(".options-panel>header").tap()
+        assert p.locator(".options").is_visible()
+        assert not p.locator("#shutdown").is_visible()           # not stoppable from a phone
+        browser.close()
+
+
+def test_on_a_phone_a_line_is_corrected_with_taps(site, data):
+    with playwright.sync_playwright() as pw:
+        browser = launch(pw)
+        ctx = browser.new_context(viewport={"width": 390, "height": 844}, is_mobile=True, has_touch=True)
+        p = ctx.new_page()
+        errors = []
+        p.on("pageerror", lambda e: errors.append(str(e)))
+        p.goto(site)
+        p.locator("#open-list").tap()
+        p.locator(".item", has_text="Supplier check-in").tap()
+        p.wait_for_selector(".reader")
+        assert p.locator(".jumps button").all_inner_texts()[:2] == ["Transcript", "Voices"]
+        p.locator(".tabs button").nth(2).tap()
+        assert p.locator(".tabs button").nth(2).inner_text() == "Lines"
+        p.get_by_role("button", name="Correct").tap()
+        p.locator(".reader p[data-i='0'] span.text").tap()
+        p.keyboard.press("Control+End")              # the end of the text, not of the wrapped row
+        p.keyboard.type(" Bye.")
+        with p.expect_response(lambda r: "/api/correct/" in r.url):
+            p.locator(".edit-actions .primary").tap()
+        p.wait_for_function("document.querySelector(\".reader p[data-i='0'] span.text\").textContent.endsWith('Bye.')")
+        # Cancel really cancels: the button must not let the blur save first.
+        p.locator(".reader p[data-i='1'] span.text").tap()
+        p.keyboard.type("XXX")
+        p.locator(".edit-actions .text-button").tap()
+        assert "XXX" not in p.locator(".reader p[data-i='1']").inner_text()
+        txt = (data / "transcripts" / SUPPLIER / "Supplier check-in, Brenna Print.txt").read_text(encoding="utf-8")
+        assert "Bye." in txt.splitlines()[0] and "XXX" not in txt
+        assert errors == []
         browser.close()
 
 
