@@ -1,0 +1,1396 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sottovoce</title>
+
+<!--
+  THE QUESTION THIS SCREEN ANSWERS: what was said in this call, and where is
+  the text uncertain?
+
+  Everything else follows. The biggest block is the transcript, because it is
+  the answer. Above it sits THE CALL STRIP, the one thing no other
+  transcription tool shows: the real duration of the recording as a single
+  band, with speech, silence, the invented phrases that were dropped and the
+  lines corrected by hand. Click it and the audio jumps there.
+
+  THE FONTS ARE IN THE REPO, not on Google Fonts. A page that calls an outside
+  server when it opens contradicts the one promise of this program (nothing
+  leaves this machine) and would not open without a network. Public Sans,
+  SIL Open Font License 1.1, 26 KB: app/fonts/.
+
+  GRID ARITHMETIC at 1440, written down so it can be checked:
+      1440 - 50 (rail) - 318 (call list) = 1072 canvas
+      1072 - 2 x 32 (padding)            = 1008 usable
+      1008 = 664 + 24 + 320    and   664 = 2 x 320 + 24
+  One gap value, 24, horizontally and vertically.
+-->
+
+<style>
+  @font-face{font-family:"Public Sans";font-weight:400 700;font-style:normal;
+    font-display:swap;src:url(fonts/public-sans-latin.woff2) format("woff2");
+    unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,
+      U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,
+      U+2212,U+2215,U+FEFF,U+FFFD}
+  @font-face{font-family:"Public Sans";font-weight:400 700;font-style:normal;
+    font-display:swap;src:url(fonts/public-sans-latin-ext.woff2) format("woff2");
+    unicode-range:U+0100-02AF,U+0304,U+0308,U+0329,U+1E00-1E9F,U+1EF2-1EFF,
+      U+2020,U+20A0-20AB,U+20AD-20C0,U+2113,U+2C60-2C7F,U+A720-A7FF}
+
+  :root{
+    --ground:#171719; --surface:#131217; --raised:#212023;
+    --border:#222224; --rule:#1b1a1f; --control:#3a3a3e;
+    --text:#ffffff; --muted:#8a8c92;
+    --accent:#4a8ad6; --positive:#44a282; --negative:#e5566f; --warning:#d9a441;
+    --chart-1:#f2f2f3;
+    --pill-warning-bg:#2a2416; --pill-warning-ink:#d9a441;
+    --shadow:0 12px 28px rgba(0,0,0,.2);
+    --radius-card:6px; --radius-control:999px; --radius-chip:4px;
+    --rail:50px; --list:318px;
+    --gap:24px; --pad:32px; --control-h:34px;
+    --fs-title:26px; --fs-section:20px; --fs-kpi:20px; --fs-body:13px; --fs-small:12px;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{margin:0;background:var(--ground);color:var(--text);
+    font:400 var(--fs-body)/1.5 "Public Sans",Inter,system-ui,sans-serif;
+    display:grid;grid-template-columns:var(--rail) var(--list) 1fr;
+    overflow:hidden}
+  .num{font-variant-numeric:tabular-nums}
+  h1,h2,h3{margin:0;font-weight:600}
+  button,select{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
+  a{color:inherit}
+  :focus-visible{outline:1px solid var(--accent);outline-offset:2px}
+
+  /* ---- the rail: the mark, two views, shutdown at the bottom ------------ */
+  .rail{border-right:1px solid var(--border);display:flex;flex-direction:column;
+    align-items:center;padding:14px 0 12px;gap:4px}
+  .rail .mark{display:block;margin-bottom:18px}
+  .rail button{width:34px;height:34px;display:grid;place-items:center;
+    color:var(--muted);border-radius:var(--radius-card);position:relative}
+  .rail button:hover{color:var(--text)}
+  .rail button[aria-current=page]{color:var(--text)}
+  /* The style's one move: every selection is the same 1px line in the accent,
+     on the nearest edge. Here, the edge of the rail. */
+  .rail button[aria-current=page]::after{content:"";position:absolute;
+    right:-8px;top:5px;bottom:5px;width:1px;background:var(--accent)}
+  .rail .bottom{margin-top:auto}
+  .rail svg{width:17px;height:17px;fill:none;stroke:currentColor;
+    stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round}
+
+  /* ---- the call list ----------------------------------------------------- */
+  .sidebar{border-right:1px solid var(--border);display:flex;
+    flex-direction:column;min-height:0;background:var(--ground)}
+  .sidebar>header{padding:18px 16px 12px}
+  .sidebar h2{font-size:var(--fs-section);font-weight:400;color:var(--muted)}
+  .engine{display:flex;align-items:center;gap:7px;font-size:var(--fs-small);
+    color:var(--muted);margin:5px 0 0}
+  .light{width:6px;height:6px;border-radius:50%;background:var(--warning);flex:none}
+  .light.ok{background:var(--positive)} .light.no{background:var(--negative)}
+  .search-row{padding:0 16px 12px}
+  #search{width:100%;height:var(--control-h);background:var(--surface);
+    color:var(--text);border:1px solid var(--control);
+    border-radius:var(--radius-control);padding:0 14px;font:inherit}
+  #search::placeholder{color:var(--muted)}
+  #search:focus{outline:none;border-color:var(--accent)}
+  .list{overflow-y:auto;min-height:0;padding:0 8px 16px}
+  .item{display:block;width:100%;text-align:left;padding:9px 8px;
+    border-radius:var(--radius-card);position:relative;line-height:1.35}
+  .item:hover{background:var(--surface)}
+  .item[aria-current=true]{background:var(--raised)}
+  .item[aria-current=true]::before{content:"";position:absolute;left:0;
+    top:4px;bottom:4px;width:1px;background:var(--accent)}
+  .item .name{display:block;overflow:hidden;text-overflow:ellipsis;
+    white-space:nowrap;font-weight:500}
+  .item .meta{display:block;font-size:var(--fs-small);color:var(--muted);margin-top:2px}
+  .item .meta .dropped{color:var(--warning)}
+  .group{font-size:var(--fs-small);color:var(--muted);padding:14px 8px 6px;margin:0}
+  .hit{display:flex;gap:10px;padding:5px 8px;border-radius:var(--radius-card);
+    width:100%;text-align:left;line-height:1.4}
+  .hit:hover{background:var(--surface)}
+  .hit time{color:var(--muted);flex:none;font-size:var(--fs-small)}
+  .hit span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .hit mark{background:transparent;color:var(--text);font-weight:600}
+  .quiet{color:var(--muted);padding:10px 8px;line-height:1.5;margin:0}
+
+  /* ---- the canvas -------------------------------------------------------- */
+  .canvas{overflow-y:auto;min-height:0;padding:var(--pad);position:relative}
+  .canvas.dragover::after{content:"";position:fixed;
+    inset:0 0 0 calc(var(--rail) + var(--list));
+    border:1px solid var(--accent);pointer-events:none}
+  .inner{max-width:1008px}
+
+  .title-row{display:flex;align-items:flex-start;gap:var(--gap);margin-bottom:var(--gap)}
+  .title-row>div:first-child{min-width:0;flex:1}
+  h1{font-size:var(--fs-title);letter-spacing:-.01em;overflow-wrap:anywhere}
+  .finding{color:var(--muted);margin:6px 0 0;font-size:14px;line-height:1.5}
+  .actions{display:flex;gap:8px;flex:none;align-items:center}
+  .primary{background:var(--text);color:#000;font-weight:600;
+    height:var(--control-h);padding:0 16px;border-radius:var(--radius-control)}
+  /* Disabled but readable, and the label says why. */
+  .primary:disabled{background:var(--raised);color:var(--muted);cursor:default}
+  .secondary{border:1px solid var(--control);height:var(--control-h);
+    padding:0 14px;border-radius:var(--radius-control);display:inline-flex;
+    align-items:center;text-decoration:none;color:var(--muted)}
+  .secondary:hover{color:var(--text);border-color:var(--text)}
+  select.secondary{background:var(--surface);padding:0 12px}
+  select.secondary option{background:var(--surface);color:var(--text)}
+  .text-button{color:var(--muted);text-decoration:none}
+  .text-button:hover{color:var(--text)}
+
+  /* No border on the panels: on a dark ground the separation is the shadow,
+     as the style prescribes. Never a border AND a shadow. */
+  .panel{background:var(--surface);border-radius:var(--radius-card);
+    box-shadow:var(--shadow);margin-bottom:var(--gap)} /* taste-skill-ignore */
+  .panel>header{display:flex;align-items:baseline;gap:14px;
+    padding:14px 20px;border-bottom:1px solid var(--rule)}
+  .panel>header h2{font-size:16px;flex:none}
+  .panel>header .right{margin-left:auto;display:flex;align-items:baseline;
+    gap:14px;font-size:var(--fs-small);color:var(--muted)}
+  .content{padding:20px}
+
+  /* the legend: every key is the mark itself, smaller */
+  .legend{display:flex;gap:14px;font-size:var(--fs-small);color:var(--muted);
+    margin-left:auto;align-items:center}
+  .legend span{display:flex;align-items:center;gap:6px}
+  .legend i{display:block;flex:none}
+  .k-speech{width:14px;height:8px;background:var(--chart-1);opacity:.5}
+  .k-dropped{width:1px;height:11px;background:var(--negative)}
+  .k-corrected{width:1px;height:11px;background:var(--accent)}
+
+  /* ---- the call strip ---------------------------------------------------- */
+  #strip{display:block;width:100%;height:72px;cursor:pointer}
+  .strip-body{padding:14px 20px 10px}
+  /* The minute labels live OUTSIDE the SVG: the band stretches to fill the
+     width, and text stretched with it became a row of squashed, unreadable
+     digits on a phone. */
+  .axis{position:relative;height:18px;margin-top:6px;font-size:var(--fs-small);
+    color:var(--muted);font-variant-numeric:tabular-nums}
+  .axis span{position:absolute;top:0;transform:translateX(-50%);white-space:nowrap}
+  .axis span:first-child{transform:none}
+  .axis span:last-child{transform:translateX(-100%)}
+
+  /* ---- the figures: one container, split by 1px lines -------------------- */
+  .figures{display:grid;grid-template-columns:repeat(6,1fr);margin:0}
+  .figures>div{padding:16px 20px;border-left:1px solid var(--rule)}
+  .figures>div:first-child{border-left:0}
+  .figures dt{font-size:var(--fs-small);color:var(--muted)}
+  .figures dd{margin:4px 0 0;font-size:var(--fs-kpi);font-weight:400;
+    font-variant-numeric:tabular-nums}
+  .figures dd u{text-decoration:none;font-size:var(--fs-small);
+    color:var(--muted);margin-left:3px}
+  .figures dd.none{color:var(--muted)}
+
+  /* Left, what is read, at a reading measure: 664px is about 75 characters at
+     15px. Right, a rail with the call's details that stays in view while the
+     text scrolls.
+
+     Summary and transcript are three views of the SAME panel. Stacked, the
+     summary pushed the transcript, which is the answer, below the fold. And
+     before that they were two side-by-side columns that never balanced: their
+     height depends on how long each call is. A rail does not have to end
+     level with the column next to it. */
+  .split{display:grid;grid-template-columns:664px 320px;gap:var(--gap);align-items:start}
+  .split>*{min-width:0}
+  .side{position:sticky;top:0}
+  .glossary-body table{margin-top:12px}
+  .glossary-body td{padding:8px 0}
+  .foot-action{margin-top:16px}
+
+  /* ---- the summary ------------------------------------------------------- */
+  .summary{padding-top:14px}
+  .summary h3{font-size:14px;margin:20px 0 6px;color:var(--muted);font-weight:500}
+  .summary h3:first-child{margin-top:0}
+  .summary p{margin:0 0 12px}
+  .summary ul{margin:0 0 12px;padding-left:18px}
+  .summary li{margin-bottom:5px}
+  .summary>:last-child{margin-bottom:0}
+
+  /* ---- to check, glossary ------------------------------------------------ */
+  .suspect{display:block;width:100%;text-align:left;padding:9px 0;
+    border-top:1px solid var(--rule);line-height:1.45}
+  .suspect time{display:block;font-size:var(--fs-small);color:var(--muted)}
+  .suspect span{color:var(--muted)}
+  .suspect:hover span{color:var(--text)}
+  .note{color:var(--muted);line-height:1.55;margin:0 0 4px}
+  .pill-warn{background:var(--pill-warning-bg);color:var(--pill-warning-ink);
+    border-radius:var(--radius-chip);padding:2px 8px;font-size:var(--fs-small);
+    font-weight:500;white-space:nowrap;flex:none}
+
+  /* ---- the reading panel ------------------------------------------------- */
+  .tabs{display:flex;gap:18px;flex:none}
+  .tabs button{position:relative;padding-bottom:14px;margin-bottom:-14px;color:var(--muted)}
+  .tabs button[aria-selected=true]{color:var(--text);font-weight:500}
+  .tabs button[aria-selected=true]::after{content:"";position:absolute;
+    left:0;right:0;bottom:0;height:1px;background:var(--accent)}
+  .player{display:flex;align-items:center;gap:10px;flex:none}
+  .player button{width:28px;height:28px;border:1px solid var(--control);
+    border-radius:50%;display:grid;place-items:center;color:var(--text)}
+  .player button:hover{border-color:var(--text)}
+  .player svg{width:11px;height:11px;fill:currentColor}
+  .player .clock{font-size:var(--fs-small);color:var(--muted);font-variant-numeric:tabular-nums}
+
+  .reader{padding:6px 20px 20px;max-height:452px;overflow-y:auto;
+    font-size:15px;line-height:1.7;position:relative}
+  .reader .empty{margin-top:14px}
+  .context{display:flex;gap:14px;align-items:baseline}
+  .lines p{display:flex;gap:16px;margin:0;padding:5px 0 5px 9px;
+    border-left:1px solid transparent}
+  .lines p:hover{background:var(--raised)}
+  .lines p.playing{border-left-color:var(--accent);background:var(--raised)}
+  .lines time{color:var(--muted);flex:none;width:44px;font-size:var(--fs-small);
+    font-variant-numeric:tabular-nums;padding-top:4px}
+  .lines.paras p{padding-top:9px;padding-bottom:9px}
+  .lines span[contenteditable]{border-bottom:1px solid var(--accent)}
+  .lines span[contenteditable]:focus{outline:none}
+  .lines p.saved{background:var(--raised)}
+
+  .help{padding:0 20px 16px;color:var(--muted);font-size:var(--fs-small);
+    margin:0;line-height:1.6}
+  .help kbd{border:1px solid var(--control);border-radius:3px;padding:0 5px;font:inherit}
+
+  /* ---- a running job: it takes the strip's place ------------------------- */
+  .stage{color:var(--muted);margin:0 0 12px}
+  .bar{height:4px;background:var(--raised);border-radius:2px;overflow:hidden}
+  .bar i{display:block;height:100%;background:var(--chart-1);width:0;
+    transition:width .9s linear}
+  .bar.indeterminate i{width:30%;animation:slide 1.5s ease-in-out infinite}
+  @keyframes slide{0%{margin-left:-30%}100%{margin-left:100%}}
+
+  /* ---- the glossary view ------------------------------------------------- */
+  table{width:100%;border-collapse:collapse}
+  th{font-size:var(--fs-small);font-weight:400;color:var(--muted);text-align:left;padding:0 0 10px}
+  th.n{text-align:right}
+  td{padding:11px 0;border-top:1px solid var(--rule);vertical-align:top}
+  td.n{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+  td.variants{color:var(--muted)}
+  .form-row{display:grid;grid-template-columns:1fr 1fr auto;gap:12px;
+    margin-top:22px;align-items:end}
+  .form-row label{display:block;font-size:var(--fs-small);color:var(--muted);margin-bottom:7px}
+  .form-row input{width:100%;height:38px;background:var(--surface);
+    color:var(--text);border:1px solid var(--control);border-radius:8px;
+    padding:0 12px;font:inherit}
+  .form-row input::placeholder{color:var(--muted)}
+  .form-row input:focus{outline:none;border-color:var(--accent)}
+
+  .empty{border:1px dashed var(--control);border-radius:var(--radius-card);
+    padding:14px 16px;color:var(--muted);line-height:1.55;margin:0}
+  .error{color:var(--negative)}
+  .drop{text-align:center;padding:78px 24px;border:1px dashed var(--control);
+    border-radius:var(--radius-card)}
+  .drop b{display:block;font-size:18px;font-weight:600;margin-bottom:9px}
+  .drop span{color:var(--muted);line-height:1.6}
+  input[type=file]{display:none}
+
+  /* ---- tablet: the rail becomes a bar, the list a drawer ----------------- */
+  @media (max-width:1100px){
+    body{grid-template-columns:1fr;grid-template-rows:48px 1fr}
+    .rail{flex-direction:row;border-right:0;border-bottom:1px solid var(--border);
+      padding:0 12px;align-items:center;gap:6px}
+    .rail .mark{margin:0 10px 0 0}
+    .rail button[aria-current=page]::after{right:5px;left:5px;top:auto;
+      bottom:-1px;width:auto;height:1px}
+    .rail .bottom{margin:0 0 0 auto}
+    /* here the list really floats over the canvas: the shadow is earned */
+    .sidebar{position:fixed;top:48px;bottom:0;left:0;width:min(340px,86vw);
+      z-index:5;box-shadow:var(--shadow);transform:translateX(-101%);
+      transition:transform .18s ease} /* taste-skill-ignore */
+    .sidebar.open{transform:none}
+    .canvas.dragover::after{inset:48px 0 0 0}
+    /* One column: reading first, then the rail, which stops staying put. */
+    .split{grid-template-columns:1fr}
+    .side{position:static}
+    .figures{grid-template-columns:repeat(3,1fr)}
+    .figures>div:nth-child(4){border-left:0}
+    .figures>div:nth-child(n+4){border-top:1px solid var(--rule)}
+  }
+  @media (min-width:1101px){#open-list{display:none}}
+
+  /* ---- phone ------------------------------------------------------------- */
+  @media (max-width:640px){
+    :root{--pad:16px}
+    .title-row{flex-direction:column;gap:14px}
+    .actions{width:100%;flex-wrap:wrap}
+    .primary{flex:1}
+    .figures{grid-template-columns:repeat(2,1fr)}
+    .figures>div{border-left:1px solid var(--rule)}
+    .figures>div:nth-child(odd){border-left:0}
+    .figures>div:nth-child(n+3){border-top:1px solid var(--rule)}
+    h1{font-size:21px}
+    .reader{max-height:none}
+    .tabs{gap:14px}
+    .axis span.minor{display:none}
+    .panel>header{flex-wrap:wrap;gap:9px}
+    .legend{margin-left:0;width:100%;flex-wrap:wrap}
+    .form-row{grid-template-columns:1fr}
+    #strip{height:60px}
+  }
+
+  @media (prefers-reduced-motion:reduce){
+    .bar.indeterminate i{animation:none;width:100%;opacity:.35}
+    .bar i{transition:none}
+    .sidebar{transition:none}
+  }
+</style>
+
+<nav class="rail" aria-label="Views">
+  <!-- The mark: a voice, three strokes of different amplitude. Drawn for this
+       program, not a square with a letter in it. -->
+  <svg class="mark" width="22" height="22" viewBox="0 0 22 22" role="img"
+       aria-label="Sottovoce">
+    <rect x="3" y="7" width="2.6" height="8" rx="1.3" fill="#4a8ad6"/>
+    <rect x="9.7" y="3" width="2.6" height="16" rx="1.3" fill="#4a8ad6"/>
+    <rect x="16.4" y="9" width="2.6" height="4" rx="1.3" fill="#4a8ad6"/>
+  </svg>
+
+  <button id="open-list" type="button" title="Calls" aria-label="Open the call list">
+    <svg viewBox="0 0 20 20"><path d="M3 5h14M3 10h14M3 15h9"/></svg>
+  </button>
+  <button id="v-calls" type="button" aria-current="page" title="Calls" aria-label="Calls">
+    <svg viewBox="0 0 20 20"><path d="M4 3.5h12v13H4z"/><path d="M7 7h6M7 10h6M7 13h3.5"/></svg>
+  </button>
+  <button id="v-glossary" type="button" title="Name glossary" aria-label="Name glossary">
+    <svg viewBox="0 0 20 20"><path d="M3.5 4.5a1 1 0 0 1 1-1h11v13h-11a1 1 0 0 1-1-1z"/><path d="M3.5 13.5h12M7 7h5"/></svg>
+  </button>
+  <button class="bottom" id="shutdown" type="button" title="Stop the server" aria-label="Stop the server">
+    <svg viewBox="0 0 20 20"><path d="M10 3v6"/><path d="M14.5 6a6 6 0 1 1-9 0"/></svg>
+  </button>
+</nav>
+
+<aside class="sidebar" id="sidebar">
+  <header>
+    <h2>Calls</h2>
+    <p class="engine"><i class="light"></i><span id="engine-text">loading the model</span></p>
+  </header>
+  <div class="search-row">
+    <input type="search" id="search" placeholder="Search every call">
+  </div>
+  <div class="list" id="list"></div>
+</aside>
+
+<main class="canvas" id="canvas">
+  <div class="inner" id="inner"></div>
+</main>
+
+<input type="file" id="file" accept="audio/*,video/*">
+
+<script>
+"use strict";
+const $ = s => document.querySelector(s);
+const el = (t, c) => { const e = document.createElement(t); if (c) e.className = c; return e; };
+const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g,
+  c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+const mmss = s => { s = Math.max(0, Math.round(s || 0));   /* taste-skill-ignore: a clock */
+  return String(Math.floor(s / 60)).padStart(2, '0') + ':' + String(s % 60).padStart(2, '0'); };
+const thousands = n => (n === null || n === undefined ? '—' : Number(n).toLocaleString('en-US'));
+const secondsOf = m => { const p = /^(\d+):(\d+)$/.exec(String(m == null ? '' : m).trim());
+  return p ? (+p[1]) * 60 + (+p[2]) : null; };
+const plural = (n, one, many) => n + ' ' + (n === 1 ? one : many);
+
+// Whisper language codes. "auto" lets the model detect it from the audio; a
+// fixed language is safer when a call opens with silence or a foreign word.
+const LANGUAGES = [['auto', 'Detect language'], ['en', 'English'], ['it', 'Italian'],
+  ['es', 'Spanish'], ['fr', 'French'], ['de', 'German'], ['pt', 'Portuguese'],
+  ['nl', 'Dutch'], ['pl', 'Polish'], ['ro', 'Romanian'], ['sv', 'Swedish'],
+  ['el', 'Greek'], ['tr', 'Turkish'], ['ru', 'Russian'], ['uk', 'Ukrainian'],
+  ['ar', 'Arabic'], ['hi', 'Hindi'], ['zh', 'Chinese'], ['ja', 'Japanese'],
+  ['ko', 'Korean']];
+const languageName = c => {
+  if (!c) return null;
+  const f = LANGUAGES.find(x => x[0] === c);
+  return f ? f[1] : c.toUpperCase();
+};
+// The choice is remembered in this browser only: a convenience, never data.
+const store = {
+  get(k){ try{ return localStorage.getItem(k); } catch(e){ return null; } },
+  set(k, v){ try{ localStorage.setItem(k, v); } catch(e){} },
+};
+
+let ready = false, openNow = null, calls = [], llm = null;
+
+/* ========================== engine and calls ========================== */
+
+async function checkEngine(){
+  try{
+    const d = await (await fetch('/api/status')).json();
+    const light = $('.light'), t = $('#engine-text');
+    if (d.error){ light.className = 'light no'; t.textContent = d.error; return; }
+    if (d.ready){
+      ready = true;
+      light.className = 'light ok';
+      t.textContent = d.model.split('/').pop() + ' · ready';
+      document.querySelectorAll('.primary[data-label]').forEach(b => {
+        b.disabled = false;
+        b.textContent = b.dataset.label;
+      });
+    } else setTimeout(checkEngine, 1500);
+  } catch(e){ setTimeout(checkEngine, 2000); }
+}
+
+async function checkLLM(){
+  try{ llm = await (await fetch('/api/llm')).json(); }
+  catch(e){ llm = {available:false}; }
+}
+
+async function loadHistory(){
+  try{ calls = (await (await fetch('/api/history')).json()).history || []; }
+  catch(e){ return; }
+  drawList();
+}
+
+function drawList(){
+  const l = $('#list');
+  l.textContent = '';
+  if (!calls.length){
+    const p = el('p', 'quiet');
+    p.textContent = 'No calls yet. Drop one on the page.';
+    l.append(p);
+    return;
+  }
+  for (const v of calls){
+    const b = el('button', 'item');
+    b.type = 'button';
+    if (v.folder === openNow) b.setAttribute('aria-current', 'true');
+    const n = el('span', 'name');
+    n.textContent = v.original || v.folder;
+    // A count only on what asks to be looked at, and it names what it counts:
+    // never a bare number next to a name.
+    const dropped = (v.phantoms_dropped || []).length;
+    const m = el('span', 'meta');
+    m.innerHTML = '<span class="num">' + esc((v.transcribed_at || '').slice(0, 10)) + '</span>'
+      + ' · <span class="num">' + Math.round((v.duration_s || 0) / 60) + '</span> min'
+      + ' · <span class="num">' + thousands(v.words) + '</span> words'
+      + (dropped ? ' · <span class="dropped">' + esc(plural(dropped, 'phrase dropped', 'phrases dropped')) + '</span>' : '');
+    b.append(n, m);
+    b.onclick = () => openCall(v.folder);
+    l.append(b);
+  }
+}
+
+/* ================================ search ================================ */
+
+let searchWait;
+$('#search').oninput = e => {
+  clearTimeout(searchWait);
+  const q = e.target.value.trim();
+  if (q.length < 2){ drawList(); return; }
+  searchWait = setTimeout(() => search(q), 250);
+};
+
+async function search(q){
+  let d;
+  try{ d = await (await fetch('/api/search?q=' + encodeURIComponent(q))).json(); }
+  catch(e){ return; }
+  const l = $('#list');
+  l.textContent = '';
+  if (!d.results.length){
+    const p = el('p', 'quiet');
+    p.textContent = 'No call mentions “' + q + '”.';
+    l.append(p);
+    return;
+  }
+  const tot = el('p', 'group');
+  tot.innerHTML = '<span class="num">' + esc(plural(d.total, 'match', 'matches')) + '</span> in '
+    + '<span class="num">' + esc(plural(d.results.length, 'call', 'calls')) + '</span>';
+  l.append(tot);
+  for (const r of d.results){
+    const g = el('p', 'group');
+    g.textContent = r.folder;
+    l.append(g);
+    for (const x of r.lines){
+      const b = el('button', 'hit');
+      b.type = 'button';
+      b.innerHTML = '<time class="num">' + esc(x.minute) + '</time>'
+        + '<span>' + highlight(x.snippet, q) + '</span>';
+      b.onclick = () => openCall(r.folder, x.seconds);
+      l.append(b);
+    }
+  }
+}
+
+// Highlighting without regular expressions: the query may contain characters
+// that mean something else in a regex, and escaping them is a roundabout way
+// of doing what indexOf does better.
+function highlight(s, q){
+  const out = [], L = s.toLowerCase(), Q = q.toLowerCase();
+  let i = 0;
+  for(;;){
+    const k = L.indexOf(Q, i);
+    if (k < 0){ out.push(esc(s.slice(i))); break; }
+    out.push(esc(s.slice(i, k)), '<mark>', esc(s.slice(k, k + Q.length)), '</mark>');
+    i = k + Q.length;
+  }
+  return out.join('');
+}
+
+/* ============================ the call strip ============================ */
+// The element no other transcription tool has: the real duration as one band.
+// Inside: where people speak, where an invented phrase was dropped, where a
+// line was corrected. Click it and the audio goes there; while it plays, a
+// 1px line marks the spot.
+//
+// Drawn from the real data of THIS call. Nothing is estimated and nothing is
+// decoration.
+
+const NS = 'http://www.w3.org/2000/svg';
+const sv = (t, a) => { const e = document.createElementNS(NS, t);
+  for (const k in a) e.setAttribute(k, a[k]); return e; };
+
+// A round step that falls inside the duration without leaving a stubby last
+// interval, and never just two labels at the ends: they would hide when
+// things happened.
+function axisStep(d){
+  for (const p of [15, 30, 60, 120, 300, 600, 900, 1800]) if (d / p <= 8) return p;
+  return 3600;
+}
+
+function drawStrip(svg, axis, l){
+  const W = 1008, BAND = 56, TOP = 6;
+  svg.textContent = '';
+  svg.setAttribute('viewBox', '0 0 ' + W + ' ' + (TOP + BAND + 6));
+  svg.setAttribute('preserveAspectRatio', 'none');
+  svg.setAttribute('shape-rendering', 'crispEdges');
+  const duration = l.duration || 1;
+  const x = s => Math.max(0, Math.min(W, (s / duration) * W));
+
+  // One viewBox unit stretched over 358 phone pixels becomes a third of a
+  // pixel and disappears. Line width is counted in real pixels.
+  const line = Math.max(1, W / Math.max(1, svg.getBoundingClientRect().width || W));
+
+  // The band's ground is silence; speech is laid on top of it.
+  //
+  // Speech comes from the AUDIO (l.speech, measured with ffmpeg: pauses over a
+  // second below -35 dB), not from the text. The text cannot tell: the .txt
+  // only stores where each line starts, the end is the start of the next one,
+  // so lines touch by construction. Drawn from the text, every call looked
+  // spoken from the first second to the last.
+  //
+  // If the measurement is missing the band stays empty and the legend does not
+  // mention speech: nothing is better than a full band that means nothing.
+  svg.append(sv('rect', {x:0, y:TOP, width:W, height:BAND, fill:'#0e0d11'}));
+  for (const t of (l.speech || [])){
+    const a = x(t[0]), b = x(t[1]);
+    svg.append(sv('rect', {x:a, y:TOP, width:Math.max(line, b - a), height:BAND,
+                           fill:'#f2f2f3', 'fill-opacity':'.62'}));
+  }
+
+  // Dropped phrases: a line the full height, in the colour of a fault. These
+  // are the places where the model had invented.
+  for (const f of (l.phantoms || [])){
+    const s = secondsOf(f.minute);
+    if (s === null) continue;
+    svg.append(sv('rect', {x:x(s), y:0, width:line, height:TOP + BAND + 6, fill:'#e5566f'}));
+  }
+  // Corrected lines: the same line in the accent, from the bottom.
+  for (const c of (l.corrections || [])){
+    svg.append(sv('rect', {x:x(c.seconds), y:TOP + BAND - 15, width:line,
+                           height:21, fill:'#4a8ad6'}));
+  }
+
+  const head = sv('rect', {x:0, y:0, width:line, height:TOP + BAND + 6, fill:'#ffffff'});
+  head.style.display = 'none';
+  svg.append(head);
+
+  // The axis: a round step inside the duration, and the real duration at the
+  // end. On a phone every other label is hidden.
+  axis.textContent = '';
+  const step = axisStep(duration);
+  const ticks = [];
+  // A tick is kept if there is room before the end label: 6% of the width is
+  // about 58px on a desktop, enough for two labels side by side.
+  for (let s = 0; s <= duration - Math.max(step * 0.25, duration * 0.06); s += step) ticks.push(s);
+  ticks.push(duration);
+  ticks.forEach((s, i) => {
+    const e = el('span');
+    e.style.left = (s / duration * 100) + '%';
+    e.textContent = mmss(s);
+    // On a phone every other label goes, and so does one that would touch
+    // the end label.
+    const last = ticks.length - 1;
+    if ((i % 2 === 1 && i !== last) || (i === last - 1 && (duration - s) / duration < 0.12))
+      e.classList.add('minor');
+    axis.append(e);
+  });
+
+  return {svg:svg, head:head, x:x, duration:duration};
+}
+
+/* ============================= opening a call =========================== */
+
+async function openCall(name, jump){
+  openNow = name;
+  callsView();
+  drawList();
+  $('#sidebar').classList.remove('open');
+  $('#inner').innerHTML = '<p class="quiet">opening…</p>';
+  let l;
+  try{
+    l = await (await fetch('/api/history/' + encodeURIComponent(name))).json();
+    if (l.error) throw new Error(l.error);
+  } catch(e){ return failure(e.message); }
+  show(l, jump);
+}
+
+function failure(msg){
+  $('#inner').innerHTML = '<h1>It does not open</h1><p class="finding error">'
+    + esc(msg) + '</p>';
+}
+
+// The finding: the fact about THIS call to look at first. A bare number is not
+// a finding, and every figure here says what it is counting.
+function finding(l){
+  const d = [];
+  const dropped = (l.phantoms || []).length;
+  if (dropped) d.push(plural(dropped, 'invented phrase dropped from silence',
+                                      'invented phrases dropped from silence'));
+  if (l.names_corrected) d.push(plural(l.names_corrected, 'name corrected by the glossary',
+                                                         'names corrected by the glossary'));
+  // Lines touched by the glossary are not lines corrected by hand: counting
+  // them together would inflate the one figure here that is worth something.
+  const hand = (l.corrections || []).filter(c => c.source !== 'glossary').length;
+  if (hand) d.push(plural(hand, 'line corrected by hand', 'lines corrected by hand'));
+  const n = (l.suspicious || []).length;
+  if (n) d.push(plural(n, 'phrase still to check', 'phrases still to check'));
+  if (!d.length) return 'Nothing to flag: no phrase dropped, no name corrected.';
+  return d.join(' · ');
+}
+
+function cell(label, v, unit){
+  const none = (v === null || v === undefined || v === '');
+  return '<div><dt>' + label + '</dt><dd class="' + (none ? 'none' : '') + '">'
+    + (none ? '—' : esc(v) + (unit ? ' <u>' + unit + '</u>' : '')) + '</dd></div>';
+}
+
+function panel(title){
+  const p = el('div', 'panel');
+  const h = el('header');
+  if (title){ const t = el('h2'); t.textContent = title; h.append(t); }
+  p.append(h);
+  return p;
+}
+
+// The legend names only the marks actually on the strip: a key without its
+// mark sends you looking for something that is not there.
+function legend(l){
+  const e = el('div', 'legend');
+  const keys = [];
+  if (l.speech && l.speech.length) keys.push('<span><i class="k-speech"></i>speech</span>');
+  if ((l.phantoms || []).length) keys.push('<span><i class="k-dropped"></i>phrase dropped</span>');
+  if ((l.corrections || []).length) keys.push('<span><i class="k-corrected"></i>line corrected</span>');
+  e.innerHTML = keys.join('');
+  return e;
+}
+
+// The main job's button. While the model loads it is off, and it says so in
+// words instead of sitting there as a mute grey shape.
+function primaryButton(label){
+  const b = el('button', 'primary');
+  b.type = 'button';
+  b.dataset.label = label;
+  b.textContent = ready ? label : 'Loading the model…';
+  b.disabled = !ready;
+  b.onclick = () => ready && $('#file').click();
+  return b;
+}
+
+function languagePicker(){
+  const s = el('select', 'secondary');
+  s.id = 'language';
+  s.setAttribute('aria-label', 'Language of the recording');
+  s.title = 'Language of the recording';
+  const saved = store.get('sottovoce-language') || 'auto';
+  for (const [code, name] of LANGUAGES){
+    const o = el('option');
+    o.value = code;
+    o.textContent = name;
+    if (code === saved) o.selected = true;
+    s.append(o);
+  }
+  s.onchange = () => store.set('sottovoce-language', s.value);
+  return s;
+}
+
+function show(l, jump){
+  const base = '/api/history/' + encodeURIComponent(l.folder) + '/download';
+  // Totals come from the parts as shown: if a line was corrected, the count
+  // written in info.json is one correction old.
+  const words = l.segments.reduce((s, p) =>
+    s + (p.text.trim() ? p.text.trim().split(/\s+/).length : 0), 0);
+  const speed = l.seconds_taken ? l.duration / l.seconds_taken : null;
+
+  const d = $('#inner');
+  d.textContent = '';
+
+  /* --- the title row --- */
+  const tr = el('div', 'title-row');
+  const left = el('div');
+  const h1 = el('h1');
+  h1.textContent = l.name;
+  const fd = el('p', 'finding');
+  fd.textContent = finding(l);
+  left.append(h1, fd);
+  const act = el('div', 'actions');
+  const md = el('a', 'secondary');
+  md.href = base + '.md';
+  md.textContent = '.md';
+  md.title = 'Download the text in paragraphs';
+  const tx = el('a', 'secondary');
+  tx.href = base + '.txt';
+  tx.textContent = '.txt';
+  tx.title = 'Download the text line by line, with timestamps';
+  act.append(languagePicker(), primaryButton('Transcribe a recording'), md, tx);
+  tr.append(left, act);
+  d.append(tr);
+
+  /* --- the strip: the leading element --- */
+  const ps = panel('The call, minute by minute');
+  ps.querySelector('header').append(legend(l));
+  const svg = sv('svg', {id:'strip', role:'img', 'aria-label':
+    'Strip of ' + mmss(l.duration) + ' of recording: speech, dropped phrases and '
+    + 'corrected lines. Click to listen from that point.'});
+  const axis = el('div', 'axis');
+  axis.setAttribute('aria-hidden', 'true');
+  const sb = el('div', 'strip-body');
+  sb.append(svg, axis);
+  ps.append(sb);
+  d.append(ps);
+  const st = drawStrip(svg, axis, l);
+
+  /* --- the figures: one divided container, no tiles --- */
+  const pf = el('div', 'panel');
+  const dl = el('dl', 'figures');
+  dl.innerHTML = cell('Duration', mmss(l.duration))
+    + cell('Words', thousands(words))
+    + cell('Language', languageName(l.language))
+    + cell('Transcribed in', l.seconds_taken ? mmss(l.seconds_taken) : null)
+    + cell('Speed', speed ? speed.toFixed(1) : null, '× real time')
+    + cell('Names corrected', l.names_corrected === null || l.names_corrected === undefined
+        ? null : l.names_corrected);
+  pf.append(dl);
+  d.append(pf);
+
+  /* --- left the reading, right the call's rail --- */
+  const split = el('div', 'split');
+  split.append(readingPanel(l, st, jump), sidePanel(l, st));
+  d.append(split);
+}
+
+// The little markdown the summary uses: headings, lists, bold. Three forms do
+// not need a library, and a library would mean one more file or a network call.
+function fromMarkdown(t){
+  const out = [];
+  let list = false;
+  const bold = s => esc(s).replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+  for (let line of String(t).split('\n')){
+    line = line.replace(/\s+$/, '');
+    const li = /^\s*[-*•]\s+(.*)$/.exec(line);
+    if (li){
+      if (!list){ out.push('<ul>'); list = true; }
+      out.push('<li>' + bold(li[1]) + '</li>');
+      continue;
+    }
+    if (list){ out.push('</ul>'); list = false; }
+    const h = /^(#{1,4})\s+(.*)$/.exec(line);
+    if (h){ out.push('<h3>' + bold(h[2]) + '</h3>'); continue; }
+    if (!line.trim()) continue;
+    out.push('<p>' + bold(line) + '</p>');
+  }
+  if (list) out.push('</ul>');
+  return out.join('');
+}
+
+/* ======================== to check, and the glossary ==================== */
+
+function sidePanel(l, st){
+  const col = el('div', 'side');
+
+  const p = panel('To check');
+  const n = (l.suspicious || []).length;
+  if (n){
+    const r = el('div', 'right');
+    const a = el('span', 'pill-warn');
+    a.textContent = plural(n, 'phrase', 'phrases');
+    r.append(a);
+    p.querySelector('header').append(r);
+  }
+  const c = el('div', 'content');
+  if (!n){
+    const v = el('p', 'empty');
+    v.textContent = 'Nothing suspicious. The phrases Whisper invented on silence '
+      + 'have already been dropped, and the strip above shows where.';
+    c.append(v);
+  } else {
+    const g = el('p', 'note');
+    g.textContent = 'Whisper learned from YouTube subtitles and sometimes repeats '
+      + 'them on silence. These were said where the audio was not quiet, so they '
+      + 'stayed: you decide.';
+    c.append(g);
+    for (const s of l.suspicious){
+      const b = el('button', 'suspect');
+      b.type = 'button';
+      const tm = el('time', 'num');
+      tm.textContent = mmss(s.start);
+      const sp = el('span');
+      sp.textContent = s.text;
+      b.append(tm, sp);
+      b.onclick = () => st.go && st.go(s.start);
+      c.append(b);
+    }
+  }
+  p.append(c);
+  col.append(p);
+
+  /* the glossary in this call: which names weigh in it and how much, because
+     those are the ones to look after: a name said eleven times and garbled
+     ruins the reading, one said once does not. Below it, a way to apply the
+     table again when it grew after the transcription. */
+  const g = panel('Glossary');
+  const gc = el('div', 'content glossary-body');
+  const many = l.names_corrected || 0;
+  const line = el('p', 'note');
+  line.textContent = many
+    ? plural(many, 'name', 'names') + ' corrected in this transcript.'
+    : 'No name corrected in this transcript.';
+  gc.append(line);
+
+  const names = l.names || [];
+  if (names.length){
+    const t = el('table');
+    const tb = el('tbody');
+    for (const x of names){
+      const r = el('tr');
+      r.innerHTML = '<td>' + esc(x.name) + '</td><td class="n">' + thousands(x.count) + '</td>';
+      tb.append(r);
+    }
+    t.append(tb);
+    gc.append(t);
+  } else {
+    const v = el('p', 'empty');
+    v.style.marginTop = '12px';
+    v.textContent = 'None of the names in the glossary appears in this call.';
+    gc.append(v);
+  }
+
+  const b = el('button', 'secondary foot-action');
+  b.type = 'button';
+  b.textContent = 'Apply the glossary again';
+  b.onclick = async () => {
+    b.disabled = true;
+    b.textContent = 'applying…';
+    try{
+      const r = await (await fetch('/api/reapply/' + encodeURIComponent(l.folder),
+        {method:'POST'})).json();
+      if (r.error) throw new Error(r.error);
+      if (!r.corrected){ b.textContent = 'Already up to date'; return; }
+      await loadHistory();
+      openCall(l.folder);
+    } catch(e){ b.textContent = e.message; }
+  };
+  gc.append(b);
+  g.append(gc);
+  col.append(g);
+
+  return col;
+}
+
+/* ============================ the reading panel ========================= */
+// Three views of the same panel: the summary, the text to read, the text line
+// by line. The summary is the starting view when there is one, because it is
+// the first thing you read after a call; the transcript is one click away, in
+// the same place, instead of below the fold.
+
+function readingPanel(l, st, jump){
+  const p = panel(null);
+  const h = p.querySelector('header');
+
+  const tabs = el('div', 'tabs');
+  tabs.setAttribute('role', 'tablist');
+  const buttons = {};
+  for (const [k, name] of [['summary', 'Summary'], ['read', 'Read'],
+                           ['lines', 'Line by line']]){
+    const b = el('button');
+    b.type = 'button';
+    b.setAttribute('role', 'tab');
+    b.textContent = name;
+    b.onclick = () => view(k);
+    buttons[k] = b;
+    tabs.append(b);
+  }
+  h.append(tabs);
+
+  const right = el('div', 'right');
+  const context = el('div', 'context');
+  right.append(context);
+
+  let audio = null;
+  if (l.audio){
+    audio = el('audio');
+    audio.preload = 'none';
+    audio.src = '/api/audio/' + encodeURIComponent(l.folder);
+    const player = el('div', 'player');
+    const play = el('button');
+    play.type = 'button';
+    play.setAttribute('aria-label', 'Play');
+    const clock = el('span', 'clock');
+    clock.textContent = '00:00';
+    const PLAY = '<svg viewBox="0 0 10 10"><path d="M1 0l8 5-8 5z"/></svg>';
+    const PAUSE = '<svg viewBox="0 0 10 10"><path d="M1 0h3v10H1zM6 0h3v10H6z"/></svg>';
+    play.innerHTML = PLAY;
+    play.onclick = () => audio.paused ? audio.play().catch(cannotPlay) : audio.pause();
+    audio.onplay = audio.onpause = () => {
+      play.innerHTML = audio.paused ? PLAY : PAUSE;
+      play.setAttribute('aria-label', audio.paused ? 'Play' : 'Pause');
+    };
+    audio.ontimeupdate = () => { clock.textContent = mmss(audio.currentTime); follow(); };
+    player.append(play, clock);
+    right.append(player);
+  }
+  const copy = el('button', 'text-button');
+  copy.type = 'button';
+  copy.textContent = 'Copy';
+  right.append(copy);
+  h.append(right);
+
+  const box = el('div', 'reader');
+  p.append(box);
+  const help = el('p', 'help');
+  help.hidden = true;
+  help.innerHTML = 'Double-click a line to correct it · <kbd>Enter</kbd> saves · '
+    + '<kbd>Esc</kbd> cancels. Every correction is kept with its before and after: '
+    + 'it is the material a model can one day learn your calls from.';
+  p.append(help);
+
+  let current = null, summaryText = l.summary || null, last = null;
+
+  // play() returns a promise and the browser may reject it: a codec it cannot
+  // read, or autoplay blocked. Unhandled, the button does nothing and the
+  // error sits in a console nobody looks at.
+  function cannotPlay(e){
+    if (e && e.name === 'AbortError') return;     // a play interrupted by another
+    const c = right.querySelector('.player .clock');
+    if (c) c.textContent = 'cannot play this file';
+  }
+
+  const row = (x, i) => {
+    const e = el('p');
+    e.dataset.t = x.start || 0;
+    if (i !== undefined) e.dataset.i = i;
+    const tm = el('time');
+    tm.textContent = mmss(x.start);
+    const sp = el('span');
+    sp.textContent = x.text;
+    e.append(tm, sp);
+    return e;
+  };
+  function fill(items, dense){
+    box.textContent = '';
+    box.className = 'reader lines' + (dense ? '' : ' paras');
+    for (let i = 0; i < items.length; i++) box.append(row(items[i], dense ? i : undefined));
+  }
+
+  function view(k){
+    current = k;
+    for (const q in buttons) buttons[q].setAttribute('aria-selected', String(q === k));
+    help.hidden = (k !== 'lines');
+    context.textContent = '';
+    last = null;
+    if (k === 'read') fill(l.paragraphs, false);
+    else if (k === 'lines') fill(l.segments, true);
+    else showSummary();
+    follow();
+  }
+
+  /* --- the summary --- */
+  function redoButton(){
+    const b = el('button', 'text-button');
+    b.type = 'button';
+    b.textContent = 'Redo';
+    b.onclick = () => ask(true);
+    return b;
+  }
+  function showSummary(){
+    box.className = 'reader';
+    box.textContent = '';
+    if (summaryText){
+      const r = el('div', 'summary');
+      r.innerHTML = fromMarkdown(summaryText);
+      box.append(r);
+      if (llm && llm.available) context.append(redoButton());
+      return;
+    }
+    const v = el('p', 'empty');
+    if (llm && llm.available){
+      v.textContent = 'Not asked for yet. ' + llm.model
+        + ' will write it, here on this machine, in about twenty seconds.';
+      const b = el('button', 'primary');
+      b.type = 'button';
+      b.style.marginTop = '14px';
+      b.textContent = 'Summarize the call';
+      b.onclick = () => ask(false);
+      box.append(v, b);
+    } else {
+      v.textContent = 'A summary needs a language model running on this machine: '
+        + 'LM Studio, Ollama or llama-server. None is answering, so there is '
+        + 'nothing to ask.';
+      box.append(v);
+    }
+  }
+  async function ask(redo){
+    box.className = 'reader';
+    box.textContent = '';
+    context.textContent = '';
+    const w = el('p', 'quiet');
+    w.style.padding = '14px 0';
+    w.textContent = 'the model is reading the call…';
+    box.append(w);
+    try{
+      const r = await (await fetch('/api/summary/' + encodeURIComponent(l.folder)
+        + (redo ? '?redo=true' : ''), {method:'POST'})).json();
+      if (r.error) throw new Error(r.error);
+      summaryText = r.text;
+      // You may have moved to the text meanwhile: the summary waits for you
+      // there, without pulling the view away.
+      if (current !== 'summary') return;
+      showSummary();
+      const s = el('span');
+      s.textContent = r.model + ' · ' + r.seconds + ' s';
+      context.prepend(s);
+    } catch(e){
+      if (current !== 'summary') return;
+      box.textContent = '';
+      const v = el('p', 'empty error');
+      v.textContent = e.message;
+      box.append(v);
+    }
+  }
+
+  /* --- copying: whatever view you are looking at --- */
+  copy.onclick = async () => {
+    const t = current === 'summary' ? (summaryText || '')
+      : (current === 'lines' ? l.segments : l.paragraphs)
+          .map(x => '[' + mmss(x.start) + '] ' + x.text)
+          .join(current === 'lines' ? '\n' : '\n\n');
+    if (!t) return;
+    await navigator.clipboard.writeText(t);
+    copy.textContent = 'Copied';
+    setTimeout(() => copy.textContent = 'Copy', 1500);
+  };
+
+  /* --- clicking a line plays from there --- */
+  box.addEventListener('click', e => {
+    const r = e.target.closest('p[data-t]');
+    if (!r || !audio) return;
+    audio.currentTime = parseFloat(r.dataset.t);
+    audio.play().catch(cannotPlay);
+  });
+
+  /* and the line playing stays marked with the same 1px line as everything
+     else: one kind of selection, one mark */
+  function follow(){
+    if (!audio || (audio.currentTime === 0 && audio.paused)) return;
+    const t = audio.currentTime;
+    st.head.style.display = '';
+    st.head.setAttribute('x', st.x(t));
+    let pick = null;
+    for (const r of box.querySelectorAll('p[data-t]')){
+      if (parseFloat(r.dataset.t) <= t) pick = r; else break;
+    }
+    if (pick !== last){
+      if (last) last.classList.remove('playing');
+      if (pick) pick.classList.add('playing');
+      last = pick;
+    }
+  }
+
+  /* --- the strip is also the audio's scrub bar --- */
+  // Scrolls inside the panel, not the page: clicking the strip at the top must
+  // not make the screen jump.
+  st.go = s => {
+    if (current === 'summary') view('read');
+    if (audio){ audio.currentTime = s; audio.play().catch(cannotPlay); }
+    const r = [...box.querySelectorAll('p[data-t]')].reverse()
+      .find(x => parseFloat(x.dataset.t) <= s);
+    if (r) box.scrollTop = Math.max(0, r.offsetTop - box.clientHeight / 2);
+  };
+  st.svg.onclick = e => {
+    const r = st.svg.getBoundingClientRect();
+    st.go(((e.clientX - r.left) / r.width) * st.duration);
+  };
+
+  /* --- correcting by hand: the operation that builds the dataset --------- */
+  box.addEventListener('dblclick', e => {
+    const r = e.target.closest('p[data-i]');
+    if (!r) return;
+    const s = r.querySelector('span');
+    if (s.isContentEditable) return;
+    const before = s.textContent;
+    s.contentEditable = 'true';
+    s.focus();
+    const close = async save => {
+      s.contentEditable = 'false';
+      const after = s.textContent.trim();
+      if (!save || after === before.trim()){ s.textContent = before; return; }
+      try{
+        const q = await (await fetch('/api/correct/' + encodeURIComponent(l.folder), {
+          method:'POST', headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({index: +r.dataset.i, text: after})})).json();
+        if (q.error) throw new Error(q.error);
+        r.classList.add('saved');
+        setTimeout(() => r.classList.remove('saved'), 900);
+        // The paragraph view must see the correction too: read it again from
+        // disk, which is the source, instead of rebuilding it here.
+        const fresh = await (await fetch('/api/history/' + encodeURIComponent(l.folder))).json();
+        if (!fresh.error){ l.segments = fresh.segments; l.paragraphs = fresh.paragraphs; }
+      } catch(err){ s.textContent = before; }
+    };
+    s.onkeydown = x => {
+      if (x.key === 'Enter'){ x.preventDefault(); close(true); }
+      if (x.key === 'Escape'){ x.preventDefault(); close(false); }
+    };
+    s.onblur = () => close(true);
+  });
+
+  view(summaryText && !jump ? 'summary' : 'read');
+  if (jump) setTimeout(() => st.go(jump), 60);
+  return p;
+}
+
+/* ========================== the screen with no call ===================== */
+
+function showEmpty(){
+  openNow = null;
+  callsView();
+  drawList();
+  const d = $('#inner');
+  d.textContent = '';
+  const minutes = calls.reduce((s, v) => s + (v.duration_s || 0) / 60, 0);
+  const words = calls.reduce((s, v) => s + (v.words || 0), 0);
+  const dropped = calls.reduce((s, v) => s + (v.phantoms_dropped || []).length, 0);
+
+  const tr = el('div', 'title-row');
+  const left = el('div');
+  const h1 = el('h1');
+  h1.textContent = 'Calls';
+  const fd = el('p', 'finding');
+  fd.textContent = calls.length
+    ? plural(calls.length, 'call', 'calls') + ' transcribed, '
+      + Math.round(minutes) + ' minutes of recording in ' + thousands(words)
+      + ' words. Pick one on the left.'
+    : 'Nothing yet. Drop a recording here and the text comes back in a few minutes.';
+  left.append(h1, fd);
+  const act = el('div', 'actions');
+  act.append(languagePicker(), primaryButton('Transcribe a recording'));
+  tr.append(left, act);
+  d.append(tr);
+
+  const p = el('div', 'panel');
+  const c = el('div', 'content');
+  const drop = el('div', 'drop');
+  drop.innerHTML = '<b>Drop the recording here</b><span>mp4, m4a, mp3, wav, '
+    + 'opus, 3gp, and anything else ffmpeg can open.<br>'
+    + 'The file never leaves this machine: it is converted, normalized and '
+    + 'transcribed here.</span>';
+  c.append(drop);
+  p.append(c);
+  d.append(p);
+
+  if (calls.length){
+    const n = el('div', 'panel');
+    const dl = el('dl', 'figures');
+    dl.style.gridTemplateColumns = 'repeat(3,1fr)';
+    dl.innerHTML = cell('Calls', calls.length)
+      + cell('Minutes recorded', Math.round(minutes))
+      + cell('Invented phrases dropped', dropped);
+    n.append(dl);
+    d.append(n);
+  }
+}
+
+/* ============================== the glossary ============================ */
+
+async function showGlossary(){
+  $('#v-calls').removeAttribute('aria-current');
+  $('#v-glossary').setAttribute('aria-current', 'page');
+  const d = $('#inner');
+  d.innerHTML = '<p class="quiet">opening…</p>';
+  let g;
+  try{
+    g = await (await fetch('/api/glossary')).json();
+    if (g.error) throw new Error(g.error);
+  } catch(e){ return failure(e.message); }
+  d.textContent = '';
+
+  const used = g.rules.filter(r => r.count).length;
+  const tr = el('div', 'title-row');
+  const left = el('div');
+  const h1 = el('h1');
+  h1.textContent = 'Name glossary';
+  const fd = el('p', 'finding');
+  fd.textContent = g.rules.length
+    ? plural(g.rules.length, 'name', 'names') + ', ' + used + ' of them found in your calls. '
+      + 'Names are corrected after transcription, not suggested before: given to '
+      + 'Whisper as a prompt, they made the text worse instead of better.'
+    : 'Empty. Add the names Whisper cannot know (clients, products, people) and '
+      + 'the ways it gets them wrong.';
+  left.append(h1, fd);
+  tr.append(left);
+  d.append(tr);
+
+  const p = panel('The table');
+  const c = el('div', 'content');
+  if (g.rules.length){
+    const t = el('table');
+    t.innerHTML = '<thead><tr><th>Right name</th><th>How it gets written wrong</th>'
+      + '<th class="n">Found in your calls</th></tr></thead>';
+    const tb = el('tbody');
+    for (const r of g.rules){
+      const row = el('tr');
+      row.innerHTML = '<td>' + esc(r.right) + '</td>'
+        + '<td class="variants">' + r.variants.map(esc).join(', ') + '</td>'
+        + '<td class="n">' + (r.count ? thousands(r.count)
+            : '<span style="color:var(--muted)">—</span>') + '</td>';
+      tb.append(row);
+    }
+    t.append(tb);
+    c.append(t);
+  }
+
+  const form = el('form', 'form-row');
+  form.innerHTML = '<div><label for="g-right">Right name</label>'
+    + '<input id="g-right" required placeholder="e.g. Kubernetes"></div>'
+    + '<div><label for="g-variants">How it gets written wrong, comma separated</label>'
+    + '<input id="g-variants" required placeholder="e.g. Cuber Netis, Cubernetes"></div>'
+    + '<button class="primary" type="submit">Add</button>';
+  form.onsubmit = async e => {
+    e.preventDefault();
+    const right = $('#g-right').value.trim();
+    const variants = $('#g-variants').value.split(',').map(s => s.trim()).filter(Boolean);
+    if (!right || !variants.length) return;
+    try{
+      const r = await (await fetch('/api/glossary', {method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({right:right, variants:variants})})).json();
+      if (r.error) throw new Error(r.error);
+      showGlossary();
+    } catch(err){ alert(err.message); }
+  };
+  c.append(form);
+  p.append(c);
+  d.append(p);
+}
+
+function callsView(){
+  $('#v-glossary').removeAttribute('aria-current');
+  $('#v-calls').setAttribute('aria-current', 'page');
+}
+
+$('#v-glossary').onclick = showGlossary;
+$('#v-calls').onclick = () => { if (openNow) openCall(openNow); else showEmpty(); };
+$('#open-list').onclick = () => $('#sidebar').classList.toggle('open');
+
+/* ============================= sending a file =========================== */
+
+const canvas = $('#canvas');
+canvas.addEventListener('dragover', e => { e.preventDefault(); if (ready) canvas.classList.add('dragover'); });
+canvas.addEventListener('dragleave', () => canvas.classList.remove('dragover'));
+canvas.addEventListener('drop', e => {
+  e.preventDefault();
+  canvas.classList.remove('dragover');
+  if (ready && e.dataTransfer.files[0]) send(e.dataTransfer.files[0]);
+});
+$('#file').onchange = e => e.target.files[0] && send(e.target.files[0]);
+
+async function send(file){
+  const language = ($('#language') && $('#language').value) || store.get('sottovoce-language') || 'auto';
+  openNow = null;
+  callsView();
+  drawList();
+  const d = $('#inner');
+  d.textContent = '';
+  const tr = el('div', 'title-row');
+  const left = el('div');
+  const h1 = el('h1');
+  h1.textContent = file.name;
+  const fd = el('p', 'finding');
+  fd.textContent = 'transcribing on this machine'
+    + (language === 'auto' ? ', language detected from the audio' : ', in ' + languageName(language));
+  left.append(h1, fd);
+  tr.append(left);
+  d.append(tr);
+
+  // The running job sits where the strip will be: when it ends, the page does
+  // not jump.
+  const p = panel('The call, minute by minute');
+  const c = el('div', 'content');
+  const stage = el('p', 'stage');
+  stage.textContent = 'uploading the file…';
+  const bar = el('div', 'bar indeterminate');
+  bar.append(el('i'));
+  c.append(stage, bar);
+  p.append(c);
+  d.append(p);
+
+  const form = new FormData();
+  form.append('file', file);
+  form.append('language', language);
+  let r;
+  try{ r = await (await fetch('/api/transcribe', {method:'POST', body:form})).json(); }
+  catch(e){ return failed(stage, bar, e.message); }
+  if (r.error) return failed(stage, bar, r.error);
+
+  const tick = setInterval(async () => {
+    let j;
+    try{ j = await (await fetch('/api/job/' + r.job)).json(); } catch(e){ return; }
+    if (j.state === 'error'){ clearInterval(tick); return failed(stage, bar, j.error); }
+    if (j.state === 'done'){
+      clearInterval(tick);
+      await loadHistory();
+      openCall(j.folder);
+      return;
+    }
+    if (j.expected){
+      bar.classList.remove('indeterminate');
+      bar.querySelector('i').style.width =
+        (Math.min(0.97, j.elapsed / j.expected) * 100).toFixed(0) + '%';
+      const left = Math.max(0, j.expected - j.elapsed);
+      stage.textContent = j.stage + ' · ' + Math.round(j.duration / 60)
+        + ' minutes of audio · ' + (left > 0 ? 'about ' + left + ' s left' : 'almost done');
+    } else stage.textContent = j.stage + '…';
+  }, 1000);
+}
+
+function failed(stage, bar, msg){
+  stage.className = 'stage error';
+  stage.textContent = msg;
+  bar.remove();
+}
+
+/* ================================ shutdown ============================== */
+
+$('#shutdown').onclick = async () => {
+  if (!confirm('Stop the server? The VRAM is freed; start it again with Start.bat.')) return;
+  try{
+    const r = await (await fetch('/api/shutdown', {method:'POST'})).json();
+    if (r.error){ alert(r.error); return; }
+  } catch(e){ /* the server dies while answering: the normal case */ }
+  document.body.innerHTML = '';
+  document.body.style.gridTemplateColumns = '1fr';
+  document.body.style.placeItems = 'center';
+  const d = el('div');
+  d.style.textAlign = 'center';
+  d.innerHTML = '<h1 style="font-size:21px;margin-bottom:10px">Server stopped</h1>'
+    + '<p style="color:#8a8c92;margin:0">The VRAM is free. To start it again: '
+    + '<strong style="color:#fff">Start.bat</strong></p>';
+  document.body.append(d);
+};
+
+/* ================================= start ================================ */
+
+(async () => {
+  checkEngine();
+  await Promise.all([loadHistory(), checkLLM()]);
+  if (calls.length) openCall(calls[0].folder); else showEmpty();
+})();
+</script>
+</html>

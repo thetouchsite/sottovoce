@@ -1,0 +1,17 @@
+# PyTorch is deliberately NOT listed here. Install it FIRST, from the CUDA index:
+#
+#     pip install torch --index-url https://download.pytorch.org/whl/cu130
+#
+# Installed as a dependency of transformers, pip pulls the default PyTorch from
+# PyPI, which on RTX 50-series cards (Blackwell, sm_120) does not see the GPU:
+# everything works, on the CPU, ten times slower, and nothing tells you why.
+# Install.bat does it in the right order.
+
+transformers>=5.0
+accelerate>=1.0
+soundfile>=0.12
+librosa>=0.10
+imageio-ffmpeg>=0.5
+fastapi>=0.110
+uvicorn>=0.30
+python-multipart>=0.0.9

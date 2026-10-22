@@ -1,0 +1,17 @@
+# Virtual environment: 3.5 GB, rebuilt by Install.bat
+.venv/
+
+# Uploaded recordings and their transcripts: they are data, and they are
+# conversations with clients. They must never end up in a repository.
+transcripts/
+research/transcripts/
+
+# Your glossary holds your clients' and products' names. The repo ships
+# glossary.example.txt instead.
+glossary.txt
+
+__pycache__/
+*.pyc
+
+# Screenshots from design checks: taken on real calls.
+.taste-skill/

@@ -1,0 +1,15 @@
+# Names Whisper cannot know: your clients, products, people, internal jargon.
+# Install.bat copies this file to glossary.txt, which is yours and git-ignored.
+#
+#     Right name <- how it gets written wrong, another way
+#
+# Applied to the text AFTER transcription, never given to the model as a
+# prompt: measured on a real call, a prompt made the transcript worse
+# (non-existent words went from 1.7% to 2.6%). Matching ignores case and
+# respects word boundaries. Everything after # is a comment.
+#
+# The names below are invented examples: replace them with yours.
+
+Brightwave <- Bright wave, Brite Wave, Bright weave
+Kubernetes <- Cuber Netis, Cubernetes, Kubernetis
+Q3 forecast <- Q tree forecast, cue three forecast
