@@ -161,10 +161,31 @@
     stroke-linecap:round;stroke-linejoin:round}
   select.secondary{background:var(--surface);padding:0 12px}
   select.secondary option{background:var(--surface);color:var(--text)}
-  .toggle{display:flex;align-items:center;gap:8px;color:var(--muted);font-size:var(--fs-small);
-    cursor:pointer;height:var(--control-h);white-space:nowrap}
-  .toggle input{accent-color:var(--accent);width:15px;height:15px;margin:0}
-  .toggle:hover{color:var(--text)}
+  /* The choices made before transcribing: one tile each, with what it does
+     written on it. A bare checkbox with its explanation in a tooltip is a
+     choice nobody understands, and nobody hovers to find out. */
+  .options{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
+  .option{display:flex;gap:14px;align-items:flex-start;padding:14px 16px;border-radius:8px;
+    background:var(--raised);border:1px solid transparent;cursor:pointer;min-width:0}
+  .option:hover{border-color:var(--control)}
+  .option.on{border-color:var(--accent)}
+  .option div{min-width:0;flex:1}
+  .option b{display:block;font-weight:500;font-size:14px;margin-bottom:3px}
+  .option small{display:block;color:var(--muted);font-size:var(--fs-small);line-height:1.5}
+  .option.language{cursor:default}
+  .option.language:hover{border-color:transparent}
+  .option select{width:100%;margin-top:8px}
+  .switch{appearance:none;-webkit-appearance:none;flex:none;width:34px;height:20px;margin:1px 0 0;
+    border-radius:999px;background:var(--control);position:relative;cursor:pointer;
+    transition:background .15s}
+  .switch::after{content:"";position:absolute;top:3px;left:3px;width:14px;height:14px;
+    border-radius:50%;background:var(--text);transition:transform .15s}
+  .switch:checked{background:var(--accent)}
+  .switch:checked::after{transform:translateX(14px)}
+  .switch:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+  .voices-cta .primary{margin-top:14px}
+  .voices-cta .bar{margin-top:14px}
+  .voices-cta .rec-note{margin-top:8px}
   .text-button{color:var(--muted);text-decoration:none}
   .text-button:hover{color:var(--text)}
   .text-button.danger:hover{color:var(--negative)}
@@ -428,6 +449,7 @@
 
   @media (prefers-reduced-motion:reduce){
     .bar.indeterminate i{animation:none;width:100%;opacity:.35}
+    .switch,.switch::after{transition:none}
     .bar i,.meter .track i{transition:none}
     .sidebar{transition:none}
     .live .dot{animation:none}
@@ -535,7 +557,11 @@ async function checkEngine(){
     voicesAvail = !!d.voices;
     voicesReady = !!d.voices_ready;
     const vt = $('#voices-toggle');
-    if (vt) vt.hidden = !voicesAvail;
+    if (vt){
+      vt.hidden = !voicesAvail;
+      if (voicesReady) vt.querySelector('small').textContent = vt.querySelector('small')
+        .textContent.replace('; the first time it downloads 32 MB.', '.');
+    }
     if (d.error){ light.className = 'light no'; t.textContent = d.error; return; }
     // Started with --no-model: reading old calls, nothing to transcribe with.
     if (d.off){
@@ -690,36 +716,55 @@ function languagePicker(){
   return s;
 }
 
-// Precise word timings cost twice the time (measured: 395 s instead of 200
-// on a 27-minute call), so they are a choice, remembered, and never a default.
-function preciseToggle(){
-  const l = el('label', 'toggle');
-  l.title = 'Every word lands exactly where it was said, so a click plays from that word. '
-    + 'Takes about twice as long: 27 minutes in about 7 instead of 4.';
-  const c = el('input');
+// One tile per choice, with what it does written on it. Remembered, and the
+// same for dropped files and for a recording.
+function optionTile(id, title, text, key){
+  const l = el('label', 'option');
+  l.id = id;
+  const c = el('input', 'switch');
   c.type = 'checkbox';
-  c.checked = precise();
-  c.onchange = () => store.set('sottovoce-precise', c.checked ? '1' : '0');
-  l.append(c, 'Precise word timings');
+  c.setAttribute('role', 'switch');
+  c.checked = store.get(key) === '1';
+  const t = el('div');
+  t.innerHTML = '<b>' + esc(title) + '</b><small>' + esc(text) + '</small>';
+  const mark = () => l.classList.toggle('on', c.checked);
+  c.onchange = () => { store.set(key, c.checked ? '1' : '0'); mark(); };
+  mark();
+  l.append(c, t);
   return l;
 }
 
-// Telling voices apart runs on the processor, about two seconds a minute of
-// audio, and is off unless asked: on a call with two people recorded here,
-// the two tracks already say who is who.
-function voicesToggle(){
-  const l = el('label', 'toggle');
-  l.id = 'voices-toggle';
-  l.hidden = !voicesAvail;
-  l.title = 'Marks who is speaking on every line, by the sound of their voice: '
-    + 'Voice 1, Voice 2… Name them afterwards. Adds about 2 seconds per minute of audio'
-    + (voicesReady ? '.' : '; the first time it downloads two small models (32 MB).');
-  const c = el('input');
-  c.type = 'checkbox';
-  c.checked = store.get('sottovoce-voices') === '1';
-  c.onchange = () => store.set('sottovoce-voices', c.checked ? '1' : '0');
-  l.append(c, 'Separate voices');
-  return l;
+function optionsPanel(){
+  const p = panel('Before you start');
+  const r = el('div', 'right');
+  r.textContent = 'for files and recordings · remembered';
+  p.querySelector('header').append(r);
+  const c = el('div', 'content options');
+
+  const lang = el('div', 'option language');
+  const lt = el('div');
+  lt.innerHTML = '<b>Language</b><small>Leave it on detect, or choose it if the call opens in silence or mixes languages.</small>';
+  lt.append(languagePicker());
+  lang.append(lt);
+
+  // Telling voices apart runs on the processor and is off unless asked: on a
+  // call recorded here with one other person, the two tracks already say who
+  // is who.
+  const v = optionTile('voices-toggle', 'Separate voices',
+    'Every line says who is speaking: Voice 1, Voice 2… Name them afterwards. '
+    + 'About 2 seconds more per minute'
+    + (voicesReady ? '.' : '; the first time it downloads 32 MB.'), 'sottovoce-voices');
+  v.hidden = !voicesAvail;
+
+  // Precise word timings cost twice the time (measured: 395 s instead of 200
+  // on a 27-minute call), so they are a choice, remembered, never a default.
+  const pr = optionTile('precise-toggle', 'Precise word timings',
+    'A click on a word plays from exactly that word. Takes about twice as long: '
+    + '27 minutes in 7 instead of 4.', 'sottovoce-precise');
+
+  c.append(lang, v, pr);
+  p.append(c);
+  return p;
 }
 
 function crumbs(here){
@@ -761,10 +806,9 @@ function showHome(){
   fd.textContent = 'Drop recordings you already have, or record a call as it happens. '
     + 'Everything is transcribed on this machine.';
   left.append(h1, fd);
-  const act = el('div', 'actions');
-  act.append(voicesToggle(), preciseToggle(), languagePicker());
-  tr.append(left, act);
+  tr.append(left);
   d.append(tr);
+  d.append(optionsPanel());
 
   const unfinished = el('div');
   unfinished.id = 'home-unfinished';
@@ -855,7 +899,8 @@ function drawRecordIdle(c){
   foot.append(b);
   const note = el('p', 'rec-note');
   note.textContent = 'Your microphone and the call are saved on two separate tracks, so '
-    + 'the transcript says who spoke. Use headphones, and tell the others you are recording.';
+    + 'the transcript says You and Them. With Separate voices on, the people on the call '
+    + 'are told apart too. Use headphones, and tell the others you are recording.';
   c.append(ol, f, foot, note);
 }
 
@@ -1573,30 +1618,62 @@ function voicesPanel(l){
   }
   // Calls transcribed without it: the voices can be told apart now, from the
   // recording in the folder, without transcribing again.
-  if (voicesAvail && l.audio && !speakers.some(x => x.tag.startsWith('Voice '))){
+  const split = speakers.some(x => x.tag.startsWith('Voice '));
+  if (voicesAvail && l.audio && !split){
+    const box = el('div', 'voices-cta');
     const v = el('p', 'note');
-    v.textContent = l.speakers_found === 1
-      ? 'Only one voice was heard' + (l.two_tracks ? ' on the call.' : ' in this call.')
-      : l.two_tracks ? 'Several people on the call? They can be told apart by their voice.'
-                     : 'Who is speaking is not marked in this call.';
-    const b = el('button', 'secondary foot-action');
-    b.type = 'button';
-    b.textContent = 'Tell the voices apart';
-    b.onclick = async () => {
-      b.disabled = true;
-      // About two seconds a minute, measured; said, so a minute of waiting
-      // does not look like a page that hung.
-      b.textContent = 'listening… about ' + mmss(Math.max(5, l.duration / 30));
-      try{
-        const r = await (await fetch('/api/voices/' + encodeURIComponent(l.folder), {method:'POST'})).json();
-        if (r.error) throw new Error(r.error);
-        voicesReady = true;
-        if (!r.changed){ b.textContent = 'Only one voice heard'; return; }
-        await loadCalls();
-        openCall(l.folder);
-      } catch(err){ b.textContent = err.message; }
-    };
-    c.append(v, b);
+    // About 2.5 seconds a minute of audio, measured; said up front, so a
+    // minute of waiting does not look like a page that hung.
+    const secs = Math.max(5, Math.round(l.duration / 24));
+    const wait = secs < 60 ? Math.ceil(secs / 5) * 5 + ' seconds'
+                           : plural(Math.round(secs / 60), 'minute', 'minutes');
+    if (l.speakers_found === 1){
+      v.textContent = l.two_tracks ? 'Only one voice was heard on the call side.'
+                                   : 'Only one voice was heard in this call.';
+      box.append(v);
+    } else {
+      v.textContent = l.two_tracks
+        ? 'More than one person on the call? Separate their voices to tell them apart, '
+          + 'instead of one Them.'
+        : 'Who is speaking is not marked yet. Separate the voices to see Voice 1, Voice 2… '
+          + 'on every line, then give them names.';
+      const b = el('button', speakers.length ? 'secondary' : 'primary');
+      b.type = 'button';
+      b.textContent = 'Separate voices';
+      const hint = el('p', 'rec-note');
+      hint.textContent = 'Listens to the recording again, without transcribing it again: about '
+        + wait + (voicesReady ? '.' : ', plus a 32 MB download the first time.');
+      b.onclick = async () => {
+        b.disabled = true;
+        b.textContent = 'Listening for voices…';
+        const bar = el('div', 'bar indeterminate');
+        bar.append(el('i'));
+        b.after(bar);
+        try{
+          const r = await (await fetch('/api/voices/' + encodeURIComponent(l.folder), {method:'POST'})).json();
+          if (r.error) throw new Error(r.error);
+          voicesReady = true;
+          bar.remove();
+          if (!r.changed){
+            b.remove();
+            hint.remove();
+            v.textContent = 'Only one voice was heard' + (l.two_tracks ? ' on the call side' : '')
+              + ', so nothing changed.';
+            return;
+          }
+          await loadCalls();
+          openCall(l.folder);
+        } catch(err){
+          bar.remove();
+          b.disabled = false;
+          b.textContent = 'Separate voices';
+          hint.textContent = err.message;
+          hint.classList.add('error');
+        }
+      };
+      box.append(v, b, hint);
+    }
+    c.append(box);
   }
   if (!c.children.length) return null;
   p.append(c);
@@ -1605,8 +1682,10 @@ function voicesPanel(l){
 
 function sidePanel(l, st){
   const col = el('div', 'side');
+  // Who is speaking comes first: it changes how everything below is read,
+  // and the action that marks it must be seen without scrolling.
   const vp = voicesPanel(l);
-  if (vp && (l.speakers || []).length) col.append(vp);
+  if (vp) col.append(vp);
 
   const p = panel('To check');
   const n = (l.suspicious || []).length;
@@ -1692,7 +1771,6 @@ function sidePanel(l, st){
   gc.append(b);
   g.append(gc);
   col.append(g);
-  if (vp && !(l.speakers || []).length) col.append(vp);
   return col;
 }
 

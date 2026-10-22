@@ -10,7 +10,7 @@
 
 Built by [TouchSite Software](https://www.touchsitesoftware.it).
 
-![A 24-second tour of Sottovoce on fictional calls: the home screen and the Separate voices switch, a call's summary, a click on the call strip that jumps to that moment in the text, the line-by-line view with three voices in three colours, naming them Maya, Daniel and Priya in the Voices panel, the lines now showing the names, a call recorded on two tracks with You and Them, and back to the start](docs/images/demo.gif)
+![A 24-second tour of Sottovoce on fictional calls: switching on Separate voices on the home screen, a call's summary, a click on the call strip that jumps to that moment in the text, the line-by-line view with three voices in three colours, naming them Maya, Daniel and Priya in the Voices panel, the lines now showing the names, a call recorded on two tracks with You and Them, and back to the start](docs/images/demo.gif)
 <sub>Fictional calls from `examples/`: nothing in these images is real client data. Made with `--no-model`, which is why transcription shows as off.</sub>
 
 ## Why
@@ -41,7 +41,7 @@ Sottovoce fixes the first two, and shows you where the third one is.
 - **Summaries from your own LLM.** If LM Studio, Ollama or llama-server is running, you get *Decided / To do / Open*, in the language of the call. If none is running, the button just isn't there.
 - **Nothing leaves the machine, and nothing is hidden.** The server listens on `127.0.0.1`. The page loads nothing from the internet, not even its font. Every call is a folder of plain files: no database, no account, no telemetry.
 
-![Correcting a line by hand in the line-by-line view, next to the phrases to check and the names found in the call](docs/images/correcting.png)
+![Correcting a line by hand in the line-by-line view of a two-track call, with You and Them on every line, next to the Voices panel where they can be named and the phrases to check](docs/images/correcting.png)
 
 ## Quick start (Windows)
 
@@ -56,9 +56,9 @@ Start.bat
 
 `Install.bat` creates a virtual environment and installs PyTorch with CUDA **before** everything else (see [the PyTorch trap](#the-pytorch-trap)). At the end it prints whether it sees your GPU. `Start.bat` opens <http://127.0.0.1:8200>. The first start downloads the model (2.9 GB, once) and loads it into VRAM in about twenty seconds.
 
-![The New transcription screen: drop files on the left, record a call on the right, the latest calls below](docs/images/home.png)
+![The New transcription screen: the choices that apply to everything at the top (language, Separate voices, Precise word timings), drop files on the left, record a call on the right, the latest calls below](docs/images/home.png)
 
-The page opens on **New transcription**: drop one or more files on the left, or record a call on the right. 27 minutes of call take about 4 minutes. The language is detected, or you pick it from the menu; the choice is remembered. Close the server with the power button, or `Stop.bat`.
+The page opens on **New transcription**: drop one or more files on the left, or record a call on the right. 27 minutes of call take about 4 minutes. Above both, **Before you start** holds the three choices that apply to either: the language (detected, or picked from the menu), **Separate voices** and **Precise word timings**, each with a line saying what it does. They're remembered. Close the server with the power button, or `Stop.bat`.
 
 **Linux and macOS:** `./install.sh`, then `./start.sh`. They do what the Windows launchers do: PyTorch first, from the CUDA index on Linux when `nvidia-smi` is there, then the rest, then whether the GPU is seen. `./start.sh` passes its arguments to the server, so `./start.sh --no-model` works. On GitHub they're checked for syntax and with `shellcheck` on every push, but not run end to end there: the install downloads gigabytes and needs a GPU. If you run them on a clean machine, tell us how it went (see the [roadmap](ROADMAP.md)). If they fail, these are the steps they take:
 
@@ -95,7 +95,7 @@ On **New transcription**, give the call a name and press **Start recording**. Th
 
 ## Tell voices apart
 
-On a call with several people, tick **Separate voices** before transcribing, or open a call that's already transcribed and press **Tell the voices apart** (no need to transcribe again). Every line gets *Voice 1*, *Voice 2*…, numbered in the order they first speak. Name them in the **Voices** panel next to the transcript: the names appear in the three reading views, in what you copy, in every download and in the summary. The `.txt` keeps the labels and `info.json` keeps the names, so a wrong name is undone by changing one field.
+On a call with several people, tick **Separate voices** before transcribing, or open a call that's already transcribed and press **Separate voices** at the top of its right column (no need to transcribe again). Every line gets *Voice 1*, *Voice 2*…, numbered in the order they first speak. Name them in the **Voices** panel next to the transcript: the names appear in the three reading views, in what you copy, in every download and in the summary. The `.txt` keeps the labels and `info.json` keeps the names, so a wrong name is undone by changing one field.
 
 - **No account, no gate.** The usual choice, [pyannote](https://github.com/pyannote/pyannote-audio), asks for a Hugging Face token and for accepting its terms before it downloads anything. Sottovoce uses the same segmentation model, pyannote segmentation-3.0 (MIT), as redistributed by [sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx), with a [3D-Speaker](https://github.com/modelscope/3D-Speaker) ERes2Net voice-fingerprint model (Apache-2.0). Both come from GitHub on first use, 32 MB in all, and are checked against a fixed SHA-256 before they're used.
 - **On the CPU.** About 2.5 seconds per minute of audio. The GPU stays with Whisper.

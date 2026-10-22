@@ -4,6 +4,11 @@ What changed in each release, newest first. The format follows [Keep a Changelog
 
 ## [Unreleased]
 
+### Changed
+
+- The choices made before transcribing (language, **Separate voices**, **Precise word timings**) are now a **Before you start** panel above files and recording, each with a switch and a line saying what it does, instead of two small checkboxes whose explanation was only in a tooltip.
+- On a call, the **Voices** panel comes first in the right column, so separating the voices of a call already transcribed is in view, with a progress bar while it listens. The button is called **Separate voices**, like the option, instead of *Tell the voices apart*.
+
 ## [1.2.0] - 2026-10-22
 
 Tell the voices apart, on any recording, with no account to create.

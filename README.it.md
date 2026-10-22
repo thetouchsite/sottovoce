@@ -10,7 +10,7 @@
 
 Creato da [TouchSite Software](https://www.touchsitesoftware.it).
 
-![Ventiquattro secondi di Sottovoce su call inventate: la schermata iniziale e l'interruttore Separate voices, il riassunto di una call, un clic sulla striscia della call che porta a quel punto del testo, la vista riga per riga con tre voci in tre colori, i nomi Maya, Daniel e Priya dati nel pannello Voices, le righe che ora mostrano i nomi, una call registrata su due tracce con You e Them, e il ritorno all'inizio](docs/images/demo.gif)
+![Ventiquattro secondi di Sottovoce su call inventate: l'interruttore Separate voices acceso nella schermata iniziale, il riassunto di una call, un clic sulla striscia della call che porta a quel punto del testo, la vista riga per riga con tre voci in tre colori, i nomi Maya, Daniel e Priya dati nel pannello Voices, le righe che ora mostrano i nomi, una call registrata su due tracce con You e Them, e il ritorno all'inizio](docs/images/demo.gif)
 <sub>Call inventate, prese da `examples/`: in queste immagini non c'è nessun dato reale di clienti. La GIF è fatta con `--no-model`: per questo la trascrizione risulta spenta.</sub>
 
 > L'interfaccia è in inglese. La trascrizione e il riassunto seguono la lingua della call: un file in italiano esce in italiano.
@@ -43,7 +43,7 @@ Sottovoce risolve i primi due, e per il terzo ti mostra dove guardare.
 - **Riassunti col tuo LLM.** Se è acceso LM Studio, Ollama o llama-server ottieni *Deciso / Da fare / Aperto*, nella lingua della call. Se non c'è nessuno acceso, il bottone semplicemente non compare.
 - **Niente esce dalla macchina, e niente è nascosto.** Il server ascolta solo su `127.0.0.1`. La pagina non carica niente da internet, nemmeno il carattere. Ogni call è una cartella di file normali: niente database, niente account, niente telemetria.
 
-![La correzione a mano di una riga nella vista riga per riga, accanto alle frasi da controllare e ai nomi trovati nella call](docs/images/correcting.png)
+![La correzione a mano di una riga nella vista riga per riga di una call su due tracce, con You e Them su ogni riga, accanto al pannello Voices dove si possono nominare e alle frasi da controllare](docs/images/correcting.png)
 
 ## Avvio rapido (Windows)
 
@@ -58,9 +58,9 @@ Start.bat
 
 `Install.bat` crea l'ambiente virtuale e installa PyTorch con CUDA **prima** di tutto il resto (vedi [la trappola di PyTorch](#la-trappola-di-pytorch)), e alla fine ti dice se vede la GPU. `Start.bat` apre <http://127.0.0.1:8200>. Al primo avvio scarica il modello (2,9 GB, una volta sola) e lo carica nella VRAM in una ventina di secondi.
 
-![La schermata New transcription: a sinistra si trascinano i file, a destra si registra una call, sotto le ultime call](docs/images/home.png)
+![La schermata New transcription: in alto le scelte che valgono per tutto (lingua, Separate voices, Precise word timings), a sinistra si trascinano i file, a destra si registra una call, sotto le ultime call](docs/images/home.png)
 
-La pagina si apre su **New transcription**: a sinistra trascini uno o più file, a destra registri una call. 27 minuti di call richiedono circa 4 minuti. La lingua viene riconosciuta, oppure la scegli dal menu, e la scelta viene ricordata. Il server si spegne col bottone di accensione, oppure con `Stop.bat`.
+La pagina si apre su **New transcription**: a sinistra trascini uno o più file, a destra registri una call. 27 minuti di call richiedono circa 4 minuti. Sopra a tutti e due, **Before you start** raccoglie le tre scelte che valgono per entrambi: la lingua (riconosciuta, o scelta dal menu), **Separate voices** e **Precise word timings**, ognuna con una riga che dice cosa fa. Vengono ricordate. Il server si spegne col bottone di accensione, oppure con `Stop.bat`.
 
 **Linux e macOS:** `./install.sh`, poi `./start.sh`. Fanno quello che fanno i lanciatori per Windows: prima PyTorch, dall'indice CUDA su Linux se c'è `nvidia-smi`, poi il resto, e alla fine ti dicono se la GPU si vede. `./start.sh` passa i suoi argomenti al server, quindi `./start.sh --no-model` funziona. Su GitHub vengono controllati a ogni push, la sintassi e `shellcheck`, ma lì non vengono eseguiti davvero: l'installazione scarica gigabyte e richiede una GPU. Se li provi su una macchina pulita, facci sapere com'è andata (vedi i [prossimi passi](ROADMAP.md)). Se non funzionano, questi sono i passi che fanno:
 
@@ -97,7 +97,7 @@ In **New transcription** dai un nome alla call e premi **Start recording**. Il b
 
 ## Separare le voci
 
-In una call con più persone, spunta **Separate voices** prima di trascrivere, oppure apri una call già trascritta e premi **Tell the voices apart** (non serve ritrascriverla). Ogni riga prende *Voice 1*, *Voice 2*…, numerate nell'ordine in cui parlano la prima volta. Dai loro un nome nel pannello **Voices** accanto alla trascrizione: i nomi compaiono nelle tre viste, in quello che copi, in ogni download e nel riassunto. Il `.txt` tiene le etichette e `info.json` tiene i nomi, quindi un nome sbagliato si corregge cambiando un campo.
+In una call con più persone, spunta **Separate voices** prima di trascrivere, oppure apri una call già trascritta e premi **Separate voices** in cima alla colonna di destra (non serve ritrascriverla). Ogni riga prende *Voice 1*, *Voice 2*…, numerate nell'ordine in cui parlano la prima volta. Dai loro un nome nel pannello **Voices** accanto alla trascrizione: i nomi compaiono nelle tre viste, in quello che copi, in ogni download e nel riassunto. Il `.txt` tiene le etichette e `info.json` tiene i nomi, quindi un nome sbagliato si corregge cambiando un campo.
 
 - **Niente account, niente cancello.** La scelta di solito è [pyannote](https://github.com/pyannote/pyannote-audio), che prima di scaricare chiede un token di Hugging Face e di accettarne le condizioni. Sottovoce usa lo stesso modello di segmentazione, pyannote segmentation-3.0 (MIT), nella versione ridistribuita da [sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx), insieme a un modello di impronte vocali [3D-Speaker](https://github.com/modelscope/3D-Speaker) ERes2Net (Apache-2.0). Arrivano tutti e due da GitHub al primo uso, 32 MB in tutto, e prima di usarli se ne controlla lo SHA-256.
 - **Sul processore.** Circa 2,5 secondi per minuto di audio. La GPU resta a Whisper.

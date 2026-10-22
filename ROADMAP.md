@@ -52,7 +52,7 @@ And a rule learned the hard way, on another project: **never decide on a single 
 
 **Tried, not good enough.** Over-splitting and then merging the closest groups down to the given number scored 27-34% error on AMI, against 12% for counting on its own. So it isn't offered. pyannote's way is to constrain the grouping itself, not to merge after it.
 
-**Done when** giving the right number never scores worse than counting, on both AMI meetings, and the page offers it next to **Tell the voices apart**.
+**Done when** giving the right number never scores worse than counting, on both AMI meetings, and the page offers it next to **Separate voices**.
 
 ## 5. Recognise the same person across calls
 

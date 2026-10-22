@@ -70,6 +70,21 @@ def open_call(p, name):
     p.wait_for_selector(".reader")
 
 
+def test_the_choices_before_transcribing_are_explained_and_remembered(page):
+    tiles = page.locator(".options .option")
+    assert tiles.count() == 3
+    assert "Voice 1" in page.locator("#voices-toggle").inner_text()
+    page.locator("#precise-toggle").click()
+    assert "on" in page.locator("#precise-toggle").get_attribute("class")
+    page.reload()
+    assert page.locator("#precise-toggle input").is_checked()
+
+
+def test_the_voices_panel_comes_first_on_a_call(page):
+    open_call(page, NORTHPINE)
+    assert page.locator(".side .panel h2").first.inner_text() == "Voices"
+
+
 def test_the_page_opens_on_a_new_transcription_not_on_a_call(page):
     assert page.locator("h1").inner_text() == "New transcription"
     assert page.locator("#drop").is_visible()
