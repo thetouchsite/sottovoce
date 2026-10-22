@@ -474,7 +474,7 @@ def lines_from_words(words, speakers=None, breaks=None, pause=1.0, longest=220):
 
 # --- two tracks: who speaks -------------------------------------------------------
 
-def label_speakers(words, left, right, rate, window=0.08):
+def label_speakers(words, left, right, rate, window=0.08, breaks=None):
     """Me or Them for every word, from the energy of the two tracks.
 
     `left` is your microphone, `right` the call's audio, both mono arrays at
@@ -487,8 +487,28 @@ def label_speakers(words, left, right, rate, window=0.08):
     A single word that disagrees with both neighbours is smoothed over: one
     "yes" in the middle of someone else's sentence is more often bleed than a
     real interruption.
+
+    With estimated word timings (`breaks`, Whisper's lines), a word's own
+    time is a guess, and the guess is worst exactly where it matters: a line
+    of Whisper that holds the end of one turn and the start of the next
+    shares its time evenly, pause included, and the words at the change land
+    on the wrong side. In a test call in Meet: "Parla | un po'", "Ciao, |
+    come va?". So then each line's words are laid out, in order and by
+    length, over the moments in that line when someone is actually speaking,
+    and each takes the track that carries its moment. Measured on a public
+    AMI meeting put on two tracks, words on the right side: 98.6% -> 99.0%,
+    and with the others bleeding into the microphone at -25 dB, 98.1% ->
+    98.9%. Keeping a lone word at the edge of a line with its line, as for
+    voices, cost 0.4 points here: on two tracks a one-word reply is real.
+
+    Tried and dropped: transcribing each track on its own. Every word is
+    then on the right side by construction, but Whisper's times on a track
+    that is silent half the time drift: on the call's side, the median word
+    was 2.3 s away from where it was said, and lines came out of order.
     """
     import numpy as np
+    if breaks:
+        return _by_turns(words, breaks, left, right, rate)
 
     def energy(x, a, b):
         i, j = int(max(0, a - window) * rate), int((b + window) * rate)
@@ -528,6 +548,49 @@ def tell_voices(words, audio, speakers=None, progress=None, breaks=None):
         return speakers, found
     keep = [s if s == "Me" else None for s in speakers] if speakers else None
     return voices.assign(words, turns, keep, breaks), found
+
+
+def _by_turns(words, breaks, left, right, rate, hop=0.02, floor=0.08):
+    """label_speakers() with estimated word timings: see there."""
+    import numpy as np
+    n = max(1, int(rate * hop))
+
+    def frames(x):
+        m = len(x) // n
+        return np.sqrt((x[:m * n].astype(np.float64).reshape(m, n) ** 2).mean(1))
+
+    L, R = frames(left), frames(right)
+    m = min(len(L), len(R))
+    L, R = L[:m], R[:m]
+    ref_me, ref_them = float(np.percentile(L, 90)) if m else 0.0, float(np.percentile(R, 90)) if m else 0.0
+    if ref_me < 1e-4:
+        return ["Them"] * len(words)       # a muted microphone
+    if ref_them < 1e-4:
+        return ["Me"] * len(words)         # nobody else spoke
+    l, r = L / ref_me, R / ref_them
+    # each moment: nobody (-1), you (0), the call (1)
+    side = np.where(np.maximum(l, r) < floor, -1, np.where(l > r, 0, 1))
+    starts = sorted(set(breaks) | {len(words)})
+    out = []
+    for a, b in zip(starts, starts[1:]):
+        ws = words[a:b]
+        if not ws:
+            continue
+        f0 = int(ws[0][0] / hop)
+        f1 = max(int(ws[-1][1] / hop), f0 + 1)
+        voiced = side[f0:f1]
+        voiced = voiced[voiced >= 0]
+        if not len(voiced):
+            out += ["Me" if l[f0:f1].sum() > r[f0:f1].sum() else "Them"] * len(ws)
+            continue
+        chars = np.array([len(w[2]) + 1 for w in ws], float)
+        centre = (np.cumsum(chars) - chars / 2) / chars.sum()
+        out += ["Me" if voiced[min(len(voiced) - 1, int(c * len(voiced)))] == 0 else "Them"
+                for c in centre]
+    for i in range(1, len(out) - 1):
+        if out[i - 1] == out[i + 1] != out[i]:
+            out[i] = out[i - 1]
+    return out
 
 
 def read_two_tracks(source, rate=16000):
@@ -837,7 +900,7 @@ def run(source, language=None, progress=None, two_tracks=False, precise=False, v
             if progress:
                 progress("telling the two voices apart", seconds)
             left, right, rate = read_two_tracks(source)
-            speakers = label_speakers(words, left, right, rate)
+            speakers = label_speakers(words, left, right, rate, breaks=breaks)
 
         found = None
         if voices and words:

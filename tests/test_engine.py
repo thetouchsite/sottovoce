@@ -207,3 +207,16 @@ def test_a_word_at_the_edge_of_a_line_stays_with_its_sentence():
     assert voices.assign(words, turns)[3] == "Voice 2"
     assert voices.assign(words, turns, lines={0, 4}) == ["Voice 1"] * 4 + ["Voice 2"]
 
+
+def test_two_tracks_lay_a_lines_words_over_who_really_speaks_in_it():
+    import numpy as np
+    rate = 1000
+    # One Whisper line, 0 to 3 s, its time shared among the words by length.
+    # Really: you speak until 1.5 s, a pause, then they answer from 2.4 s.
+    words, breaks = T.spread([{"text": "Vediamo. Parla un po'. Sì, certo.", "timestamp": (0.0, 3.0)}])
+    me = np.zeros(3000); me[:1500] = 0.3
+    them = np.zeros(3000); them[2400:] = 0.3
+    # By each word's own (guessed) time, "po'." lands in their turn.
+    assert T.label_speakers(words, me, them, rate)[3] == "Them"
+    # Laid over the speech, the line splits where the voice changes.
+    assert T.label_speakers(words, me, them, rate, breaks=breaks) == ["Me"] * 4 + ["Them"] * 2
