@@ -627,6 +627,16 @@
 <script>
 "use strict";
 const $ = s => document.querySelector(s);
+// Opened from another device and no longer let in (the PIN was changed):
+// back to the PIN page, instead of every panel failing one by one.
+{
+  const fetch0 = window.fetch.bind(window);
+  window.fetch = async (...a) => {
+    const r = await fetch0(...a);
+    if (r.status === 401) location.href = '/pin';
+    return r;
+  };
+}
 const el = (t, c) => { const e = document.createElement(t); if (c) e.className = c; return e; };
 const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g,
   c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));

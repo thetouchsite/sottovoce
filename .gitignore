@@ -23,3 +23,5 @@ __pycache__/
 /models/
 # Public meetings for research/voices.py, downloaded on first run
 /research/ami/
+# The PIN for --lan, and the secret that signs the devices let in
+/.lan-pin

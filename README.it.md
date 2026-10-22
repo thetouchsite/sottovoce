@@ -76,7 +76,7 @@ Su Mac non c'è CUDA: gira sulla CPU, circa dieci volte più lento.
 
 ### Dal telefono
 
-`python server.py --lan` (oppure `Start.bat --lan`, `./start.sh --lan`) rende la pagina raggiungibile dagli altri dispositivi della stessa rete: stampa l'indirizzo da aprire sul telefono. Da lì leggi, ascolti, cerchi, correggi, dai i nomi alle voci e mandi una registrazione dal telefono da trascrivere sul PC. Registrare una call funziona solo sul computer stesso. **Non c'è password**: chiunque sia su quel Wi-Fi può leggere le tue call, quindi usalo a casa o in ufficio, mai su una rete pubblica. Senza `--lan` il server risponde solo su `127.0.0.1`.
+`python server.py --lan` (oppure `Start.bat --lan`, `./start.sh --lan`) rende la pagina raggiungibile dagli altri dispositivi della stessa rete: stampa l'indirizzo da aprire sul telefono. Da lì leggi, ascolti, cerchi, correggi, dai i nomi alle voci e mandi una registrazione dal telefono da trascrivere sul PC. Registrare una call funziona solo sul computer stesso. Gli altri dispositivi devono inserire un **PIN** una volta, poi vengono ricordati per un anno; il computer stesso non lo chiede mai. Il PIN viene inventato la prima volta e stampato a ogni avvio (scegline uno tuo con `--pin`; cambiarlo disconnette tutti i dispositivi). Cinque PIN sbagliati bloccano un dispositivo per 15 minuti. La connessione è `http` semplice, quindi il PIN tiene fuori i curiosi sul tuo Wi-Fi, non chi ascolta il traffico apposta: usalo a casa o in ufficio, mai su una rete pubblica. Senza `--lan` il server risponde solo su `127.0.0.1`.
 
 ## Provalo in un minuto, senza GPU
 

@@ -268,3 +268,51 @@ def test_deleting_moves_the_call_to_a_bin(client, data):
     assert NORTHPINE not in folders and "_deleted" not in folders
     assert client.get("/api/search?q=Trailhead").json()["total"] == 0
     assert client.delete(f"/api/history/{NORTHPINE}").status_code == 404
+
+
+# --- the PIN, with --lan -------------------------------------------------------------
+
+def lan_client(monkeypatch, tmp_path, host):
+    import server
+    from fastapi.testclient import TestClient
+    monkeypatch.setattr(server, "PIN_FILE", tmp_path / ".lan-pin")
+    monkeypatch.setattr(server, "lan", {"pin": None, "secret": b""})
+    monkeypatch.setattr(server, "pin_tries", {})
+    pin = server.pin_setup("246810")
+    return TestClient(server.app, client=(host, 50000)), pin
+
+
+def test_another_device_needs_the_pin_once(client, monkeypatch, tmp_path):
+    phone, pin = lan_client(monkeypatch, tmp_path, "192.168.1.50")
+    assert phone.get("/api/history").status_code == 401
+    r = phone.get("/", follow_redirects=False)
+    assert r.status_code == 303 and r.headers["location"] == "/pin"
+    assert "Sottovoce" in phone.get("/pin").text
+    assert phone.get("/health").status_code == 200              # allowed: says nothing
+    assert phone.post("/api/pin", json={"pin": "000000"}).status_code == 403
+    assert phone.post("/api/pin", json={"pin": pin}).json() == {"ok": True}
+    assert phone.get("/api/history").status_code == 200          # the cookie lets it in
+    assert phone.get(f"/api/history/{NORTHPINE}").json()["name"]
+
+
+def test_this_computer_is_never_asked(client, monkeypatch, tmp_path):
+    here, _ = lan_client(monkeypatch, tmp_path, "127.0.0.1")
+    assert here.get("/api/history").status_code == 200
+
+
+def test_five_wrong_pins_lock_a_device_out(client, monkeypatch, tmp_path):
+    phone, pin = lan_client(monkeypatch, tmp_path, "192.168.1.51")
+    for _ in range(5):
+        assert phone.post("/api/pin", json={"pin": "111111"}).status_code == 403
+    assert phone.post("/api/pin", json={"pin": pin}).status_code == 429     # even the right one
+
+
+def test_the_pin_is_kept_and_a_new_one_logs_everyone_out(client, monkeypatch, tmp_path):
+    import server
+    phone, pin = lan_client(monkeypatch, tmp_path, "192.168.1.52")
+    phone.post("/api/pin", json={"pin": pin})
+    assert server.pin_setup() == pin                                # kept across restarts
+    assert phone.get("/api/history").status_code == 200
+    server.pin_setup("135790")                                      # changed
+    assert phone.get("/api/history").status_code == 401
+

@@ -3,7 +3,7 @@
     python server.py                         then  http://127.0.0.1:8200
     python server.py --port 8300 --data D:\\calls --glossary D:\\calls\\names.txt
     python server.py --no-model              browse transcripts, no GPU needed
-    python server.py --lan                   also open it from a phone on the same Wi-Fi
+    python server.py --lan                   also open it from a phone on the same Wi-Fi, with a PIN
 
 Why a server and not a script you drop files on: the model weighs 2.88 GB and
 loading it from disk into VRAM takes about twenty seconds. Here that is paid
@@ -47,8 +47,11 @@ loads nothing from the internet, not even its fonts. (The API reference at
 from __future__ import annotations
 
 import argparse
+import hashlib
+import hmac
 import importlib.util
 import json
+import secrets
 import pathlib
 import queue
 import re
@@ -60,7 +63,8 @@ import uuid
 from datetime import date
 
 from fastapi import FastAPI, File, Form, Request, UploadFile
-from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse, Response
+from fastapi.responses import (FileResponse, HTMLResponse, JSONResponse, PlainTextResponse,
+                               RedirectResponse, Response)
 
 import summary as S
 import transcribe as T
@@ -79,6 +83,109 @@ app = FastAPI(
                 "Every call is a folder of plain files; this API reads and writes them.")
 
 engine_state = {"ready": False, "error": None, "off": False}
+
+# --- the PIN, when the page is open to the network ------------------------------
+# With --lan the server answers other devices, and it hands out client calls
+# to whoever asks. So another device must give a PIN once; then a cookie
+# signed with a secret kept on this machine lets it in for a year, across
+# restarts. This computer itself is never asked. Plain http: the PIN keeps
+# out the curious on the same Wi-Fi, not someone listening on purpose.
+PIN_FILE = ROOT / ".lan-pin"
+lan = {"pin": None, "secret": b""}
+pin_tries: dict[str, list[float]] = {}
+LOCAL = ("127.0.0.1", "::1", "localhost")
+
+
+def pin_setup(chosen: str | None = None) -> str:
+    """The PIN for --lan: the one chosen, or the one kept, or a new one."""
+    kept = json.loads(PIN_FILE.read_text(encoding="utf-8")) if PIN_FILE.exists() else {}
+    pin = chosen or kept.get("pin") or f"{secrets.randbelow(10 ** 6):06d}"
+    # A new PIN, a new secret: every device let in with the old one is out.
+    secret = kept["secret"] if kept.get("pin") == pin and kept.get("secret") else secrets.token_hex(32)
+    PIN_FILE.write_text(json.dumps({"pin": pin, "secret": secret}), encoding="utf-8")
+    lan.update(pin=pin, secret=secret.encode())
+    return pin
+
+
+def pin_token() -> str:
+    return hmac.new(lan["secret"], b"sottovoce-lan", hashlib.sha256).hexdigest()
+
+
+@app.middleware("http")
+async def pin_guard(request: Request, call_next):
+    if lan["pin"] and (request.client is None or request.client.host not in LOCAL):
+        path = request.url.path
+        allowed = path in ("/pin", "/api/pin", "/health") or path.startswith("/fonts/")
+        if not allowed and not hmac.compare_digest(request.cookies.get("sottovoce_pin", ""), pin_token()):
+            if path.startswith("/api/"):
+                return JSONResponse({"error": "PIN required"}, 401)
+            return RedirectResponse("/pin", 303)
+    return await call_next(request)
+
+
+PIN_PAGE = """<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1"><title>Sottovoce</title>
+<style>
+  :root{color-scheme:dark}
+  body{margin:0;min-height:100vh;display:grid;place-items:center;background:#171719;color:#fff;
+    font:15px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif;padding:16px;box-sizing:border-box}
+  form{width:100%;max-width:320px;background:#131217;border-radius:6px;padding:28px 24px;
+    box-shadow:0 12px 28px rgba(0,0,0,.2)}
+  h1{font-size:21px;margin:0 0 6px} p{color:#8a8c92;margin:0 0 20px;font-size:13px}
+  input{width:100%;box-sizing:border-box;height:46px;background:#171719;color:#fff;font-size:22px;
+    letter-spacing:.3em;text-align:center;border:1px solid #3a3a3e;border-radius:8px}
+  input:focus{outline:none;border-color:#4a8ad6}
+  button{width:100%;height:42px;margin-top:14px;border:0;border-radius:999px;background:#fff;
+    color:#000;font-weight:600;font-size:15px}
+  .err{color:#e5566f;min-height:20px;margin:12px 0 0;font-size:13px}
+</style></head><body>
+<form id="f"><h1>Sottovoce</h1><p id="t">Enter the PIN shown on the computer where Sottovoce runs.
+This device will be remembered.</p>
+<input id="pin" inputmode="numeric" autocomplete="one-time-code" maxlength="12" autofocus aria-label="PIN">
+<button id="b" type="submit">Open</button><p class="err" id="e" role="alert"></p></form>
+<script>
+const it = (localStorage.getItem('sottovoce-ui') || navigator.language || '').startsWith('it');
+if (it){ document.documentElement.lang = 'it';
+  document.getElementById('t').textContent = 'Scrivi il PIN che compare sul computer dove gira Sottovoce. Questo dispositivo verrà ricordato.';
+  document.getElementById('b').textContent = 'Apri'; }
+document.getElementById('f').onsubmit = async e => {
+  e.preventDefault();
+  const r = await fetch('/api/pin', {method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({pin: document.getElementById('pin').value.trim()})});
+  if (r.ok){ location.href = '/'; return; }
+  const j = await r.json().catch(() => ({}));
+  document.getElementById('e').textContent = r.status === 429
+    ? (it ? 'Troppi tentativi: riprova tra qualche minuto.' : (j.error || 'Too many tries.'))
+    : (it ? 'PIN sbagliato.' : 'Wrong PIN.');
+};
+</script></body></html>"""
+
+
+@app.get("/pin", include_in_schema=False)
+def pin_page():
+    if not lan["pin"]:
+        return RedirectResponse("/", 303)
+    return HTMLResponse(PIN_PAGE)
+
+
+@app.post("/api/pin", include_in_schema=False)
+def api_pin(request: Request, body: dict):
+    """Lets a device in. Five wrong PINs from one address: 15 minutes off."""
+    if not lan["pin"]:
+        return {"ok": True}
+    who = request.client.host if request.client else "?"
+    now = time.time()
+    tries = [t for t in pin_tries.get(who, []) if now - t < 900]
+    pin_tries[who] = tries
+    if len(tries) >= 5:
+        return JSONResponse({"error": "too many tries: wait 15 minutes"}, 429)
+    if not hmac.compare_digest(str(body.get("pin") or "").strip(), lan["pin"]):
+        tries.append(now)
+        return JSONResponse({"error": "wrong PIN"}, 403)
+    pin_tries.pop(who, None)
+    r = JSONResponse({"ok": True})
+    r.set_cookie("sottovoce_pin", pin_token(), max_age=365 * 24 * 3600, httponly=True, samesite="strict")
+    return r
 jobs: dict[str, dict] = {}
 line_up: queue.Queue = queue.Queue()
 
@@ -1288,8 +1395,10 @@ if __name__ == "__main__":
     ap.add_argument("--no-model", action="store_true",
                     help="browse transcripts without loading Whisper (no GPU needed)")
     ap.add_argument("--lan", action="store_true",
-                    help="reachable from other devices on your network, e.g. your phone "
-                         "(no password: only on a network you trust)")
+                    help="reachable from other devices on your network, e.g. your phone, "
+                         "with a PIN asked once per device")
+    ap.add_argument("--pin", default=None,
+                    help="the PIN for --lan (default: one made up the first time, then kept)")
     args = ap.parse_args()
 
     start(args.data, args.glossary, model=not args.no_model)
@@ -1300,9 +1409,9 @@ if __name__ == "__main__":
     print("  browsing only: Whisper is not loaded (--no-model)\n" if args.no_model else
           "  (the first start loads 2.88 GB into VRAM: about twenty seconds)\n")
     # 127.0.0.1 by default: the server hands out client recordings and
-    # transcripts to whoever asks, with no password. --lan opens it to the
-    # local network on purpose, for reading and uploading from a phone, and
-    # says so every time it starts.
+    # transcripts to whoever reaches it. --lan opens it to the local network
+    # on purpose, for reading and uploading from a phone, behind a PIN (see
+    # pin_guard), and says so every time it starts.
     host = "127.0.0.1"
     if args.lan:
         import socket
@@ -1318,9 +1427,11 @@ if __name__ == "__main__":
                 ips = [s.getsockname()[0]]
         except OSError:
             pass
-        print("  ON YOUR NETWORK, with no password: anyone on this Wi-Fi can read")
-        print("  and change your calls. Use it at home or in the office, not on public Wi-Fi.")
+        pin = pin_setup(args.pin)
+        print("  ON YOUR NETWORK: other devices on this Wi-Fi can open it, with the PIN.")
         for ip in ips or ["<this computer's IP>"]:
             print(f"  from your phone:  http://{ip}:{args.port}")
+        print(f"  PIN: {pin}      (asked once per device; this computer is never asked)")
+        print("  Plain http: fine at home or in the office, not on public Wi-Fi.")
         print("  Windows may ask whether Python can use private networks: say yes.\n")
     uvicorn.run(app, host=host, port=args.port, log_level="warning")
