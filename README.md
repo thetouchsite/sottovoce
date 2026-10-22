@@ -292,7 +292,7 @@ The tests run on the fictional calls in `examples/`, with the server started `--
 | `app/index.html` | The page: one file, no build step, no framework, its fonts next to it |
 | `examples/` | Four fictional calls, to try the interface with `--no-model` |
 | `tests/` | Engine, API and page tests; they run on the examples |
-| `research/` | The scripts behind the numbers above: run several models, compare without a reference, grade the voices on AMI |
+| `research/` | The scripts behind the numbers above: run several models, compare without a reference, grade the voices and two-track calls on AMI |
 | `Install.bat`, `Start.bat`, `Stop.bat` | Double-click launchers for Windows |
 | `install.sh`, `start.sh` | The same, for Linux and macOS |
 

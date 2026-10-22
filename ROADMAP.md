@@ -31,7 +31,9 @@ The ideas come from projects that do this job well: [whisper.cpp](https://github
 
 Both look fixable: a stretch belongs to your track only where your track is the louder of the two (as the current labelling already decides), and stretches too short or too quiet are not sent to Whisper.
 
-**Done when** it beats the current way on several real calls recorded here (with and without headphones, two and three people), counted word by word, and never puts lines out of order. Transcribing each whole track without cutting was tried too: Whisper's times drift on a track that is silent half the time (median 2.3 s off).
+**Measured.** `research/two_tracks.py` builds real two-track calls from AMI meetings, where every person wore a headset microphone: one person's headset on one side, the others on the other, with the room heard faintly in every microphone as in real life. On the held-out meeting the current way puts about **90%** of words on the right side (2 people 89.8%, 3 people 91.8%, 4 people 90.7%; with the call leaking from loudspeakers at -25 dB, 90.7%, 91.8%, 89.2%). Earlier figures of 99% came from tracks cut apart artificially, with no crosstalk: too kind.
+
+**Done when** it beats those numbers in `research/two_tracks.py` and on several real calls recorded here (with and without headphones, two and three people), counted word by word, and never puts lines out of order. Transcribing each whole track without cutting was tried too: Whisper's times drift on a track that is silent half the time (median 2.3 s off).
 
 ## 2. Record calls from desktop apps
 

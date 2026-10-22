@@ -294,7 +294,7 @@ I test girano sulle call inventate di `examples/`, col server avviato `--no-mode
 | `app/index.html` | La pagina: un file solo, niente build, niente framework, i caratteri accanto |
 | `examples/` | Quattro call inventate, per provare l'interfaccia con `--no-model` |
 | `tests/` | Test del motore, dell'API e della pagina; girano sugli esempi |
-| `research/` | Gli script dietro ai numeri qui sopra: più modelli a confronto, senza riferimento, le voci misurate su AMI |
+| `research/` | Gli script dietro ai numeri qui sopra: più modelli a confronto, senza riferimento, le voci e le call a due tracce misurate su AMI |
 | `Install.bat`, `Start.bat`, `Stop.bat` | Lanciatori da doppio clic per Windows |
 | `install.sh`, `start.sh` | Gli stessi, per Linux e macOS |
 
