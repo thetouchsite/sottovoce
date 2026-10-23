@@ -380,3 +380,63 @@ def test_with_no_server_the_built_in_model_writes(client, monkeypatch):
     r = client.post(f"/api/followup/{NORTHPINE}").json()
     assert r["text"] == "Oggetto: prossimi passi" and "Voice 1:" in seen["request"]
 
+
+
+# --- only its own address, only its own pages -----------------------------------------
+
+def guarded(monkeypatch, *addresses):
+    import server
+    from fastapi.testclient import TestClient
+    monkeypatch.setattr(server, "allowed_hosts", server.hosts_for(8200, addresses))
+    return TestClient(server.app, base_url="http://127.0.0.1:8200")
+
+
+def test_a_foreign_host_is_refused_as_dns_rebinding_would_send_it(client, monkeypatch):
+    c = guarded(monkeypatch)
+    assert c.get("/api/history").status_code == 200
+    assert c.get("/api/history", headers={"host": "localhost:8200"}).status_code == 200
+    assert c.get("/api/history", headers={"host": "evil.example:8200"}).status_code == 403
+    assert c.get("/api/history", headers={"host": "127.0.0.1:9999"}).status_code == 403
+
+
+def test_with_lan_this_computers_address_is_accepted(client, monkeypatch):
+    c = guarded(monkeypatch, "192.168.1.12")
+    assert c.get("/api/history", headers={"host": "192.168.1.12:8200"}).status_code == 200
+    assert c.get("/api/history", headers={"host": "192.168.1.99:8200"}).status_code == 403
+
+
+def test_a_change_sent_from_another_site_is_refused(client, monkeypatch):
+    c = guarded(monkeypatch)
+    url = "/api/recordings"                   # harmless: it only starts an empty recording
+    assert c.post(url, json={}, headers={"origin": "https://evil.example"}).status_code == 403
+    assert c.post(url, json={}, headers={"origin": "null"}).status_code == 403
+    assert c.post(url, json={}, headers={"sec-fetch-site": "cross-site"}).status_code == 403
+    # its own page, and a script with no Origin at all
+    assert c.post(url, json={}, headers={"origin": "http://127.0.0.1:8200"}).status_code == 200
+    assert c.post(url, json={}).status_code == 200
+    # reading is not a change: a cross-site GET still can't read the answer (same-origin policy)
+    assert c.get("/api/status", headers={"origin": "https://evil.example"}).status_code == 200
+
+
+def test_info_is_never_read_half_written(data):
+    import threading
+    import server
+    d = data / "transcripts" / NORTHPINE
+    info = server.read_info(d)
+    stop, bad = threading.Event(), []
+
+    def reader():
+        while not stop.is_set():
+            try:
+                server.read_info(d)
+            except (ValueError, OSError) as e:   # an empty or cut file, or refused
+                bad.append(e)
+    r = threading.Thread(target=reader)
+    r.start()
+    for i in range(200):
+        server.write_info(d, {**info, "n": i})
+    stop.set()
+    r.join()
+    assert bad == [] and server.read_info(d)["n"] == 199
+    assert not (d / "info.json.tmp").exists()
+

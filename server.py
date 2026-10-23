@@ -52,8 +52,9 @@ import hashlib
 import hmac
 import importlib.util
 import json
-import secrets
+import os
 import pathlib
+import secrets
 import queue
 import re
 import shutil
@@ -122,6 +123,43 @@ async def pin_guard(request: Request, call_next):
             if path.startswith("/api/"):
                 return JSONResponse({"error": "PIN required"}, 401)
             return RedirectResponse("/pin", 303)
+    return await call_next(request)
+
+
+# --- who may talk to this server -----------------------------------------------
+# Listening on 127.0.0.1 is not enough on its own. Any web page open in the
+# browser can send requests there: a form posted to /api/shutdown stopped the
+# server (checked), and with DNS rebinding (evil.example made to resolve to
+# 127.0.0.1) a page could read /api/history as if it were its own. So:
+#
+#   Host    only the names this server is reached by: 127.0.0.1, localhost
+#           and [::1] on its port, plus this computer's addresses with --lan.
+#           A rebound name never matches.
+#   Origin  a request that changes something (POST, PUT, PATCH, DELETE) is
+#           refused when the browser says it comes from another site. Without
+#           an Origin (a script, curl) it goes through: browsers always send
+#           one on cross-site requests that change state.
+allowed_hosts: set[str] | None = None      # set at startup; None when imported by tests or scripts
+CHANGES = {"POST", "PUT", "PATCH", "DELETE"}
+
+
+def hosts_for(port: int, addresses=()) -> set[str]:
+    names = {"127.0.0.1", "localhost", "[::1]", *addresses}
+    return {f"{n}:{port}".lower() for n in names}
+
+
+@app.middleware("http")
+async def origin_guard(request: Request, call_next):
+    host = (request.headers.get("host") or "").lower()
+    if allowed_hosts is not None and host not in allowed_hosts:
+        return PlainTextResponse("This server only answers to its own address.", 403)
+    if request.method in CHANGES:
+        origin = request.headers.get("origin")
+        if origin is not None:
+            if origin == "null" or urllib.parse.urlsplit(origin).netloc.lower() != host:
+                return JSONResponse({"error": "refused: the request comes from another site"}, 403)
+        elif request.headers.get("sec-fetch-site") == "cross-site":
+            return JSONResponse({"error": "refused: the request comes from another site"}, 403)
     return await call_next(request)
 
 
@@ -243,11 +281,34 @@ def sweep():
 
 
 def write_info(d: pathlib.Path, info: dict):
-    (d / "info.json").write_text(json.dumps(info, indent=1, ensure_ascii=False),
-                                 encoding="utf-8")
+    """info.json, replaced whole: never seen half written.
+
+    A transcription writes it from its own thread while the page reads the
+    list. Written in place, a read landing between the truncation and the
+    write found an empty file (it failed a test in CI once). So it is
+    written next to it and swapped in one step. On Windows the swap is
+    refused while someone has the file open, for the few milliseconds of a
+    read: then it waits and tries again.
+    """
+    tmp = d / "info.json.tmp"
+    tmp.write_text(json.dumps(info, indent=1, ensure_ascii=False), encoding="utf-8")
+    for _ in range(40):
+        try:
+            os.replace(tmp, d / "info.json")
+            return
+        except PermissionError:
+            time.sleep(0.05)
+    os.replace(tmp, d / "info.json")
 
 
 def read_info(d: pathlib.Path) -> dict:
+    # On Windows, for the instant write_info swaps the file in, opening it
+    # is refused: wait a moment instead of failing the page.
+    for _ in range(40):
+        try:
+            return json.loads((d / "info.json").read_text(encoding="utf-8"))
+        except PermissionError:
+            time.sleep(0.05)
     return json.loads((d / "info.json").read_text(encoding="utf-8"))
 
 
@@ -1513,6 +1574,7 @@ if __name__ == "__main__":
     # on purpose, for reading and uploading from a phone, behind a PIN (see
     # pin_guard), and says so every time it starts.
     host = "127.0.0.1"
+    allowed_hosts = hosts_for(args.port)
     if args.lan:
         import socket
         host = "0.0.0.0"
@@ -1527,6 +1589,14 @@ if __name__ == "__main__":
                 ips = [s.getsockname()[0]]
         except OSError:
             pass
+        # Every address of this computer is a name it may be reached by on
+        # the network (and its own name), never a name someone else chose.
+        own = set(ips)
+        try:
+            own |= set(socket.gethostbyname_ex(socket.gethostname())[2])
+        except OSError:
+            pass
+        allowed_hosts = hosts_for(args.port, own | {socket.gethostname()})
         pin = pin_setup(args.pin)
         print("  ON YOUR NETWORK: other devices on this Wi-Fi can open it, with the PIN.")
         for ip in ips or ["<this computer's IP>"]:
