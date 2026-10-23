@@ -510,6 +510,20 @@ def counter():
             line_up.task_done()
 
 
+# desktop.py puts Whisper off until the window shows the page: loading it
+# takes the whole of Python for seconds, and the server, then the window,
+# waited for it. Measured: the window appeared after 12 s, as Whisper did.
+WARM_LATER = False
+_warm_pending = threading.Event()
+
+
+def warm_up_now():
+    """Starts loading Whisper, once, if start() put it off."""
+    if _warm_pending.is_set():
+        _warm_pending.clear()
+        threading.Thread(target=warm_up, daemon=True).start()
+
+
 def start(data: pathlib.Path, glossary: pathlib.Path | None = None, model: bool = True):
     """Startup side effects, run once from __main__ after the options are read.
 
@@ -524,7 +538,9 @@ def start(data: pathlib.Path, glossary: pathlib.Path | None = None, model: bool 
     RECORDINGS = DATA / "_recordings"
     DATA.mkdir(parents=True, exist_ok=True)
     sweep()
-    if model:
+    if model and WARM_LATER:
+        _warm_pending.set()
+    elif model:
         threading.Thread(target=warm_up, daemon=True).start()
     else:
         engine_state["off"] = True
@@ -637,6 +653,22 @@ async def api_transcribe_added(name: str, request: Request):
                            two_tracks=bool(body.get("two_tracks") or info.get("two_tracks")),
                            precise=bool(body.get("precise")),
                            voices=bool(body.get("voices")) and voices_installed())}
+
+
+@app.get("/api/calls/stamp")
+def api_calls_stamp():
+    """Changes when a call is added, removed or changed on disk: the page
+    redraws its list when it does, whoever made the change (Stop in the
+    icon's menu, a phone, another window). Cheap: a folder listing and a
+    stat per call."""
+    count, latest = 0, 0.0
+    for d in DATA.iterdir() if DATA.exists() else []:
+        if d.is_dir() and not d.name.startswith("_"):
+            count += 1
+            f = d / "info.json"
+            if f.exists():
+                latest = max(latest, f.stat().st_mtime)
+    return {"stamp": f"{count}:{latest:.3f}"}
 
 
 @app.get("/api/jobs")

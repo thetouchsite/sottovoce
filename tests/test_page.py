@@ -354,3 +354,13 @@ def test_the_version_is_shown_in_the_side_bar(page):
     import server
     page.wait_for_function("document.getElementById('app-version').textContent.length > 0")
     assert page.locator("#app-version").inner_text() == "v" + server.VERSION
+
+
+def test_a_call_added_elsewhere_appears_in_the_list_by_itself(page, data):
+    # Stop in the icon's menu, or a phone, adds a call without this page.
+    import shutil
+    page.wait_for_selector(".item")
+    before = page.locator(".item").count()
+    src = data / "transcripts" / NORTHPINE
+    shutil.copytree(src, src.with_name("2026-10-23_Added elsewhere"))
+    page.wait_for_function(f"document.querySelectorAll('.item').length > {before}", timeout=10000)

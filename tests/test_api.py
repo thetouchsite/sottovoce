@@ -516,6 +516,14 @@ def test_a_recording_stopped_without_transcribing_waits_in_the_list_on_two_track
     assert asked["two_tracks"] is True
 
 
+def test_the_list_stamp_changes_when_a_call_is_added_elsewhere(here):
+    before = here.get("/api/calls/stamp").json()["stamp"]
+    assert here.get("/api/calls/stamp").json()["stamp"] == before        # nothing changed
+    here.post("/api/capture", json={"name": "Weekly"})
+    here.post("/api/capture/stop", json={"transcribe": False})           # as from the icon's menu
+    assert here.get("/api/calls/stamp").json()["stamp"] != before
+
+
 def test_running_transcriptions_are_listed_whoever_started_them(client):
     import server
     server.jobs["tray1"] = {"state": "running", "name": "Weekly.wav", "folder": "2026-10-23_Weekly"}

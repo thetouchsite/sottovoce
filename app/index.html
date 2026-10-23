@@ -1657,15 +1657,20 @@ function jobStageText(j){
   return j.stage + '…';
 }
 
-// Transcriptions this page did not start (Stop in the icon's menu, a phone,
-// this page reloaded half-way) are followed too: before, they showed up only
-// once finished.
-async function adoptJobs(){
+// What changed without this page: transcriptions it did not start, and
+// calls added or changed elsewhere (Stop in the icon's menu, a phone, this
+// page reloaded half-way). Before, they showed up only once finished, or
+// after closing and opening the window again.
+let callsStamp = null;
+async function keepUp(){
   try{
     const r = (await (await fetch('/api/jobs')).json()).jobs || [];
     for (const j of r) if (!queue.some(q => q.id === j.id)) track(j.id, j.name);
+    const s = (await (await fetch('/api/calls/stamp')).json()).stamp;
+    if (callsStamp !== null && s !== callsStamp) loadCalls();
+    callsStamp = s;
   } catch(e){ /* the server is restarting: try again later */ }
-  setTimeout(adoptJobs, 3000);
+  setTimeout(keepUp, 3000);
 }
 
 function track(id, name){
@@ -3401,6 +3406,6 @@ checkEngine();
 checkLLM();
 loadCalls();
 checkCapture();
-adoptJobs();
+keepUp();
 </script>
 </html>
