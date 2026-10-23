@@ -194,7 +194,7 @@ EOF
     local version
     version=$(sed -n 's/^VERSION = "\(.*\)"/\1/p' "$app/server.py")
     echo
-    "$py" -c "import torch; ok = torch.cuda.is_available(); print('  PyTorch', torch.__version__, '|', ('GPU: ' + torch.cuda.get_device_name(0)) if ok else 'no NVIDIA GPU in use: it will run on the CPU, about ten times slower')"
+    "$py" "$app/transcribe.py" --where
     echo
     echo "  Sottovoce $version is installed."
     echo "  Start it from $where, or with: \"$launcher\""

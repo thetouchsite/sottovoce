@@ -16,6 +16,13 @@ Three ways to transcribe, on the same audio:
                 normalization, the anti-hallucination settings and the removal
                 of subtitle phrases on silence
 
+The engine can be measured on each of the paths it can take (transcribe.PATHS),
+and with turbo:
+
+    sottovoce@cuda  sottovoce@intel-gpu  sottovoce@cpu  sottovoce@cpu+turbo
+
+"sottovoce" alone is the path this computer would take by itself.
+
 WER = (substituted + deleted + inserted words) / words in the reference, over
 the whole set. Reference and transcript go through the same normalizer,
 Whisper's own (EnglishTextNormalizer for English, BasicTextNormalizer for
@@ -157,6 +164,18 @@ def plain(model_id, wav, language):
     return words
 
 
+def engine_config(config):
+    """ "sottovoce@intel-gpu+turbo" -> ("intel-gpu", True); None if not the engine."""
+    if not config.startswith("sottovoce"):
+        return None
+    rest = config[len("sottovoce"):]
+    turbo = rest.endswith("+turbo")
+    p = rest.removesuffix("+turbo").removeprefix("@")
+    if p and p not in T.PATHS:
+        raise SystemExit(f"unknown path {p!r}: {', '.join(T.PATHS)}")
+    return p, turbo
+
+
 def ours(wav, language):
     r = T.run(wav, language)
     return [w for s in r["segments"] for w in (s.get("words") or [])]
@@ -166,9 +185,13 @@ def load(config):
     """The model on the GPU before the clock starts: loading is not transcribing."""
     import torch
     from transformers import pipeline
-    if config == "sottovoce":
+    if engine_config(config):
         _plain.clear()
         torch.cuda.empty_cache()
+        p, turbo = engine_config(config)
+        if p and p not in T.found():
+            raise SystemExit(f"{p} is not on this computer: {', '.join(T.found())}")
+        T.choose(p, turbo)
         T.engine()
     elif MODELS[config] not in _plain:
         _plain.clear()
@@ -178,7 +201,7 @@ def load(config):
 
 
 def transcribe(config, wav, language):
-    return ours(wav, language) if config == "sottovoce" else plain(MODELS[config], wav, language)
+    return ours(wav, language) if engine_config(config) else plain(MODELS[config], wav, language)
 
 
 # --- scoring --------------------------------------------------------------------------
@@ -216,6 +239,8 @@ def run_set(name, items, language, configs):
         secs = time.time() - t0
         s = score([i[1] for i in items], hyps, norm)
         results[c] = {**s, "seconds": round(secs), "audio_seconds": round(audio_s)}
+        if engine_config(c):
+            results[c]["engine"] = T.key()
         print(f"  {c:10}  {s['wer']:6.1%}  {s['sub']:6.1%}  {s['del']:6.1%}  {s['ins']:6.1%}  "
               f"{secs:9.0f}   {audio_s / secs:10.1f}", flush=True)
     return results
@@ -260,7 +285,10 @@ def main():
     args = ap.parse_args()
     configs = [c.strip() for c in args.configs.split(",") if c.strip()]
     import torch
-    print(f"\n  {torch.cuda.get_device_name(0)}, torch {torch.__version__}")
+    import platform
+    gpu = torch.cuda.get_device_name(0) if torch.cuda.is_available() else "no NVIDIA GPU"
+    print(f"\n  {gpu}, {platform.processor() or 'CPU'}, torch {torch.__version__}, "
+          f"paths here: {', '.join(T.found())}")
     if args.set == "fleurs":
         r = run_set("FLEURS it_it test", fleurs(args.limit), "it", configs)
     elif args.set == "ami":

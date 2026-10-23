@@ -9,7 +9,7 @@ hide:
 Call transcription that runs on your own computer, and shows you where the text can't be trusted.
 { .lead }
 
-Drop a recorded call on the page, or record the call from it. You get the transcript, who said what, a summary, a follow-up email, and a map of the places to double-check. Whisper large-v3 on your GPU. Nothing leaves the machine.
+Drop a recorded call on the page, or record the call from it. You get the transcript, who said what, a summary, a follow-up email, and a map of the places to double-check. Whisper large-v3 on your NVIDIA or Intel GPU, or on the processor. Nothing leaves the machine.
 
 [Get started](getting-started.md){ .md-button .md-button--primary } [See it on GitHub](https://github.com/thetouchsite/sottovoce){ .md-button }
 

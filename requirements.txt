@@ -23,6 +23,12 @@ pystray>=0.19; sys_platform == "win32"
 # what the computer plays, through WASAPI.
 soundcard>=0.4.6; sys_platform == "win32"
 
+# Whisper on an Intel GPU or on the processor (transcribe.py, "where Whisper
+# runs"): on a processor about six times faster than PyTorch. It brings
+# openvino-telemetry along, which only OpenVINO's model converter uses, and
+# only if its user says yes; Sottovoce never runs the converter.
+openvino-genai>=2026.4; platform_machine == "AMD64" or platform_machine == "x86_64"
+
 # Telling voices apart: CPU only, no account, two small models fetched on first
 # use (see voices.py). Without these three the page simply does not offer it.
 sherpa-onnx>=1.12

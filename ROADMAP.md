@@ -85,7 +85,7 @@ And a rule learned the hard way, on another project: **never decide on a single 
 
 **Done so far.** `installer/install.sh` installs, updates and removes Sottovoce with one command, as `installer/install.ps1` does on Windows: uv brings Python, `installer/gpu.py` picks the PyTorch build. On every push CI runs it end to end on Ubuntu and macOS (and Windows): install, update, start the server, uninstall, with PyTorch for the CPU.
 
-**Still open.** CI has no GPU, and the author's machine runs Windows: nobody has transcribed with it on Linux with an NVIDIA card, or on a Mac. On a Mac Whisper runs on the CPU; Apple's GPU (MPS) is untested.
+**Still open.** CI has no GPU, and the author's machine runs Windows: nobody has transcribed with it on Linux with an NVIDIA card, or on a Mac. On a Mac Whisper runs on the CPU through PyTorch (OpenVINO is installed on x86-64 only); Apple's GPU (MPS) is untested.
 
 **Done when** a call is transcribed after the one-command install on a clean Ubuntu machine with an NVIDIA GPU and on an Apple-silicon Mac, checked by someone who isn't the author, with the time it took written in the benchmarks.
 

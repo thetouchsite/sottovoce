@@ -197,6 +197,14 @@
   .switch:checked{background:var(--accent)}
   .switch:checked::after{transform:translateX(14px)}
   .switch:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+  /* One of several: a dot instead of a switch. */
+  .switch[type=radio]{width:18px;height:18px}
+  .switch[type=radio]::after{top:5px;left:5px;width:8px;height:8px;background:transparent}
+  .switch[type=radio]:checked::after{transform:none;background:var(--text)}
+  .option.off{opacity:.55}
+  .option b::first-letter{text-transform:uppercase}
+  .option small.slow{color:var(--text);margin-top:6px}
+  .measure{margin-top:18px;display:grid;gap:10px;justify-items:start}
   /* Words that depend on the hand: "click" and "drop" with a mouse, "tap" with
      a finger. A phone told to drop files or press Esc is told nothing. */
   @media (hover:hover), (pointer:fine){ .touch-only{display:none !important} }
@@ -611,6 +619,9 @@
   <button id="v-glossary" type="button" title="Name glossary" aria-label="Name glossary">
     <svg viewBox="0 0 20 20"><path d="M3.5 4.5a1 1 0 0 1 1-1h11v13h-11a1 1 0 0 1-1-1z"/><path d="M3.5 13.5h12M7 7h5"/></svg>
   </button>
+  <button id="v-settings" type="button" title="Settings: transcription and summaries" aria-label="Settings">
+    <svg viewBox="0 0 20 20"><path d="M4 6h12M4 14h12"/><circle cx="8" cy="6" r="1.8"/><circle cx="12.5" cy="14" r="1.8"/></svg>
+  </button>
   <div class="bottom">
     <span class="version" id="app-version" translate="no"></span>
     <button class="lang" id="ui-lang" type="button" translate="no"></button>
@@ -698,6 +709,40 @@ const IT = {
   'Open the call list': 'Apri la lista delle call', 'Sottovoce: home': 'Sottovoce: home', 'Sottovoce, home': 'Sottovoce, home',
   'Name glossary': 'Glossario dei nomi', 'Stop the server': 'Spegni il server', 'New transcription': 'Nuova trascrizione',
   'Search every call': 'Cerca in tutte le call', 'loading the model': 'carico il modello',
+  // settings
+  'Settings': 'Impostazioni', 'Settings: transcription and summaries': 'Impostazioni: trascrizione e riassunti',
+  'Where the work is done on this computer. Nothing leaves it.': 'Dove si fa il lavoro su questo computer. Niente ne esce.',
+  'Transcription': 'Trascrizione', 'Summaries and emails': 'Riassunti ed email',
+  'Whisper large-v3, the same model on every path: what changes is the program that runs it and how fast it goes.':
+    'Whisper large-v3, lo stesso modello su ogni percorso: cambia il programma che lo fa girare e quanto va veloce.',
+  'NVIDIA GPU': 'GPU NVIDIA', 'Intel GPU': 'GPU Intel', 'processor': 'processore',
+  'large-v3': 'large-v3', 'large-v3-turbo': 'large-v3-turbo', 'ready': 'pronto',
+  'OpenVINO': 'OpenVINO', 'PyTorch': 'PyTorch',
+  'Let Sottovoce choose': 'Lascia scegliere a Sottovoce',
+  'Faster model, turbo': 'Modello più veloce, turbo',
+  'Whisper large-v3-turbo: about three times faster, about twice the mistakes, more on names.':
+    'Whisper large-v3-turbo: circa tre volte più veloce, circa il doppio degli errori, più sui nomi.',
+  'Measuring: three minutes of your latest call through each path.':
+    "Misuro: tre minuti dell'ultima call su ogni percorso.",
+  'waiting for the transcriptions in line…': 'aspetto le trascrizioni in coda…',
+  'This computer can run Whisper in more than one way. Which one is fastest depends on the computer: measure it once, on three minutes of your latest call.':
+    "Questo computer può far girare Whisper in più modi. Quale sia il più veloce dipende dal computer: misuralo una volta, su tre minuti dell'ultima call.",
+  'Measure again': 'Misura di nuovo', 'Measure which is fastest': 'Misura il più veloce',
+  'Transcribe a call first: it is measured on that': 'Prima trascrivi una call: si misura su quella',
+  'To compare them, each path needs its own copy of the model: ': 'Per confrontarli, ogni percorso ha bisogno della sua copia del modello: ',
+  'Download it now?': 'Scaricarla adesso?',
+  'looking for LM Studio and Ollama…': 'cerco LM Studio e Ollama…',
+  'The model that writes summaries and follow-up emails, on this computer. If you already have LM Studio or Ollama, pick one of your models: Sottovoce starts the program by itself when it needs it, and stops it when it quits.':
+    "Il modello che scrive riassunti ed email di follow-up, su questo computer. Se hai già LM Studio o Ollama, scegli uno dei tuoi modelli: Sottovoce avvia il programma da solo quando serve, e lo ferma quando si chiude.",
+  'Automatic': 'Automatico',
+  'LM Studio or Ollama if one is already running, otherwise the built-in model.':
+    'LM Studio o Ollama se uno è già acceso, altrimenti il modello integrato.',
+  'On this computer, on the NVIDIA GPU.': 'Su questo computer, sulla GPU NVIDIA.',
+  'Needs an NVIDIA GPU: not on this computer.': 'Serve una GPU NVIDIA: non su questo computer.',
+  'Running now. Your models:': 'Acceso adesso. I tuoi modelli:',
+  'Not running: started when a summary is asked. Your models:': 'Spento: si avvia quando chiedi un riassunto. I tuoi modelli:',
+  'a transcription is running: wait for it to finish': 'una trascrizione è in corso: aspetta che finisca',
+  'no transcribed call to measure on yet': 'ancora nessuna call trascritta su cui misurare',
   'browsing only, Whisper not loaded': 'solo consultazione, Whisper non caricato', 'No calls yet.': 'Ancora nessuna call.',
   'Where you are': 'Dove sei', 'Back to the start (Esc)': "Torna all'inizio (Esc)", 'Sottovoce': 'Sottovoce',
   'adding…': 'aggiungo…',
@@ -947,8 +992,28 @@ const IT_RULES = [
   [/^No call mentions “(.*)”\.$/, (_, q) => 'Nessuna call contiene “' + q + '”.'],
   [/^(\d+) names?, (\d+) of them found in your calls\. Names are corrected after transcription, not suggested before: given to Whisper as a prompt, they made the text worse instead of better\.$/,
     (_, a, b) => n1(a, 'nome', 'nomi') + ', ' + b + ' trovati nelle tue call. I nomi si correggono dopo la trascrizione, non si suggeriscono prima: dati a Whisper come prompt, peggioravano il testo invece di migliorarlo.'],
-  [/^(.+) · ready$/, (_, m) => m + ' · pronto'],
+  [/^(.+) · ready$/, (_, m) => (translated(m) || m) + ' · pronto'],
+  [/^([\d.]+) GB, once: a few minutes$/, (_, g) => gb(g) + ' GB, una volta sola: qualche minuto'],
+  [/^The first transcription downloads the transcription model, Whisper large-v3: ([\d.]+) GB, once, a few minutes\. Download it now\?$/,
+    (_, g) => 'La prima trascrizione scarica il modello di trascrizione, Whisper large-v3: ' + gb(g) + ' GB, una volta sola, qualche minuto. Scaricarlo adesso?'],
+  [/^an hour of call in about (\d+) min$/, (_, n) => "un'ora di call in circa " + n + ' min'],
+  [/^an hour of call in about (\d+) min, measured here$/, (_, n) => "un'ora di call in circa " + n + ' min, misurato qui'],
+  [/^On this computer: an hour of call in about (\d+) min\.$/, (_, n) => "Su questo computer: un'ora di call in circa " + n + ' min.'],
+  [/^([\d.]+) GB to download the first time$/, (_, g) => gb(g) + ' GB da scaricare la prima volta'],
+  [/^([\d.]+) GB to download the first time, on the NVIDIA GPU\.$/, (_, g) => gb(g) + ' GB da scaricare la prima volta, sulla GPU NVIDIA.'],
+  [/^Set by SOTTOVOCE_ENGINE: (.+)\.$/, (_, p) => 'Impostato da SOTTOVOCE_ENGINE: ' + p + '.'],
+  [/^Measured on (.+)\. The fastest is in use\.$/, (_, w) => 'Misurato il ' + w + '. È in uso il più veloce.'],
+  [/^Measured: (.+)\. The fastest is now in use\.$/, (_, r) => 'Misurato: ' + r + '. Ora è in uso il più veloce.'],
+  [/^The measurement stopped: (.+)$/, (_, e) => 'La misura si è fermata: ' + (translated(e) || e)],
+  [/^loading the model on the (.+)…$/, (_, p) => 'carico il modello sulla ' + p + '…'],
+  [/^transcribing on the (.+)…$/, (_, p) => 'trascrivo sulla ' + p + '…'],
+  [/^Built in: (.+)$/, (_, m) => 'Integrato: ' + m],
+  [/^Installed, with no models: download one in (.+) first\.$/, (_, p) => 'Installato, senza modelli: scaricane prima uno in ' + p + '.'],
+  [/^(LM Studio|Ollama) model$/, (_, p) => 'Modello di ' + p],
 ];
+
+// 2.9 -> "2,9": decimals in Italian.
+function gb(g){ return String(g).replace('.', ','); }
 
 // The page is written in English. In Italian, every piece of interface text
 // is looked up as it appears on screen: one dictionary, plus rules for the
@@ -1051,6 +1116,7 @@ async function checkEngine(){
   try{
     const d = await (await fetch('/api/status')).json();
     whisperOnDisk = d.downloaded !== false;
+    if (d.download_gb) whisperGb = d.download_gb;
     const light = $('.light'), t = $('#engine-text');
     // Which Sottovoce this is: what to say when asking for help, or after an update.
     if (d.version){
@@ -1077,7 +1143,10 @@ async function checkEngine(){
     if (d.ready){
       ready = true;
       light.className = 'light ok';
-      t.textContent = d.model.split('/').pop() + ' · ready';
+      // Named once the server has looked at the hardware: seconds after start.
+      if (d.engine) t.textContent = (d.model.includes('turbo') ? 'large-v3-turbo' : 'large-v3')
+        + ' · ' + T(PATH_NAMES[d.engine] || d.engine) + ' · ready';
+      else { t.textContent = 'ready'; setTimeout(checkEngine, 1500); }
       refreshHomeButtons();
     } else setTimeout(checkEngine, 1500);
   } catch(e){ setTimeout(checkEngine, 2000); }
@@ -1237,6 +1306,8 @@ function setView(v){
   view = v;
   $('#v-home').toggleAttribute('aria-current', v === 'home');
   $('#v-glossary').toggleAttribute('aria-current', v === 'glossary');
+  $('#v-settings').toggleAttribute('aria-current', v === 'settings');
+  if (v === 'settings') $('#v-settings').setAttribute('aria-current', 'page');
   if (v === 'home') $('#v-home').setAttribute('aria-current', 'page');
   if (v === 'glossary') $('#v-glossary').setAttribute('aria-current', 'page');
   $('#sidebar').classList.remove('open');
@@ -1672,7 +1743,7 @@ function jobStageText(j){
   if (j.stage === 'loading the model')
     return T('loading the model') + ' · ' + j.elapsed + ' s · ' + T('about ten seconds');
   if (j.stage === 'downloading the model')
-    return T('downloading the model') + ' · ' + j.elapsed + ' s · ' + T('2.9 GB, once: a few minutes');
+    return T('downloading the model') + ' · ' + j.elapsed + ' s · ' + T(whisperGb + ' GB, once: a few minutes');
   if (j.expected){
     const left = Math.max(0, j.expected - j.elapsed);
     return j.stage + ' · ' + Math.max(1, Math.round(j.duration / 60)) + ' min of audio · '
@@ -1691,7 +1762,9 @@ async function keepUp(){
     const r = (await (await fetch('/api/jobs')).json()).jobs || [];
     for (const j of r) if (!queue.some(q => q.id === j.id)) track(j.id, j.name);
     const s = (await (await fetch('/api/calls/stamp')).json()).stamp;
-    whisperOnDisk = (await (await fetch('/api/status')).json()).downloaded !== false;
+    const st = await (await fetch('/api/status')).json();
+    whisperOnDisk = st.downloaded !== false;
+    if (st.download_gb) whisperGb = st.download_gb;
     if (callsStamp !== null && s !== callsStamp) loadCalls();
     callsStamp = s;
   } catch(e){ /* the server is restarting: try again later */ }
@@ -2028,8 +2101,10 @@ if (onThisComputer){
 // click that said "Transcribe" or "Summarize", without a word. Asked once,
 // until the model is on disk.
 let whisperOnDisk = true;      // from /api/status
+let whisperGb = 2.9;           // the same: the size of the model for the path this computer takes
 function okToTranscribe(){
-  return whisperOnDisk || confirm(T('The first transcription downloads the transcription model, Whisper large-v3: 2.9 GB, once, a few minutes. Download it now?'));
+  return whisperOnDisk || confirm(T('The first transcription downloads the transcription model, Whisper large-v3: '
+                                    + whisperGb + ' GB, once, a few minutes. Download it now?'));
 }
 function okToWrite(){
   return !llm || !llm.builtin || llm.downloaded || confirm(T('Summaries and emails are written by a model that runs on this computer. The first time it is downloaded: 8 GB, once, a few minutes. Download it now?'));
@@ -3423,6 +3498,221 @@ async function showGlossary(){
   d.append(p);
 }
 
+/* ============================== the settings ============================ */
+// Where Whisper runs and who writes the summaries. Both are chosen once and
+// remembered by the server, in the folder of the calls.
+
+const PATH_NAMES = {cuda: 'NVIDIA GPU', 'intel-gpu': 'Intel GPU', cpu: 'processor'};
+const SLOW = 2;      // times real time: below it an hour of call takes over half an hour
+
+// "an hour of call in about 9 min", from a speed in times real time.
+function hourIn(speed){
+  return 'an hour of call in about ' + Math.max(1, Math.round(60 / speed)) + ' min';
+}
+
+function choiceTile(name, title, text, on, pick){
+  const l = el('label', 'option' + (on ? ' on' : ''));
+  const r = el('input', 'switch');
+  r.type = 'radio';
+  r.name = name;
+  r.checked = on;
+  r.onchange = pick;
+  const t = el('div');
+  t.innerHTML = '<b>' + esc(title) + '</b><small>' + esc(text) + '</small>';
+  l.append(r, t);
+  return l;
+}
+
+async function postJSON(url, body){
+  const r = await (await fetch(url, {method:'POST', headers:{'Content-Type':'application/json'},
+                                     body: JSON.stringify(body || {})})).json();
+  if (r.error) throw new Error(r.error);
+  return r;
+}
+
+async function showSettings(){
+  setView('settings');
+  openNow = null;
+  drawList();
+  const d = $('#inner');
+  d.innerHTML = '<p class="quiet">opening…</p>';
+  let e;
+  try{ e = await (await fetch('/api/engine')).json(); }
+  catch(x){ return failure(x.message); }
+  if (view !== 'settings') return;
+  d.textContent = '';
+  d.append(crumbs('Settings'));
+  const tr = el('div', 'title-row');
+  const left = el('div');
+  const h1 = el('h1');
+  h1.textContent = 'Settings';
+  const fd = el('p', 'finding');
+  fd.textContent = 'Where the work is done on this computer. Nothing leaves it.';
+  left.append(h1, fd);
+  tr.append(left);
+  d.append(tr);
+  d.append(enginePanel(e));
+  const lp = panel('Summaries and emails');
+  lp.append(Object.assign(el('p', 'quiet'), {textContent: 'looking for LM Studio and Ollama…'}));
+  d.append(lp);
+  drawLLM(lp);
+}
+
+function enginePanel(e){
+  const p = panel('Transcription');
+  const c = el('div', 'content');
+  const intro = el('p', 'finding');
+  intro.textContent = 'Whisper large-v3, the same model on every path: what changes is the program that runs it and how fast it goes.';
+  c.append(intro);
+  if (e.forced){
+    const f = el('p', 'finding');
+    f.textContent = 'Set by SOTTOVOCE_ENGINE: ' + T(PATH_NAMES[e.path] || e.path) + '.';
+    c.append(f);
+  }
+  const tiles = el('div', 'options');
+  tiles.style.marginTop = '16px';
+  for (const x of e.paths){
+    const bits = [x.program === 'openvino' ? 'OpenVINO' : 'PyTorch'];
+    if (x.speed) bits.push(hourIn(x.speed) + (x.measured ? ', measured here' : ''));
+    if (!x.downloaded && x.download_gb) bits.push(x.download_gb + ' GB to download the first time');
+    tiles.append(choiceTile('engine-path', PATH_NAMES[x.id] || x.id, bits.join(' · '), x.id === e.path,
+      () => setEngine({path: x.id})));
+  }
+  c.append(tiles);
+  if (!e.automatic && !e.forced){
+    const b = el('button', 'text-button');
+    b.type = 'button';
+    b.textContent = 'Let Sottovoce choose';
+    b.style.marginTop = '12px';
+    b.onclick = () => setEngine({path: ''});
+    c.append(b);
+  }
+
+  if (e.can_measure) c.append(measureBox(e));
+
+  // Turbo: offered, never imposed. Said plainly when this computer is slow.
+  const slow = e.speed && e.speed < SLOW && !e.turbo;
+  const t = el('label', 'option' + (e.turbo ? ' on' : ''));
+  t.style.marginTop = '16px';
+  const s = el('input', 'switch');
+  s.type = 'checkbox';
+  s.setAttribute('role', 'switch');
+  s.checked = e.turbo;
+  s.onchange = () => setEngine({turbo: s.checked});
+  const tt = el('div');
+  tt.innerHTML = '<b>' + esc('Faster model, turbo') + '</b><small>'
+    + esc('Whisper large-v3-turbo: about three times faster, about twice the mistakes, more on names.') + '</small>'
+    + (slow ? '<small class="slow">' + esc('On this computer: ' + hourIn(e.speed) + '.') + '</small>' : '');
+  t.append(s, tt);
+  c.append(t);
+  p.append(c);
+  return p;
+}
+
+function measureBox(e){
+  const box = el('div', 'measure');
+  const m = e.measuring || {};
+  const say = el('p', 'finding');
+  if (m.state === 'running'){
+    say.textContent = 'Measuring: three minutes of your latest call through each path.';
+    box.append(say, working(m.stage === 'loading' ? 'loading the model on the ' + T(PATH_NAMES[m.path] || '') + '…'
+                          : m.stage === 'measuring' ? 'transcribing on the ' + T(PATH_NAMES[m.path] || '') + '…'
+                          : 'waiting for the transcriptions in line…'));
+    setTimeout(() => { if (view === 'settings') refreshEngine(); }, 2000);
+    return box;
+  }
+  if (m.state === 'error') say.textContent = 'The measurement stopped: ' + m.error;
+  else if (m.state === 'done' && m.results)
+    say.textContent = 'Measured: ' + Object.entries(m.results).map(([k, v]) => T(PATH_NAMES[k]) + ' ' + v + '×').join(', ')
+      + '. The fastest is now in use.';
+  else if (e.measured_at) say.textContent = 'Measured on ' + e.measured_at + '. The fastest is in use.';
+  else say.textContent = 'This computer can run Whisper in more than one way. Which one is fastest depends on the computer: measure it once, on three minutes of your latest call.';
+  const b = el('button', 'secondary');
+  b.type = 'button';
+  b.textContent = e.measured_at ? 'Measure again' : 'Measure which is fastest';
+  b.disabled = !e.has_call;
+  if (!e.has_call) b.title = 'Transcribe a call first: it is measured on that';
+  b.onclick = async () => {
+    const missing = e.paths.filter(x => !x.downloaded && x.download_gb);
+    if (missing.length && !confirm(T('To compare them, each path needs its own copy of the model: ')
+        + missing.map(x => T(PATH_NAMES[x.id]) + ' ' + x.download_gb + ' GB').join(', ') + '. ' + T('Download it now?'))) return;
+    try{ await postJSON('/api/engine/measure'); } catch(x){ alert(T(x.message)); }
+    refreshEngine();
+  };
+  box.append(say, b);
+  return box;
+}
+
+async function refreshEngine(){
+  let e;
+  try{ e = await (await fetch('/api/engine')).json(); } catch(x){ return; }
+  const old = document.querySelector('#inner .panel');
+  if (view === 'settings' && old) old.replaceWith(enginePanel(e));
+  checkEngine();
+}
+
+async function setEngine(body){
+  try{ await postJSON('/api/engine', body); }
+  catch(x){ alert(T(x.message)); }
+  refreshEngine();
+}
+
+async function drawLLM(p){
+  let r;
+  try{ r = await (await fetch('/api/llm/programs')).json(); }
+  catch(x){ return; }
+  if (view !== 'settings') return;
+  const c = el('div', 'content');
+  const ch = r.choice || {};
+  const intro = el('p', 'finding');
+  intro.textContent = 'The model that writes summaries and follow-up emails, on this computer. If you already have LM Studio or Ollama, pick one of your models: Sottovoce starts the program by itself when it needs it, and stops it when it quits.';
+  c.append(intro);
+  const tiles = el('div', 'options');
+  tiles.style.marginTop = '16px';
+  const pick = async (program, model) => {
+    try{ await postJSON('/api/llm/choice', {program, model}); } catch(x){ alert(T(x.message)); }
+    await checkLLM();
+    p.querySelector('.content').remove();
+    drawLLM(p);
+  };
+  tiles.append(choiceTile('llm', 'Automatic', 'LM Studio or Ollama if one is already running, otherwise the built-in model.',
+    !ch.program, () => pick(null, null)));
+  for (const g of r.programs){
+    const on = ch.program === g.program;
+    if (g.builtin){
+      tiles.append(choiceTile('llm', 'Built in: ' + g.models[0].name,
+        g.usable ? (g.downloaded ? 'On this computer, on the NVIDIA GPU.' : g.models[0].gb + ' GB to download the first time, on the NVIDIA GPU.')
+                 : 'Needs an NVIDIA GPU: not on this computer.',
+        on, () => pick('Sottovoce', null)));
+      if (!g.usable) tiles.lastChild.classList.add('off');
+      continue;
+    }
+    const models = g.models || [];
+    const tile = choiceTile('llm', g.program,
+      !models.length ? 'Installed, with no models: download one in ' + g.program + ' first.'
+        : (g.running ? 'Running now.' : 'Not running: started when a summary is asked.') + ' Your models:',
+      on, () => models.length && pick(g.program, (on && ch.model) || models[0].id));
+    if (models.length){
+      const s = el('select', 'secondary');
+      s.setAttribute('aria-label', g.program + ' model');
+      for (const m of models){
+        const o = el('option');
+        o.value = m.id;
+        o.textContent = m.name + (m.gb ? ' · ' + m.gb + ' GB' : '');
+        o.className = 'data';
+        s.append(o);
+      }
+      s.value = on && ch.model ? ch.model : models[0].id;
+      s.onchange = () => pick(g.program, s.value);
+      tile.querySelector('div').append(s);
+    } else tile.classList.add('off');
+    tiles.append(tile);
+  }
+  c.append(tiles);
+  p.querySelector('.quiet')?.remove();
+  p.append(c);
+}
+
 /* ============================== wiring ================================== */
 
 $('#v-home').onclick = showHome;
@@ -3439,6 +3729,7 @@ document.addEventListener('keydown', e => {
 });
 $('#new-button').onclick = showHome;
 $('#v-glossary').onclick = showGlossary;
+$('#v-settings').onclick = showSettings;
 $('#open-list').onclick = () => $('#sidebar').classList.toggle('open');
 // A drawer closes when you tap beside it, as drawers do.
 document.addEventListener('click', e => {

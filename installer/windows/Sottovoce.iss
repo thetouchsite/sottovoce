@@ -250,12 +250,30 @@ begin
   Result := Result + '\hub';
 end;
 
+// Sottovoce's own models in the Hugging Face cache, not the whole cache:
+// other programs may use it. Whisper as PyTorch and as OpenVINO runs it,
+// turbo if it was chosen, and the summary model.
+const
+  ModelCount = 5;
+
+function Model(I: Integer): String;
+begin
+  case I of
+    0: Result := 'models--openai--whisper-large-v3';
+    1: Result := 'models--openai--whisper-large-v3-turbo';
+    2: Result := 'models--OpenVINO--whisper-large-v3-int8-ov';
+    3: Result := 'models--OpenVINO--whisper-large-v3-turbo-int8-ov';
+    4: Result := 'models--Qwen--Qwen3-4B-Instruct-2507';
+  end;
+end;
+
 // Uninstalling: the program goes; the calls and the models go only if the
 // user says so, with No already chosen. Yes to both leaves the computer as
 // it was before Sottovoce.
 procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
 var
-  Whisper, Qwen: String;
+  I: Integer;
+  Found: Boolean;
 begin
   if CurUninstallStep = usUninstall then
   begin
@@ -267,13 +285,13 @@ begin
     if DirExists(UninstallData) then
       if MsgBox(FmtMessage(CustomMessage('AskCalls'), [UninstallData]), mbConfirmation, MB_YESNO or MB_DEFBUTTON2) = IDYES then
         DelTree(UninstallData, True, True, True);
-    Whisper := Hub() + '\models--openai--whisper-large-v3';
-    Qwen := Hub() + '\models--Qwen--Qwen3-4B-Instruct-2507';
-    if DirExists(Whisper) or DirExists(Qwen) then
+    Found := False;
+    for I := 0 to ModelCount - 1 do
+      if DirExists(Hub() + '\' + Model(I)) then
+        Found := True;
+    if Found then
       if MsgBox(CustomMessage('AskModels'), mbConfirmation, MB_YESNO or MB_DEFBUTTON2) = IDYES then
-      begin
-        DelTree(Whisper, True, True, True);
-        DelTree(Qwen, True, True, True);
-      end;
+        for I := 0 to ModelCount - 1 do
+          DelTree(Hub() + '\' + Model(I), True, True, True);
   end;
 end;

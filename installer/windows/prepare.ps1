@@ -56,6 +56,7 @@ try {
     # Where the calls are, for the uninstall to ask about the right folder.
     Set-Content (Join-Path $Program "data-folder.txt") -Value $Data -Encoding UTF8
     Add-Content $Log (& $Py -c "import torch; print('PyTorch', torch.__version__, 'GPU' if torch.cuda.is_available() else 'CPU')")
+    Add-Content $Log (& $Py (Join-Path $App "transcribe.py") --where)
     Say "done"
 } catch {
     Add-Content $Log "ERROR: $($_.Exception.Message)"

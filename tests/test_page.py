@@ -156,6 +156,18 @@ def test_glossary_view(page):
     assert page.locator("tbody tr").count() == 3
 
 
+def test_settings_show_where_whisper_runs_and_who_writes(page):
+    page.locator("#v-settings").click()
+    page.wait_for_selector("text=Where the work is done on this computer")
+    engine = page.locator(".panel", has_text="Transcription")
+    assert engine.locator("input[name=engine-path]").count() >= 1      # the processor is always there
+    assert engine.locator("input[name=engine-path]:checked").count() == 1
+    assert engine.locator("text=Faster model, turbo").count() == 1
+    writers = page.locator(".panel", has_text="Summaries and emails")
+    writers.locator("text=Automatic").wait_for()
+    assert writers.locator("input[name=llm]:checked").count() == 1
+
+
 def test_phone_width(site):
     with playwright.sync_playwright() as pw:
         browser = launch(pw)
@@ -320,15 +332,27 @@ def test_an_italian_system_gets_the_page_in_italian_until_a_choice_is_made(site)
 
 
 def test_in_the_window_recording_opens_the_browser_and_the_power_button_quits(site):
+    # A computer that cannot record by itself: the window sends you to the browser.
     with playwright.sync_playwright() as pw:
         browser = launch(pw)
         p = browser.new_page(locale="en-US", viewport={"width": 1440, "height": 900})
+        p.route("**/api/capture", lambda r: r.fulfill(json={"available": False}))
         p.goto(site + "?window")
         assert p.locator("#record-panel button.primary").inner_text() == "Record in the browser"
         assert p.locator("#shutdown").get_attribute("title") == "Quit Sottovoce"
         with p.expect_popup() as tab:
             p.locator("#record-panel button.primary").click()
         assert tab.value.url == site
+        browser.close()
+
+
+def test_in_the_window_a_computer_that_can_record_records_itself(site):
+    with playwright.sync_playwright() as pw:
+        browser = launch(pw)
+        p = browser.new_page(locale="en-US", viewport={"width": 1440, "height": 900})
+        p.route("**/api/capture", lambda r: r.fulfill(json={"available": True}))
+        p.goto(site + "?window")
+        p.locator("#record-panel button.primary", has_text="Start recording").wait_for()
         browser.close()
 
 

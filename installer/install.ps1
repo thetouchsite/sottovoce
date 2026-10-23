@@ -196,7 +196,7 @@ function Install-Sottovoce {
     New-ItemProperty $key -Name EstimatedSize -Value $size -PropertyType DWord -Force | Out-Null
 
     Write-Host ""
-    & $Py -c "import torch; ok = torch.cuda.is_available(); print('  PyTorch', torch.__version__, '|', ('GPU: ' + torch.cuda.get_device_name(0)) if ok else 'no GPU in use: it will run on the CPU, about ten times slower')"
+    & $Py (Join-Path $App "transcribe.py") --where
     Write-Host ""
     Say "Sottovoce $version is installed."
     Say "Open it from the Start menu or the desktop. Your calls are kept in $Data"

@@ -4,11 +4,12 @@ What Sottovoce doesn't do, or doesn't do well yet. Most of these are on the [roa
 
 ## Hardware and platforms
 
-- **An NVIDIA GPU is expected.** Whisper large-v3 runs on CUDA; without it, it runs on the CPU, much slower. Apple Silicon and AMD GPUs are not accelerated yet.
+- **Some GPUs are not used yet.** Whisper runs on NVIDIA cards (PyTorch), Intel GPUs and any x86 processor (OpenVINO). AMD GPUs, Apple Silicon's GPU and the NPU of recent Intel processors are not used: Whisper runs on the processor there. On the Core Ultra NPU we tried, OpenVINO's transcripts were not usable.
+- **Speeds are measured on one laptop** (Core Ultra 9 285H with an RTX 5090 Laptop and an Arc 140T). A smaller computer is slower; the page learns its real speed from the first call of a minute or more.
 - **Transcription is tested on Windows.** The installer runs end to end in CI on Windows, Ubuntu and macOS, with PyTorch for the CPU; nobody has yet transcribed with it on a Linux machine with an NVIDIA GPU, or on a Mac.
-- **The installer is a command, not a program to double-click.** A downloadable `.exe` would need a code-signing certificate, paid every year, or Windows warns that it *protected your PC*. A command pasted in PowerShell gets no such warning.
+- **The Windows setup is not signed.** A signature needs a certificate paid every year; without it, Windows may warn that it *protected your PC* (**More info → Run anyway**). The one-command install in PowerShell gets no such warning.
 - **Intel Macs are not supported:** PyTorch no longer ships for them.
-- **The built-in summary model needs about 8 GB of GPU memory** next to Whisper. On a smaller card, use LM Studio or Ollama with a smaller model.
+- **The built-in summary model needs an NVIDIA GPU** with about 8 GB free next to Whisper. On a smaller card, or without one, pick a model you have in LM Studio or Ollama.
 
 ## Recording
 

@@ -14,9 +14,21 @@
 - **Behind a company proxy**: set `HTTPS_PROXY` before running it (in PowerShell, `$env:HTTPS_PROXY = "http://proxy:8080"`). The installer needs github.com, pypi.org, files.pythonhosted.org and download.pytorch.org.
 - **It says to update the driver**: an RTX 50 card needs NVIDIA driver 580 or newer, older cards 528 (525 on Linux). Update it from nvidia.com and run the command again.
 
-## The GPU is not used
+## Which GPU is used
 
-Transcription works but is very slow, and the GPU stays idle. Almost always this is **the PyTorch trap**: installed as a dependency of `transformers`, pip pulls the default PyTorch from PyPI, which on RTX 50-series cards (Blackwell, `sm_120`) doesn't see the GPU. Everything runs on the CPU and nothing tells you.
+**Settings → Transcription** says where Whisper runs. To see it from a terminal:
+
+```sh
+%LOCALAPPDATA%\Programs\Sottovoce\app\.venv\Scripts\python.exe %LOCALAPPDATA%\Programs\Sottovoce\app\transcribe.py --where
+```
+
+- **An Intel GPU is missing from the list:** OpenVINO reaches it through the Intel graphics driver. Update it from intel.com (or Windows Update) and restart Sottovoce. In a virtual machine the host's GPU is usually not visible: Whisper runs on the processor there.
+- **The NVIDIA card is there but another path is chosen:** you, or **Measure which is fastest**, chose it; click the card to go back. On some laptops the GPU built into the processor really is faster.
+- **An AMD GPU is not listed:** not used yet; Whisper runs on the processor through OpenVINO.
+
+## The NVIDIA GPU is not used
+
+Transcription works but is very slow, and the NVIDIA card stays idle. Almost always this is **the PyTorch trap**: installed as a dependency of `transformers`, pip pulls the default PyTorch from PyPI, which on RTX 50-series cards (Blackwell, `sm_120`) doesn't see the GPU. Everything runs on the CPU and nothing tells you.
 
 Check:
 
@@ -38,15 +50,16 @@ The installer does it in this order; so does *From a clone* in [Getting started]
 
 ## The first transcription is slow
 
-The first transcription downloads Whisper large-v3 (2.9 GB), the first summary the built-in model (8 GB), the first voice separation two small models (32 MB). Each happens once, and the page shows it with a moving bar and the seconds counted. After a pause of ten minutes or more, Whisper is loaded again before transcribing: about ten seconds, shown as *loading the model*.
+The first transcription downloads Whisper large-v3 (2.9 GB for an NVIDIA card, 1.5 GB through OpenVINO), the first summary the built-in model (8 GB), the first voice separation two small models (32 MB). Each happens once, and the page shows it with a moving bar and the seconds counted. After a pause of ten minutes or more, Whisper is loaded again before transcribing: about ten seconds, shown as *loading the model*.
 
 On Windows, Hugging Face may warn that it can't create symlinks in its cache. It's harmless: files are copied instead.
 
 ## Summaries take minutes, or fail
 
 - **With LM Studio or llama.cpp:** check which build runs. A Vulkan build on an RTX 50-series card works but crawls; the CUDA build is many times faster.
-- **With the built-in model:** the page says when there isn't enough free GPU memory next to Whisper. Close other GPU programs, or run LM Studio or Ollama with a smaller model; Sottovoce uses a running server first.
-- **No button at all:** no LLM is running and the built-in model is off (`--no-llm`, or `--no-model`), or there is no NVIDIA GPU.
+- **With the built-in model:** the page says when there isn't enough free GPU memory next to Whisper. Close other GPU programs, or pick a smaller model of yours in **Settings → Summaries and emails**.
+- **LM Studio or Ollama, picked in Settings, doesn't answer:** the page says why. *Not installed*: Sottovoce looks for `lms` in `%USERPROFILE%\.lmstudio\bin` and for Ollama where its setup puts it. *Did not start in 60 seconds*: open the program once by hand, then try again. A model deleted in the program since: pick another.
+- **No button at all:** no LLM is running and the built-in model is off (`--no-llm`, or `--no-model`), or there is no NVIDIA GPU and no model is picked in Settings.
 
 ## Recording
 
