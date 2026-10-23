@@ -1,0 +1,9 @@
+# The documentation site (docs/, mkdocs.yml), published to GitHub Pages.
+#
+#     pip install -r requirements-docs.txt
+#     mkdocs serve          # http://127.0.0.1:8000, rebuilt as you edit
+#
+# Pinned: MkDocs 2.0 drops the plugin and theme system Material is built on,
+# with no migration path, so neither moves without a deliberate check.
+mkdocs==1.6.1
+mkdocs-material==9.7.7

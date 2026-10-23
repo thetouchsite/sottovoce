@@ -1,54 +1,81 @@
 # Contributing
 
-Thanks for helping. A few things keep this project useful.
+Thanks for helping. This page says how the project is built, how to check a change, and what we look for in a pull request. By taking part you agree to the [Code of Conduct](CODE_OF_CONDUCT.md). Security problems go through [SECURITY.md](SECURITY.md), not public issues.
 
 ## Principles
 
-- **Measure before changing a default.** Every setting in `transcribe.py` was chosen by measuring on a real call, and the comment next to it says what it fixed. If you change one, show the numbers before and after, taken the same way: `research/benchmark.py` and `research/compare.py` exist for that. One run on five minutes of audio is not enough: the models looked even on 600 words and diverged on 2,500.
-- **Nothing leaves the machine.** No network calls during transcription, no CDN, no analytics, no fonts from the internet. The page must open offline. The only network use is the one-time model downloads (Whisper from Hugging Face, the two voice models from the sherpa-onnx releases on GitHub, checked by SHA-256), and the optional local LLM on `127.0.0.1`.
-- **One page, no build.** `app/index.html` is a single file with no framework and no build step. Keep it that way.
+- **Nothing leaves the machine.** No network calls while transcribing, no CDN, no analytics, no remote LLM. The page must open offline. The only network use is downloading models on first use (Whisper and the summary model from Hugging Face, the voice models from GitHub, checked by SHA-256) and an optional LLM server on `127.0.0.1`.
 - **Plain files are the database.** One folder per call; the `.txt` is the source the rest is rebuilt from. A feature that needs a database needs a very good reason.
+- **Measure before changing a default.** Every setting in `transcribe.py` was chosen by measuring against the alternatives, and the comment next to it says what it fixed. If you change one, show the numbers before and after, taken with a script in `research/`.
+- **Every number has a script.** A figure in the README or the docs comes from a script in `research/` that anyone can re-run, with the command next to it.
+- **One page, no build.** `app/index.html` is a single file with no framework and no build step.
+- **Never a silent deletion.** Anything the program removes from a transcript is reported, with its time.
 - **Say why in the code.** Comments explain the reason behind a choice, especially when the obvious alternative was tried and failed.
-- **Never a silent deletion.** Anything the program removes from a transcript is reported, with its timestamp.
 
-## Good first contributions
+## Setting up
 
-**Phrases Whisper invents on silence, in your language.** Whisper repeats the subtitles it was trained on: *"Thanks for watching"*, *"Untertitel im Auftrag des ZDF"*, *"Sous-titres réalisés par…"*. Add the ones you've seen to `SUBTITLE_PHRASES` in `transcribe.py`. Only phrases that belong to subtitles, never to conversation: a plain "thank you" would flag every polite line of every call.
-
-**A run of the Linux and macOS launchers.** `install.sh` and `start.sh` are checked for syntax in CI, but nobody has run them on a clean machine yet. See the [roadmap](ROADMAP.md).
-
-**Voices, measured in your language.** `research/voices_ami.py` grades telling voices apart on English meetings. A public meeting in another language, with every speaker annotated, would say whether the numbers hold. Add it to the script, not to the repo: the audio stays a download.
-
-**Languages in the picker.** The list is `LANGUAGES` in `app/index.html`; codes are Whisper's.
-
-## Checks before a pull request
-
-No GPU needed:
+For the tests, the API and the page, no GPU is needed:
 
 ```sh
+git clone https://github.com/thetouchsite/sottovoce && cd sottovoce
+python -m venv .venv && source .venv/bin/activate     # Windows: .venv\Scripts\activate
 pip install -r requirements-dev.txt
-pytest tests/test_engine.py tests/test_api.py
-
-pip install playwright && playwright install chromium
-pytest tests/test_page.py
-```
-
-The same tests run on GitHub on every push. A change that fixes a bug should come with a test that would have caught it: several tests in `tests/test_engine.py` exist because the bug happened once.
-
-To look at the page yourself:
-
-```sh
 python server.py --no-model --data examples/transcripts --glossary examples/glossary.txt
 ```
 
-Go through the new transcription screen, the call strip, the three reading views, a two-track call, naming the voices of the Northpine call, search, a correction and the glossary view, at desktop width and at phone width. The browser console must stay empty. Then `git checkout examples/ && git clean -f examples/` to undo what you changed there.
+To transcribe, install the full set with PyTorch for your GPU first: `Install.bat` or `./install.sh`, or by hand as in [Getting started](docs/getting-started.md).
 
-With a GPU, transcribe a recording of your own end to end, once in the default mode and once with **Precise word timings**, and record a short call from a browser tab. Check that `info.json` has a `speech` map, a numeric `names_corrected`, the detected `language` and `word_times`.
+## Tests
 
-If you touched `voices.py`, run `python research/voices_ami.py` before and after: it prints the error on a meeting the threshold was never tuned on. Don't tune anything on that meeting: use `--sweep`, which works on the other one.
+```sh
+pytest tests/test_engine.py tests/test_api.py      # engine and API, a few seconds
 
-Never commit a real call, a real transcript or a real glossary: `transcripts/` and `glossary.txt` are git-ignored for that reason. Screenshots in pull requests use the fictional examples.
+pip install playwright && playwright install chromium
+pytest tests/test_page.py                          # the page in a real browser
+SOTTOVOCE_BROWSER=chrome pytest tests/test_page.py # or with the Chrome you have
+```
+
+The tests run on the fictional calls in `examples/`, on a temporary copy, with the server started `--no-model`. CI runs them on every push and pull request: Ubuntu and Windows, Python 3.10 and 3.14, plus the page in Chromium, the launchers through `shellcheck`, and the docs through `mkdocs build --strict`.
+
+- **A new feature comes with tests.** A bug fix comes with a test that would have caught it: several tests exist because the bug happened once.
+- **Existing behaviour doesn't change without a test that says so.**
+- Transcription itself needs a GPU and is checked by hand: transcribe a recording of your own in the default mode and with **Precise word timings**, record a short call from a browser tab, and check `info.json`.
+
+## Measurements
+
+| Script | What it measures | Data |
+| --- | --- | --- |
+| `research/voices_ami.py` | Telling voices apart (DER) | Public AMI meetings, downloaded on first run |
+| `research/two_tracks.py` | Who said each word on two-track calls | Public AMI headset recordings |
+| `research/llm.py` | The built-in summary model: time and memory | The examples in the repo |
+| `research/benchmark.py`, `research/compare.py` | Whisper models on a recording of yours: speed, invented phrases, non-existent words | Your own audio |
+
+Results go in [docs/benchmarks.md](docs/benchmarks.md) with the hardware, the versions and the command. Data downloaded by the scripts lands in git-ignored folders.
+
+## Documentation
+
+The site is built from `docs/` with MkDocs Material:
+
+```sh
+pip install -r requirements-docs.txt
+mkdocs serve        # http://127.0.0.1:8000
+```
+
+The README stays short and points to the docs. Write in plain, short sentences. Screenshots use the fictional examples only, never real calls.
+
+## Commits and pull requests
+
+- **One subject per pull request.** Keep unrelated changes apart.
+- **Commit messages:** a first line that says what changes, in plain words (no prefixes like `feat:`), then a body that says why, and what was measured or tried. Look at `git log` for the tone.
+- **Changelog:** add a line under *Unreleased* in [CHANGELOG.md](CHANGELOG.md), in [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) form. Versions follow [Semantic Versioning](https://semver.org/).
+- **Never commit a real call**, a real transcript or a real glossary: `transcripts/` and `glossary.txt` are git-ignored for that reason.
+
+## Good first contributions
+
+- **Phrases Whisper invents on silence, in your language.** Add the ones you've seen to `SUBTITLE_PHRASES` in `transcribe.py`. Only phrases that belong to subtitles, never to conversation: a plain "thank you" would flag every polite line.
+- **A run of the Linux and macOS launchers** on a clean machine. `install.sh` and `start.sh` are checked for syntax in CI, but not run end to end.
+- **Languages in the picker:** `LANGUAGES` in `app/index.html`, with Whisper's codes.
 
 ## Reporting a bug
 
-Say what you dropped or recorded (format, length, language, browser), what you expected and what you got. Paste the lines from `info.json` that matter, **not** the transcript. If it's about the quality of a transcript, a few lines with the timestamp and what was really said are enough.
+Say what you dropped or recorded (format, length, language, browser), what you expected and what you got. Paste the lines from `info.json` that matter, **not** the transcript. For the quality of a transcript, a few lines with their time and what was really said are enough.
