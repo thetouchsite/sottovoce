@@ -60,13 +60,14 @@ jobs:
     runs-on: ${{ matrix.os }}
     env:
       SOTTOVOCE_SOURCE: ${{ github.workspace }}
-      SOTTOVOCE_DIR: ${{ runner.temp }}/sottovoce
-      SOTTOVOCE_HOME: ${{ runner.temp }}/calls
       SOTTOVOCE_TORCH: ${{ matrix.torch }}
     steps:
       - uses: actions/checkout@v4
       - if: runner.os == 'Windows'
         shell: powershell
+        env:
+          SOTTOVOCE_DIR: ${{ runner.temp }}/sottovoce
+          SOTTOVOCE_HOME: ${{ runner.temp }}/calls
         run: |
           & .\installer\install.ps1
           & .\installer\install.ps1
@@ -83,6 +84,9 @@ jobs:
           if (Test-Path $env:SOTTOVOCE_DIR) { throw "the program folder is still there" }
           if (-not (Test-Path (Join-Path $env:SOTTOVOCE_HOME "glossary.txt"))) { throw "the calls folder was removed" }
       - if: runner.os != 'Windows'
+        env:
+          SOTTOVOCE_DIR: ${{ runner.temp }}/sottovoce
+          SOTTOVOCE_HOME: ${{ runner.temp }}/calls
         run: |
           bash installer/install.sh
           bash installer/install.sh
