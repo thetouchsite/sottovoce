@@ -44,6 +44,9 @@ WORDS = {
     "done": ("Transcribed", "Trascritta"),
     "failed": ("Transcription failed", "Trascrizione non riuscita"),
     "stop rec": ("Stop recording and transcribe", "Ferma la registrazione e trascrivi"),
+    "stop later": ("Stop recording, transcribe later", "Ferma la registrazione, trascrivi dopo"),
+    "saved": ("Recording saved: it waits in the list, to transcribe when you want.",
+              "Registrazione salvata: la trovi nell'elenco, da trascrivere quando vuoi."),
     "transcribing": ("Recording stopped: it is being transcribed.", "Registrazione fermata: la sto trascrivendo."),
     "kept": ("Recording saved: it waits among the interrupted recordings.",
              "Registrazione salvata: la trovi tra le registrazioni interrotte."),
@@ -264,17 +267,24 @@ def main(argv=None):
     def toggle_startup(*_):
         set_startup(not startup_on(), rest)
 
-    def stop_recording(*_):
+    def stop_recording(transcribe):
         def stop():
             rid = server.stop_capture()
             if rid is None:
                 return
-            done = server.finish_recording(rid, {})
-            icon.notify(say("kept" if not isinstance(done, dict) else "transcribing"), "Sottovoce")
+            if transcribe:
+                done = server.finish_recording(rid, {})
+                icon.notify(say("kept" if not isinstance(done, dict) else "transcribing"), "Sottovoce")
+            else:
+                server.keep_for_later(rid)
+                icon.notify(say("saved"), "Sottovoce")
         threading.Thread(target=stop, daemon=True).start()
 
     icon = pystray.Icon("Sottovoce", plain, "Sottovoce", pystray.Menu(
-        pystray.MenuItem(say("stop rec"), stop_recording, visible=lambda _: server.capture is not None),
+        pystray.MenuItem(say("stop rec"), lambda *_: stop_recording(True),
+                         visible=lambda _: server.capture is not None),
+        pystray.MenuItem(say("stop later"), lambda *_: stop_recording(False),
+                         visible=lambda _: server.capture is not None),
         pystray.MenuItem(say("open"), show, default=True),
         pystray.MenuItem(say("calls"), lambda *_: subprocess.Popen(["explorer", str(server.DATA)])),
         pystray.MenuItem(say("startup"), toggle_startup, checked=lambda _: startup_on()),

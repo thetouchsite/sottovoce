@@ -184,6 +184,7 @@ def fake_run(monkeypatch, fail=False):
     monkeypatch.setattr(server.T, "run", run)
     monkeypatch.setitem(server.engine_state, "ready", True)
     monkeypatch.setitem(server.engine_state, "off", False)
+    monkeypatch.setitem(server.engine_state, "off", False)
 
 
 def wait_for(client, folder, status, tries=200):
@@ -497,6 +498,33 @@ def test_a_kept_recording_without_the_model_waits_with_the_choices_made(here, da
     listed = here.get("/api/recordings").json()["recordings"]
     assert [(x["name"], x["language"], x["voices"], x["from"]) for x in listed] == [("Weekly", "it", True, "computer")]
     assert listed[0]["bytes"] == 44 + 4 * 48000
+
+
+def test_a_recording_stopped_without_transcribing_waits_in_the_list_on_two_tracks(here, data, monkeypatch):
+    import server
+    here.post("/api/capture", json={"name": "Weekly"})
+    folder = here.post("/api/capture/stop", json={"transcribe": False}).json()["folder"]
+    assert list((data / "transcripts" / "_recordings").iterdir()) == []
+    listed = {c["folder"]: c for c in here.get("/api/history").json()["history"]}
+    assert listed[folder]["status"] == "waiting" and listed[folder]["two_tracks"] is True
+    # Transcribed later with the page's choices, it is still on two tracks.
+    asked = {}
+    monkeypatch.setattr(server, "enqueue", lambda *a, **k: asked.update(k) or "job1")
+    monkeypatch.setitem(server.engine_state, "ready", True)
+    monkeypatch.setitem(server.engine_state, "off", False)
+    assert here.post(f"/api/transcribe/{folder}", json={"language": "it"}).json() == {"job": "job1"}
+    assert asked["two_tracks"] is True
+
+
+def test_running_transcriptions_are_listed_whoever_started_them(client):
+    import server
+    server.jobs["tray1"] = {"state": "running", "name": "Weekly.wav", "folder": "2026-10-23_Weekly"}
+    server.jobs["old"] = {"state": "done", "name": "Old.wav"}
+    try:
+        assert client.get("/api/jobs").json()["jobs"] == [
+            {"id": "tray1", "name": "Weekly.wav", "folder": "2026-10-23_Weekly"}]
+    finally:
+        server.jobs.pop("tray1"), server.jobs.pop("old")
 
 
 def test_the_page_is_checked_again_at_every_load(client):

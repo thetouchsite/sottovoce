@@ -728,6 +728,7 @@ const IT = {
   'Your microphone and everything the computer plays are saved on two tracks, so the transcript says You and Them. Use headphones if you can, and tell the others you are recording.':
     'Il tuo microfono e tutto quello che il computer riproduce finiscono su due tracce, così la trascrizione dice Tu e Loro. Se puoi usa le cuffie, e avvisa gli altri che registri.',
   'The others (computer sound)': 'Gli altri (audio del computer)',
+  'Stop, transcribe later': 'Ferma, trascrivi dopo',
   'Recording. Closing the window is fine: it goes on by the clock.': 'Registrazione in corso. Puoi chiudere la finestra: continua vicino all’orologio.',
   'No sound from the computer yet. If the others are talking, check that the volume is not muted.':
     'Ancora nessun suono dal computer. Se gli altri parlano, controlla che il volume non sia azzerato.',
@@ -1649,6 +1650,17 @@ function jobStageText(j){
   return j.stage + '…';
 }
 
+// Transcriptions this page did not start (Stop in the icon's menu, a phone,
+// this page reloaded half-way) are followed too: before, they showed up only
+// once finished.
+async function adoptJobs(){
+  try{
+    const r = (await (await fetch('/api/jobs')).json()).jobs || [];
+    for (const j of r) if (!queue.some(q => q.id === j.id)) track(j.id, j.name);
+  } catch(e){ /* the server is restarting: try again later */ }
+  setTimeout(adoptJobs, 3000);
+}
+
 function track(id, name){
   queue.push({id, name, state:'running', stage:'queued', expected:0, elapsed:0, duration:0});
   drawQueue();
@@ -2030,11 +2042,15 @@ function drawCaptureLive(){
   stop.type = 'button';
   stop.textContent = 'Stop and transcribe';
   stop.onclick = () => stopCapture(true);
+  const later = el('button', 'secondary');
+  later.type = 'button';
+  later.textContent = 'Stop, transcribe later';
+  later.onclick = () => stopCapture(true, false);
   const cancel = el('button', 'text-button danger');
   cancel.type = 'button';
   cancel.textContent = 'Discard';
   cancel.onclick = () => { if (confirm(T('Discard this recording? Nothing will be kept.'))) stopCapture(false); };
-  foot.append(stop, cancel);
+  foot.append(stop, later, cancel);
   c.append(live, m1, m2, hint, foot);
   tickCapture();
 }
@@ -2067,20 +2083,21 @@ async function tickCapture(){
   setTimeout(tickCapture, 250);
 }
 
-async function stopCapture(keep){
+async function stopCapture(keep, transcribe = true){
   const c = capturing;
   if (!c || c.stopping) return;
   c.stopping = true;
   let j;
   try{
     j = await (await fetch('/api/capture/stop', {method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({keep, language: currentLanguage(), precise: precise(),
+      body: JSON.stringify({keep, transcribe, language: currentLanguage(), precise: precise(),
                             voices: voicesWanted()})})).json();
   } catch(e){ j = {error: 'the server did not answer'}; }
   capturing = null;
   if (view !== 'home') showHome();
   drawRecordIdle();
   if (!keep) return;
+  if (!transcribe && !j.error){ loadCalls(); return; }       // in the list, "Not transcribed"
   if (j.error){
     drawUnfinished();
     alert(T('The recording is saved, but could not be sent to transcription:') + ' ' + T(j.error)
@@ -3377,5 +3394,6 @@ checkEngine();
 checkLLM();
 loadCalls();
 checkCapture();
+adoptJobs();
 </script>
 </html>

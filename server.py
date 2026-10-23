@@ -634,9 +634,18 @@ async def api_transcribe_added(name: str, request: Request):
     info = read_info(d)
     return {"job": enqueue(d / audio, info.get("title") or audio,
                            language_of(body.get("language")),
-                           two_tracks=bool(body.get("two_tracks")),
+                           two_tracks=bool(body.get("two_tracks") or info.get("two_tracks")),
                            precise=bool(body.get("precise")),
                            voices=bool(body.get("voices")) and voices_installed())}
+
+
+@app.get("/api/jobs")
+def api_jobs():
+    """The transcriptions running or waiting, whoever started them: Stop in
+    the icon's menu, a phone, a page opened half-way. The page follows them
+    all, not only the ones it asked for."""
+    return {"jobs": [{"id": k, "name": j.get("name"), "folder": j.get("folder")}
+                     for k, j in list(jobs.items()) if j["state"] == "running"]}
 
 
 @app.get("/api/job/{job_id}")
@@ -827,7 +836,28 @@ async def api_capture_stop(request: Request):
         recording(rid).unlink(missing_ok=True)
         (RECORDINGS / f"{rid}.json").unlink(missing_ok=True)
         return {"discarded": True}
+    if not body.get("transcribe", True):
+        return keep_for_later(rid, body.get("name"))
     return finish_recording(rid, {k: body[k] for k in ("name", "language", "precise", "voices") if k in body})
+
+
+def keep_for_later(rid: str, name: str | None = None):
+    """A stopped recording kept as a call to transcribe later, like an added
+    file: in the list, "Not transcribed", remembering its two tracks."""
+    f = recording(rid)
+    if f is None or not f.exists():
+        return JSONResponse({"error": "unknown recording"}, 404)
+    recorder.repair(f)
+    meta_f = RECORDINGS / f"{rid}.json"
+    meta = json.loads(meta_f.read_text(encoding="utf-8")) if meta_f.exists() else {}
+    dest = INCOMING / f"{rid}{f.suffix}"
+    shutil.move(str(f), dest)
+    meta_f.unlink(missing_ok=True)
+    original = take(dest, clean(name or meta.get("name") or "Call") + f.suffix)
+    write_info(original.parent, {"original": original.name, "status": "waiting", "two_tracks": True,
+                                 "uploaded_at": meta.get("started_at") or time.strftime("%Y-%m-%d %H:%M"),
+                                 "duration_s": probe_seconds(original)})
+    return {"folder": original.parent.name}
 
 
 # --- history ----------------------------------------------------------------------
