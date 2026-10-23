@@ -25,6 +25,19 @@ jobs:
       - run: python -m py_compile server.py desktop.py transcribe.py summary.py voices.py research/benchmark.py research/compare.py research/voices_ami.py research/two_tracks.py research/llm.py research/wer.py installer/gpu.py
       - run: python -m pytest tests/test_engine.py tests/test_api.py tests/test_installer.py tests/test_desktop.py -q
 
+  # The real window: open it, X, launch again, Quit. Windows' own messages,
+  # no mouse. Catches what the unit tests can't see, such as a window that
+  # stops answering after X.
+  window:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m pip install -r requirements-dev.txt "pywebview>=6.2" "pystray>=0.19"
+      - run: python -m pytest tests/test_window.py -q -rs
+
   page:
     runs-on: ubuntu-latest
     steps:

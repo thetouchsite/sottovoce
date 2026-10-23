@@ -282,8 +282,11 @@ def main(argv=None):
         window.hide()
         state["visible"] = False
         # Put away, it falls silent: a call left playing behind a hidden
-        # window is a voice from nowhere. Not waited for: this is the UI thread.
-        window.run_js("typeof silence === 'function' && silence()")
+        # window is a voice from nowhere. From another thread: run_js waits
+        # for the window's thread, which is this one, busy closing. Called
+        # from here it hung the window, the icon and its menu.
+        threading.Thread(target=window.run_js, args=("typeof silence === 'function' && silence()",),
+                         daemon=True).start()
         if not state["told"]:
             icon.notify(say("still here"), "Sottovoce")
             state["told"] = True
