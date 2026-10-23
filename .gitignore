@@ -25,3 +25,5 @@ __pycache__/
 /research/ami/
 # The PIN for --lan, and the secret that signs the devices let in
 /.lan-pin
+# The documentation site, built by mkdocs
+/site/

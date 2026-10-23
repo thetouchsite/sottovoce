@@ -1,0 +1,19 @@
+/* Sottovoce's own colours: the app's dark bar and its one blue accent. */
+[data-md-color-primary="custom"] {
+  --md-primary-fg-color: #171719;
+  --md-primary-fg-color--light: #212023;
+  --md-primary-fg-color--dark: #131217;
+  --md-primary-bg-color: #ffffff;
+}
+[data-md-color-accent="custom"] {
+  --md-accent-fg-color: #4a8ad6;
+  --md-accent-fg-color--transparent: rgba(74, 138, 214, .1);
+}
+.md-typeset { --md-typeset-a-color: #4a8ad6; }
+.md-typeset .md-button { color: #4a8ad6; border-color: #4a8ad6; border-radius: 999px; }
+.md-typeset .md-button--primary,
+.md-typeset .md-button:hover { background-color: #4a8ad6; border-color: #4a8ad6; color: #fff; }
+
+/* The home page: the promise first, large. */
+.md-typeset .lead { font-size: 1.35rem; line-height: 1.4; font-weight: 600; margin-top: 0; }
+.md-typeset .lead + p { font-size: .95rem; }

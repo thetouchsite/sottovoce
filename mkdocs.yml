@@ -1,0 +1,74 @@
+site_name: Sottovoce
+site_description: Call transcription that runs on your own computer, and shows where the text can't be trusted.
+site_url: https://thetouchsite.github.io/sottovoce/
+repo_url: https://github.com/thetouchsite/sottovoce
+repo_name: thetouchsite/sottovoce
+edit_uri: edit/main/docs/
+copyright: MIT licence · © 2026 TouchSite Software
+
+# Only the pages are published: README, notes and the images the README uses
+# stay where they are.
+exclude_docs: |
+  images/cover.png
+  images/social-preview.jpg
+
+theme:
+  name: material
+  logo: images/icon.svg
+  favicon: images/icon.svg
+  # No Google Fonts: the system fonts, as in the app. (The diagram in How it
+  # works is drawn by Mermaid, which Material loads from a CDN; the app itself
+  # loads nothing from the internet.)
+  font: false
+  palette:
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: custom
+      accent: custom
+      toggle: {icon: material/brightness-4, name: Light mode}
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: custom
+      accent: custom
+      toggle: {icon: material/brightness-7, name: Dark mode}
+  features:
+    - navigation.sections
+    - navigation.top
+    - navigation.footer
+    - content.code.copy
+    - search.suggest
+
+plugins:
+  - search
+
+extra_css:
+  - stylesheets/extra.css
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - md_in_html
+  - tables
+  - toc: {permalink: true}
+  - pymdownx.details
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.tabbed: {alternate_style: true}
+
+nav:
+  - Home: index.md
+  - Getting started: getting-started.md
+  - How it works: how-it-works.md
+  - Using it:
+      - Recording a call: recording.md
+      - Telling voices apart: voices.md
+      - Summaries, notes and follow-ups: summaries.md
+      - The name glossary: glossary.md
+      - From your phone: lan.md
+  - Measurements:
+      - Benchmarks: benchmarks.md
+      - Limitations: limitations.md
+  - Troubleshooting: troubleshooting.md
