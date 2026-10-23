@@ -12,7 +12,7 @@
 
 === "Windows"
 
-    Download **Sottovoce-Setup.exe** from the [latest release](https://github.com/thetouchsite/sottovoce/releases/latest) and open it. It needs no administrator rights. The setup is not signed yet, so Windows may say it *protected your PC*: **More info**, then **Run anyway**. After copying the program it downloads, once, Python and the parts that suit this computer's GPU, with a progress bar.
+    Download **Sottovoce-Setup-….exe** from the [latest release](https://github.com/thetouchsite/sottovoce/releases/latest) and open it. It needs no administrator rights. The setup is not signed yet, so Windows may say it *protected your PC*: **More info**, then **Run anyway**. After copying the program it downloads, once, Python and the parts that suit this computer's GPU, with a progress bar.
 
     Or, in PowerShell, the same install with one command:
 

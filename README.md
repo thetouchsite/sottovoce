@@ -36,7 +36,7 @@ Drop a recorded call on the page, or record the call from it. You get the transc
 
 ## Quick start
 
-**Windows:** download **Sottovoce-Setup.exe** from the [latest release](https://github.com/thetouchsite/sottovoce/releases/latest) and open it. No administrator rights needed. The setup isn't signed yet, so Windows may say it *protected your PC*: **More info**, then **Run anyway**.
+**Windows:** download **Sottovoce-Setup-….exe** from the [latest release](https://github.com/thetouchsite/sottovoce/releases/latest) and open it. No administrator rights needed. The setup isn't signed yet, so Windows may say it *protected your PC*: **More info**, then **Run anyway**.
 
 Or with one command, on every system: it brings its own Python, needs no administrator rights, and picks what runs Whisper fastest on your computer.
 

@@ -36,7 +36,7 @@ Trascini sulla pagina una call registrata, oppure registri la call da lì. Ottie
 
 ## Avvio rapido
 
-**Windows:** scarica **Sottovoce-Setup.exe** dall'[ultima release](https://github.com/thetouchsite/sottovoce/releases/latest) e aprilo. Non servono i permessi di amministratore. L'installazione non è ancora firmata, quindi Windows può dire che *ha protetto il PC*: **Ulteriori informazioni**, poi **Esegui comunque**.
+**Windows:** scarica **Sottovoce-Setup-….exe** dall'[ultima release](https://github.com/thetouchsite/sottovoce/releases/latest) e aprilo. Non servono i permessi di amministratore. L'installazione non è ancora firmata, quindi Windows può dire che *ha protetto il PC*: **Ulteriori informazioni**, poi **Esegui comunque**.
 
 Oppure con un comando, su ogni sistema: porta il suo Python, non chiede i permessi di amministratore e sceglie quello che fa girare Whisper più veloce sul tuo computer.
 
