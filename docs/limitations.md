@@ -12,7 +12,8 @@ What Sottovoce doesn't do, or doesn't do well yet. Most of these are on the [roa
 
 ## Recording
 
-- **Calls in a browser tab only**, in Chrome or Edge. Desktop apps (Zoom, Teams, Webex) and phone calls through the computer can't be recorded from the page yet.
+- **Calls in a browser tab only**, in Chrome or Edge. Desktop apps (Zoom, Teams, Webex) and phone calls through the computer can't be recorded yet. From the Sottovoce window, recording opens the browser.
+- **The window and the icon by the clock are Windows only.** On Linux and macOS, Sottovoce opens in the browser and is stopped from the page or its terminal.
 - **No live transcript** during the call: the transcript arrives when the call ends.
 
 ## Who spoke

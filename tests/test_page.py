@@ -56,7 +56,7 @@ def site(data):
 def page(site):
     with playwright.sync_playwright() as pw:
         browser = launch(pw)
-        p = browser.new_page(viewport={"width": 1440, "height": 900})
+        p = browser.new_page(locale="en-US", viewport={"width": 1440, "height": 900})
         errors = []
         p.on("pageerror", lambda e: errors.append(str(e)))
         p.goto(site)
@@ -92,6 +92,7 @@ def test_the_page_opens_on_a_new_transcription_not_on_a_call(page):
     page.wait_for_function("document.getElementById('engine-text').textContent.includes('browsing only')")
     # Adding a file needs no model: it only waits to be transcribed.
     assert page.locator("#drop .primary").is_enabled()
+    page.wait_for_selector(".item .name")                          # the list arrives after the page
     names = page.locator(".item .name").all_inner_texts()
     assert names[0].startswith("Supplier check-in")              # newest first
     assert len(names) == 4
@@ -158,7 +159,7 @@ def test_glossary_view(page):
 def test_phone_width(site):
     with playwright.sync_playwright() as pw:
         browser = launch(pw)
-        p = browser.new_page(viewport={"width": 390, "height": 844}, is_mobile=True)
+        p = browser.new_page(locale="en-US", viewport={"width": 390, "height": 844}, is_mobile=True)
         p.goto(site)
         p.wait_for_selector("#drop")
         assert p.evaluate("document.documentElement.scrollWidth") <= 390
@@ -173,7 +174,7 @@ def test_phone_width(site):
 def test_on_a_phone_the_recording_comes_first_and_the_choices_fold(site):
     with playwright.sync_playwright() as pw:
         browser = launch(pw)
-        ctx = browser.new_context(viewport={"width": 390, "height": 844}, is_mobile=True, has_touch=True)
+        ctx = browser.new_context(locale="en-US", viewport={"width": 390, "height": 844}, is_mobile=True, has_touch=True)
         p = ctx.new_page()
         p.goto(site)
         p.wait_for_selector("#drop")
@@ -191,7 +192,7 @@ def test_on_a_phone_the_recording_comes_first_and_the_choices_fold(site):
 def test_on_a_phone_a_line_is_corrected_with_taps(site, data):
     with playwright.sync_playwright() as pw:
         browser = launch(pw)
-        ctx = browser.new_context(viewport={"width": 390, "height": 844}, is_mobile=True, has_touch=True)
+        ctx = browser.new_context(locale="en-US", viewport={"width": 390, "height": 844}, is_mobile=True, has_touch=True)
         p = ctx.new_page()
         errors = []
         p.on("pageerror", lambda e: errors.append(str(e)))
@@ -273,7 +274,7 @@ def test_a_transcribed_call_can_be_renamed(page):
 def test_the_page_in_italian_leaves_the_calls_as_they_are(site):
     with playwright.sync_playwright() as pw:
         browser = launch(pw)
-        ctx = browser.new_context(viewport={"width": 1440, "height": 900})
+        ctx = browser.new_context(locale="en-US", viewport={"width": 1440, "height": 900})
         ctx.add_init_script("if (!localStorage.getItem('sottovoce-ui')) localStorage.setItem('sottovoce-ui', 'it')")
         p = ctx.new_page()
         errors = []
@@ -304,3 +305,28 @@ def test_a_call_offers_notes_and_a_follow_up_email(page):
     page.keyboard.press("Escape")
     assert page.locator("#p-followup h2").inner_text() == "Follow-up email"
 
+
+
+def test_an_italian_system_gets_the_page_in_italian_until_a_choice_is_made(site):
+    with playwright.sync_playwright() as pw:
+        browser = launch(pw)
+        p = browser.new_page(locale="it-IT", viewport={"width": 1440, "height": 900})
+        p.goto(site)
+        assert p.locator("h1").inner_text() == "Nuova trascrizione"
+        with p.expect_navigation():
+            p.locator("#ui-lang").click()                               # the choice wins, and stays
+        assert p.locator("h1").inner_text() == "New transcription"
+        browser.close()
+
+
+def test_in_the_window_recording_opens_the_browser_and_the_power_button_quits(site):
+    with playwright.sync_playwright() as pw:
+        browser = launch(pw)
+        p = browser.new_page(locale="en-US", viewport={"width": 1440, "height": 900})
+        p.goto(site + "?window")
+        assert p.locator("#record-panel button.primary").inner_text() == "Record in the browser"
+        assert p.locator("#shutdown").get_attribute("title") == "Quit Sottovoce"
+        with p.expect_popup() as tab:
+            p.locator("#record-panel button.primary").click()
+        assert tab.value.url == site
+        browser.close()

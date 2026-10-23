@@ -49,7 +49,7 @@ irm https://raw.githubusercontent.com/thetouchsite/sottovoce/main/installer/inst
 curl -fsSL https://raw.githubusercontent.com/thetouchsite/sottovoce/main/installer/install.sh | bash
 ```
 
-Poi apri **Sottovoce** dal menu Start o dal desktop (su Linux dal menu delle applicazioni, su Mac da `~/Applications`). Le call stanno in una cartella `Sottovoce` nella tua cartella utente. Per aggiornare, rilancia lo stesso comando. È una GPU NVIDIA a renderlo veloce: senza, e su Mac, gira sulla CPU.
+Poi apri **Sottovoce** dal menu Start o dal desktop. Su Windows è un programma a sé: una finestra, e un'icona vicino all'orologio dove continua a lavorare quando chiudi la finestra; **Esci**, nel menu dell'icona, lo spegne. Su Linux parte dal menu delle applicazioni, su Mac da `~/Applications`, e si apre nel browser. Le call stanno in una cartella `Sottovoce` nella tua cartella utente. Per aggiornare, rilancia lo stesso comando. È una GPU NVIDIA a renderlo veloce: senza, e su Mac, gira sulla CPU.
 
 Il primo avvio scarica Whisper large-v3 (2,9 GB, una volta sola). Poi trascini una registrazione sulla pagina, scegli lingua e opzioni, e premi **Trascrivi**. Il pulsante **IT** in fondo alla barra laterale mette la pagina in italiano.
 

@@ -17,7 +17,11 @@
     irm https://raw.githubusercontent.com/thetouchsite/sottovoce/main/installer/install.ps1 | iex
     ```
 
-    Then open **Sottovoce** from the Start menu or the desktop.
+    Then open **Sottovoce** from the Start menu or the desktop. It opens in a window of its own, with an icon by the clock:
+
+    - **Closing the window** hides it: Sottovoce keeps working there, and a transcription goes on. A notice by the clock says when it's done.
+    - **Clicking the icon**, or the shortcut again, brings the window back.
+    - **Right-click the icon** for the folder of your calls, **Start with Windows**, and **Quit**, the only way to stop it and free the GPU's memory.
 
 === "Linux and macOS"
 

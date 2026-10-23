@@ -22,8 +22,8 @@ jobs:
         with:
           python-version: ${{ matrix.python }}
       - run: python -m pip install -r requirements-dev.txt
-      - run: python -m py_compile server.py transcribe.py summary.py voices.py research/benchmark.py research/compare.py research/voices_ami.py research/two_tracks.py research/llm.py research/wer.py installer/gpu.py
-      - run: python -m pytest tests/test_engine.py tests/test_api.py tests/test_installer.py -q
+      - run: python -m py_compile server.py desktop.py transcribe.py summary.py voices.py research/benchmark.py research/compare.py research/voices_ami.py research/two_tracks.py research/llm.py research/wer.py installer/gpu.py
+      - run: python -m pytest tests/test_engine.py tests/test_api.py tests/test_installer.py tests/test_desktop.py -q
 
   page:
     runs-on: ubuntu-latest
@@ -72,6 +72,13 @@ jobs:
           & .\installer\install.ps1
           & .\installer\install.ps1
           $app = Join-Path $env:SOTTOVOCE_DIR "app"
+          # The shortcut opens the window: pythonw, desktop.py, the program's icon.
+          $link = (New-Object -ComObject WScript.Shell).CreateShortcut((Join-Path ([Environment]::GetFolderPath("Desktop")) "Sottovoce.lnk"))
+          if (-not (Test-Path $link.TargetPath) -or $link.TargetPath -notlike "*pythonw.exe") { throw "shortcut target: $($link.TargetPath)" }
+          if ($link.Arguments -notlike "*desktop.py*--data*--log*") { throw "shortcut arguments: $($link.Arguments)" }
+          if (-not (Test-Path $link.IconLocation.Split(",")[0])) { throw "shortcut icon: $($link.IconLocation)" }
+          & (Join-Path $app ".venv\Scripts\python.exe") -c "import webview, pystray"
+          if ($LASTEXITCODE -ne 0) { throw "the window's packages are missing" }
           $server = Start-Process (Join-Path $app ".venv\Scripts\python.exe") -WorkingDirectory $app -PassThru `
             -ArgumentList "server.py", "--no-model", "--data", "examples/transcripts"
           $calls = $null

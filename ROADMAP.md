@@ -37,13 +37,13 @@ Both look fixable: a stretch belongs to your track only where your track is the 
 
 **Done when** it beats those numbers in `research/two_tracks.py` and on several real calls recorded here (with and without headphones, two and three people), counted word by word, and never puts lines out of order. Transcribing each whole track without cutting was tried too: Whisper's times drift on a track that is silent half the time (median 2.3 s off).
 
-## 2. Record calls from desktop apps
+## 2. Record any call from the Sottovoce window
 
-**Why.** Recording from the page covers calls in a browser tab. Teams, Zoom and Webex desktop apps, and phone calls through the PC, don't have a tab to share.
+**Why.** Recording from the page covers calls in a browser tab. Teams, Zoom and Webex desktop apps, and phone calls through the PC, don't have a tab to share; and since 1.6 Sottovoce is a window of its own on Windows, which can't reach the browser's tabs either, so **Record** sends you to the browser.
 
-**How.** System-wide loopback capture (WASAPI on Windows), plus the microphone, on the same two tracks. Probably a small native helper, since a web page can't capture the whole system's sound on its own.
+**How.** In the window's process, where Python can do what a page can't: the sound the computer plays (WASAPI loopback) and the microphone, on the same two tracks as today. Then recording from the browser goes, on Windows: one way to record, the one that works for every call.
 
-**Done when** a call in the Teams desktop app is recorded and transcribed with *You* and *Them*, without a browser tab.
+**Done when** a call in the Teams desktop app and one in Meet are recorded from the window and transcribed with *You* and *Them*, and the two-track measurement in the benchmarks holds on them.
 
 ## 3. Check precise word timings against a reference
 

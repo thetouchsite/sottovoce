@@ -1,5 +1,5 @@
 # Removes Sottovoce installed by install.ps1: the program folder, the
-# shortcuts and the entry in Settings > Apps. Your calls stay where they are.
+# shortcuts, the entry in Settings > Apps and the start with Windows. Your calls stay where they are.
 # Settings > Apps > Sottovoce > Uninstall runs it; so can you.
 
 $ErrorActionPreference = "Stop"
@@ -10,7 +10,7 @@ Write-Host ""
 Write-Host "  Removing Sottovoce from $Program"
 try {
     Invoke-WebRequest "http://127.0.0.1:8200/health" -UseBasicParsing -TimeoutSec 2 | Out-Null
-    Write-Host "  Sottovoce is running: stop it (the power button on the page), then uninstall again." -ForegroundColor Red
+    Write-Host "  Sottovoce is running: quit it (right-click its icon by the clock, then Quit), then uninstall again." -ForegroundColor Red
     Start-Sleep 5
     return
 } catch { }
@@ -19,6 +19,8 @@ foreach ($folder in [Environment]::GetFolderPath("Programs"), [Environment]::Get
     Remove-Item (Join-Path $folder "Sottovoce.lnk") -Force -ErrorAction SilentlyContinue
 }
 Remove-Item $key -Recurse -Force -ErrorAction SilentlyContinue
+# "Start with Windows", if it was ticked.
+Remove-ItemProperty "HKCU:\Software\Microsoft\Windows\CurrentVersion\Run" -Name Sottovoce -ErrorAction SilentlyContinue
 # Out of the folder first: Windows won't delete the folder a process stands in.
 Set-Location $env:TEMP
 Remove-Item $Program -Recurse -Force

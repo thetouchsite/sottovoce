@@ -16,6 +16,10 @@ fastapi>=0.110
 uvicorn>=0.30
 python-multipart>=0.0.9
 
+# The window and the icon by the clock (desktop.py): Windows only for now.
+pywebview>=6.2; sys_platform == "win32"
+pystray>=0.19; sys_platform == "win32"
+
 # Telling voices apart: CPU only, no account, two small models fetched on first
 # use (see voices.py). Without these three the page simply does not offer it.
 sherpa-onnx>=1.12

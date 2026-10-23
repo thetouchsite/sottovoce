@@ -25,6 +25,9 @@ __pycache__/
 /research/ami/
 # The PIN for --lan, and the secret that signs the devices let in
 /.lan-pin
+# desktop.py, run from a clone: its log and the window's storage
+/sottovoce.log
+/webview/
 # The documentation site, built by mkdocs
 /site/
 # Public datasets and results of research/wer.py, downloaded and written on first run
