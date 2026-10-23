@@ -121,6 +121,26 @@ def test_phantoms_dropped_only_where_it_is_quiet():
     assert T.suspicious(segs) == [segs[0]]
 
 
+def test_levels_are_measured_with_one_gain(tmp_path):
+    # Single-pass loudnorm lifted a line's hiss from -50 dB to speech level
+    # in the long pauses, so no silence was found and no phantom dropped.
+    import wave
+    import numpy as np
+    rate = 16000
+    rng = np.random.default_rng(0)
+    tone = 0.1 * np.sin(2 * np.pi * 220 * np.arange(3 * rate) / rate)
+    hiss = rng.normal(0, 10 ** (-50 / 20), 30 * rate)
+    x = np.concatenate([tone, hiss, tone])
+    src, meter = tmp_path / "call.wav", tmp_path / "levels.wav"
+    with wave.open(str(src), "wb") as w:
+        w.setnchannels(1), w.setsampwidth(2), w.setframerate(rate)
+        w.writeframes((x * 32767).astype("<i2").tobytes())
+    T.level_copy(src, meter)
+    speech = T.speech_regions(meter, len(x) / rate)
+    assert len(speech) == 2 and speech[0][1] < 4 and speech[1][0] > 32
+    assert T.mean_volume(meter, 15) < T.speech_level(meter, speech) - 20
+
+
 # --- voices ---------------------------------------------------------------------
 
 def test_voice_tags_are_read_back_and_other_brackets_stay_text():
