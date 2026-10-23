@@ -7,6 +7,7 @@ What changed in each release, newest first. The format follows [Keep a Changelog
 ### Security
 
 - **Cross-site requests and DNS rebinding are refused.** Any page open in the browser could send requests to `127.0.0.1:8200`: a form posted to `/api/shutdown` stopped the server, and with DNS rebinding a page could have read `/api/history`. Now requests that change state are refused when the browser says they come from another site (`Origin`, `Sec-Fetch-Site`), and only the names the server is reached by are accepted in `Host` (`127.0.0.1`, `localhost`, `[::1]` on its port; with `--lan`, also this computer's addresses and name).
+- **`info.json` is never read half written.** A transcription rewrites it from its own thread while the page reads the list; a read landing mid-write found an empty file (95 of 300 reads in a stress test, and one failed CI run). It is now written next to it and swapped in one step, and reads wait out the instant of the swap on Windows.
 - `SECURITY.md`: what is protected and how, the limits of `--lan` (a PIN over plain http), and how to report a problem privately.
 
 ### Added

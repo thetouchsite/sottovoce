@@ -52,8 +52,9 @@ import hashlib
 import hmac
 import importlib.util
 import json
-import secrets
+import os
 import pathlib
+import secrets
 import queue
 import re
 import shutil
@@ -280,11 +281,34 @@ def sweep():
 
 
 def write_info(d: pathlib.Path, info: dict):
-    (d / "info.json").write_text(json.dumps(info, indent=1, ensure_ascii=False),
-                                 encoding="utf-8")
+    """info.json, replaced whole: never seen half written.
+
+    A transcription writes it from its own thread while the page reads the
+    list. Written in place, a read landing between the truncation and the
+    write found an empty file (it failed a test in CI once). So it is
+    written next to it and swapped in one step. On Windows the swap is
+    refused while someone has the file open, for the few milliseconds of a
+    read: then it waits and tries again.
+    """
+    tmp = d / "info.json.tmp"
+    tmp.write_text(json.dumps(info, indent=1, ensure_ascii=False), encoding="utf-8")
+    for _ in range(40):
+        try:
+            os.replace(tmp, d / "info.json")
+            return
+        except PermissionError:
+            time.sleep(0.05)
+    os.replace(tmp, d / "info.json")
 
 
 def read_info(d: pathlib.Path) -> dict:
+    # On Windows, for the instant write_info swaps the file in, opening it
+    # is refused: wait a moment instead of failing the page.
+    for _ in range(40):
+        try:
+            return json.loads((d / "info.json").read_text(encoding="utf-8"))
+        except PermissionError:
+            time.sleep(0.05)
     return json.loads((d / "info.json").read_text(encoding="utf-8"))
 
 
