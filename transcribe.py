@@ -115,19 +115,22 @@ def ffmpeg() -> str:
 #     cpu         OpenVINO on the processor, Intel or AMD, int8
 #
 # OpenVINO's large-v3 is the OpenVINO organisation's int8 conversion on
-# Hugging Face. On a processor it is about six times faster than PyTorch, at the
-# same error rate (research/cpu.py, research/intel.py); research/engines.py
-# measures the three end to end on a long meeting.
+# Hugging Face. On a processor it is about five times faster than PyTorch
+# (research/intel.py and research/cpu.py, the first ten FLEURS clips). Whole,
+# end to end, research/wer.py with the sottovoce@<path> configs: the same error
+# rate within a few tenths on every path, on FLEURS, AMI and the long pauses.
 #
-# Not used: OpenVINO on an NVIDIA card, through OpenCL (slower than PyTorch on
-# the same card, research/intel.py), and the NPU of the Core Ultra tried
-# (its transcripts were not usable). A GPU that is neither NVIDIA nor Intel,
-# AMD's for one, runs on the processor for now.
+# Not used: OpenVINO on an NVIDIA card, through OpenCL (2.0x real time on
+# those ten clips, research/intel.py --configs nvidia, far below PyTorch on the
+# same card), and the NPU of the Core Ultra tried (95% of words wrong,
+# --configs npu-turbo). A GPU that is neither NVIDIA nor Intel, AMD's for one,
+# runs on the processor for now.
 
 PATHS = {"cuda": "NVIDIA GPU", "intel-gpu": "Intel GPU", "cpu": "processor"}
 
 # (program, turbo) -> the model. Turbo is the user's choice on a slow computer:
-# three times faster, twice the mistakes (see MODEL above).
+# about twice as fast through OpenVINO (SPEEDS), with more mistakes, above all
+# on names (see MODEL above).
 REPOS = {
     ("torch", False): "openai/whisper-large-v3",
     ("torch", True): "openai/whisper-large-v3-turbo",
@@ -152,10 +155,10 @@ SIZE_GB = {"openai/whisper-large-v3": 2.9, "openai/whisper-large-v3-turbo": 1.6,
 # is slower: its first call corrects the estimate.
 SPEEDS = {
     ("cuda", False): (7.0, 3.8),
-    ("intel-gpu", False): (10.6, None),
-    ("intel-gpu", True): (23.4, None),
-    ("cpu", False): (5.1, None),
-    ("cpu", True): (6.6, None),
+    ("intel-gpu", False): (10.8, None),
+    ("intel-gpu", True): (28.5, None),
+    ("cpu", False): (5.2, None),
+    ("cpu", True): (9.2, None),
 }
 measured: dict[str, float] = {}
 

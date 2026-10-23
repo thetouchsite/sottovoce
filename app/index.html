@@ -720,8 +720,8 @@ const IT = {
   'OpenVINO': 'OpenVINO', 'PyTorch': 'PyTorch',
   'Let Sottovoce choose': 'Lascia scegliere a Sottovoce',
   'Faster model, turbo': 'Modello più veloce, turbo',
-  'Whisper large-v3-turbo: about three times faster, about twice the mistakes, more on names.':
-    'Whisper large-v3-turbo: circa tre volte più veloce, circa il doppio degli errori, più sui nomi.',
+  'Whisper large-v3-turbo: about twice as fast, with more mistakes, above all on names.':
+    'Whisper large-v3-turbo: circa due volte più veloce, con più errori, soprattutto sui nomi.',
   'Measuring: three minutes of your latest call through each path.':
     "Misuro: tre minuti dell'ultima call su ogni percorso.",
   'waiting for the transcriptions in line…': 'aspetto le trascrizioni in coda…',
@@ -3601,7 +3601,7 @@ function enginePanel(e){
   s.onchange = () => setEngine({turbo: s.checked});
   const tt = el('div');
   tt.innerHTML = '<b>' + esc('Faster model, turbo') + '</b><small>'
-    + esc('Whisper large-v3-turbo: about three times faster, about twice the mistakes, more on names.') + '</small>'
+    + esc('Whisper large-v3-turbo: about twice as fast, with more mistakes, above all on names.') + '</small>'
     + (slow ? '<small class="slow">' + esc('On this computer: ' + hourIn(e.speed) + '.') + '</small>' : '');
   t.append(s, tt);
   c.append(t);

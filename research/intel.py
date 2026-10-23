@@ -85,7 +85,9 @@ def main():
         del pipe
     out = HERE / "results"
     out.mkdir(exist_ok=True)
-    (out / "intel.json").write_text(json.dumps(results, indent=1), encoding="utf-8")
+    # Running one config again keeps the others' results.
+    old = json.loads((out / "intel.json").read_text(encoding="utf-8")) if (out / "intel.json").exists() else {}
+    (out / "intel.json").write_text(json.dumps({**old, **results}, indent=1), encoding="utf-8")
 
 
 if __name__ == "__main__":

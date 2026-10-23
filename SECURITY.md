@@ -10,8 +10,8 @@ Fixes go into the latest release. Older releases are not patched.
 
 ## What runs where
 
-- **Everything runs on your computer.** Whisper, the voice models and the built-in summary model run locally. Recordings, transcripts and summaries are plain files in `transcripts/`. There is no account, no telemetry, no remote LLM.
-- **What goes out, and when.** On first use, models are downloaded: Whisper large-v3 and the summary model from Hugging Face, the two voice models from the sherpa-onnx releases on GitHub (these two are checked against a fixed SHA-256 before use). Nothing else leaves the machine. The page loads nothing from the internet. The API reference at `/docs` is FastAPI's own page and loads Swagger UI from a CDN when you open it.
+- **Everything runs on your computer.** Whisper, the voice models and the built-in summary model run locally. Recordings, transcripts and summaries are plain files in `transcripts/`. There is no account, no telemetry, no remote LLM. OpenVINO installs a telemetry package of its own, `openvino-telemetry`: only OpenVINO's model converter uses it (`ovc`), and Sottovoce never runs the converter.
+- **What goes out, and when.** On first use, models are downloaded: Whisper large-v3 (for PyTorch, or OpenVINO's conversion) and the summary model from Hugging Face, the two voice models from the sherpa-onnx releases on GitHub (these two are checked against a fixed SHA-256 before use). Nothing else leaves the machine. A model picked in LM Studio or Ollama is asked on this computer only (127.0.0.1). The page loads nothing from the internet. The API reference at `/docs` is FastAPI's own page and loads Swagger UI from a CDN when you open it.
 
 ## Threat model
 

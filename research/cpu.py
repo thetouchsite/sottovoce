@@ -117,7 +117,9 @@ def main():
         print(f"  {c:10}  {s['wer']:6.1%}  {secs:8.0f}   {audio / secs:10.2f}", flush=True)
     out = HERE / "results"
     out.mkdir(exist_ok=True)
-    (out / "cpu.json").write_text(json.dumps(results, indent=1), encoding="utf-8")
+    # Running one config again keeps the others' results.
+    old = json.loads((out / "cpu.json").read_text(encoding="utf-8")) if (out / "cpu.json").exists() else {}
+    (out / "cpu.json").write_text(json.dumps({**old, **results}, indent=1), encoding="utf-8")
 
 
 if __name__ == "__main__":

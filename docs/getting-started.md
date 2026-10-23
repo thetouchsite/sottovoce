@@ -61,7 +61,7 @@ The first transcription downloads Whisper large-v3, once, after asking: 2.9 GB f
 
 **Settings → Transcription** shows the ways this computer can run Whisper, how long an hour of call takes on each, and which one is in use. Sottovoce picks by itself: the NVIDIA card, else the Intel GPU, else the processor. A computer with more than one, like a laptop with both an NVIDIA card and an Intel GPU, can **measure which is fastest**: three minutes of your latest call through each, once; the fastest is then used. It isn't always the one you'd guess: on the laptop measured, the Intel GPU built into the processor beat the NVIDIA card ([numbers](benchmarks.md#where-it-runs)).
 
-On a slow computer, **Faster model, turbo** uses Whisper large-v3-turbo: on a GPU two to three times faster, with more mistakes, more on names.
+On a slow computer, **Faster model, turbo** uses Whisper large-v3-turbo: about twice as fast on an Intel GPU or a processor ([measured](benchmarks.md#where-it-runs)), with more mistakes, above all on names.
 
 `SOTTOVOCE_ENGINE=cuda`, `intel-gpu` or `cpu` forces a path, for trying one against another.
 
