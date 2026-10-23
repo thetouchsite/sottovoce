@@ -9,6 +9,8 @@ What changed in each release, newest first. The format follows [Keep a Changelog
 ### Fixed
 
 - **No more black windows flashing during a transcription.** In the window, Sottovoce has no console, so Windows gave each program it starts (ffmpeg, also inside Whisper's pipeline) a console of its own for an instant. They now start with none.
+- **Quit during a transcription no longer freezes.** It asked for confirmation in a dialog that stopped answering while Whisper worked. Now Quit waits: Sottovoce says it will close when the transcription ends, and does; Quit again closes it at once.
+- **A recording stops when you leave it.** Opening another call, going home, or drawing the same call again (after renaming it, separating voices…) left the old player sounding with no button to stop it. And closing the window now pauses it.
 
 ## [1.6.0] - 2026-10-23
 

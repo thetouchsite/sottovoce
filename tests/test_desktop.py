@@ -36,6 +36,12 @@ def test_each_finished_transcription_is_announced_once():
     assert desktop.finished(seen, jobs) == []
 
 
+def test_quitting_waits_while_a_transcription_runs_or_waits():
+    assert not desktop.busy({"a": {"state": "done"}}, 0)
+    assert desktop.busy({"a": {"state": "running"}}, 0)
+    assert desktop.busy({}, 1)
+
+
 def test_a_second_launch_brings_the_window_back(client):
     assert client.post("/api/window/show").status_code == 404        # no window: a plain server
     shown = []
