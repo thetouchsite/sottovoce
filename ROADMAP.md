@@ -89,10 +89,6 @@ And a rule learned the hard way, on another project: **never decide on a single 
 
 **Done when** a call is transcribed after the one-command install on a clean Ubuntu machine with an NVIDIA GPU and on an Apple-silicon Mac, checked by someone who isn't the author, with the time it took written in the benchmarks.
 
-## Not planned: a signed `.exe`
-
-A downloadable installer looks friendlier than a command, but unsigned it meets *"Windows protected your PC"*, and Smart App Control can block it outright. Signing costs about €105 a year (Microsoft Artifact Signing), or about $309 the first year for a certificate. The command needs neither, and updates in place. If a signed installer is ever worth its cost, uv and the same scripts would sit inside it.
-
 ## 8. Get back the sentence an invented phrase replaced
 
 **Why.** After a long pause Whisper's long-form mode sometimes writes *"Sottotitoli e revisione a cura di QTSS"* over a window that ends in real speech, and the first sentence after the pause is never written. The phrase is removed, the sentence is still missing: on the long-pauses test, 34 words of 1,175 ([measured](docs/benchmarks.md#long-pauses)).
@@ -100,3 +96,7 @@ A downloadable installer looks friendlier than a command, but unsigned it meets 
 **How.** Where a phrase was removed and the map of speech says someone speaks inside its window, transcribe that stretch again on its own.
 
 **Done when** words dropped on the long-pauses test fall to Whisper alone's (5 of 1,175) with no more words added, and FLEURS and AMI stay where they are.
+
+## Not planned: a signed `.exe`
+
+A downloadable installer looks friendlier than a command, but unsigned it meets *"Windows protected your PC"*, and Smart App Control can block it outright. Signing costs about €105 a year (Microsoft Artifact Signing), or about $309 the first year for a certificate. The command needs neither, and updates in place. If a signed installer is ever worth its cost, uv and the same scripts would sit inside it.
