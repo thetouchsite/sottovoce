@@ -91,12 +91,14 @@ jobs:
           bash installer/install.sh
           bash installer/install.sh
           app="$SOTTOVOCE_DIR/app"
-          (cd "$app" && .venv/bin/python server.py --no-model --data examples/transcripts) &
+          "$app/.venv/bin/python" "$app/server.py" --no-model --data "$app/examples/transcripts" &
+          server=$!
           for _ in $(seq 60); do
             if curl -fsS http://127.0.0.1:8200/api/history -o calls.json; then break; fi
             sleep 1
           done
-          kill %1
+          kill "$server"
+          wait "$server" || true
           grep -q '"name"' calls.json
           bash "$SOTTOVOCE_DIR/uninstall.sh"
           test ! -e "$SOTTOVOCE_DIR"
