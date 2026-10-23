@@ -150,6 +150,36 @@ def prepare(source, dest, two_tracks=False) -> float:
     return info.frames / info.samplerate
 
 
+def level_copy(source, dest, two_tracks=False):
+    """The same audio with one gain for the whole file: for measuring levels.
+
+    What Whisper hears, from prepare(), cannot be used to tell silence from
+    speech. In one pass loudnorm adjusts its gain as it goes and lifts long
+    quiet stretches: on a test file the faint hiss of a line, at -50 dB
+    between sentences, came out at -19 dB, as loud as the speech. The map of
+    speech then saw speech in 468 seconds out of 471, and no invented phrase
+    was ever dropped. One gain keeps the distance between speech and silence;
+    bringing the whole file to the same loudness keeps the -35 dB threshold of
+    speech_regions meaning the same on a quiet recording and on a loud one.
+    """
+    mix = "pan=mono|c0=0.5*c0+0.5*c1," if two_tracks else ""
+    r = subprocess.run(
+        [ffmpeg(), "-hide_banner", "-i", str(source),
+         "-af", f"{mix}{LOUDNORM}:print_format=json", "-f", "null", "-"],
+        capture_output=True, text=True)
+    try:
+        measured = float(json.loads(r.stderr[r.stderr.rindex("{"):])["input_i"])
+    except (ValueError, KeyError):
+        measured = float("-inf")
+    # A file of digital silence has no loudness: it stays as it is.
+    gain = -16.0 - measured if measured > -70 else 0.0
+    subprocess.run(
+        [ffmpeg(), "-hide_banner", "-loglevel", "error", "-y", "-i", str(source),
+         "-af", f"{mix}volume={gain:.2f}dB", "-ac", "1", "-ar", "16000",
+         "-c:a", "pcm_f32le", str(dest)],
+        check=True)
+
+
 # --- where people speak -------------------------------------------------------
 #
 # The map of speech is used to clean up AFTER transcribing, never to cut the
@@ -887,9 +917,11 @@ def run(source, language=None, progress=None, two_tracks=False, precise=False, v
         # So: the whole audio goes to the model, and afterwards the subtitle
         # phrases are dropped ONLY where nobody was speaking. Zero
         # hallucinations, at no cost in words.
-        speech = speech_regions(wav, seconds)
+        meter = pathlib.Path(tmp) / "levels.wav"
+        level_copy(source, meter, two_tracks)
+        speech = speech_regions(meter, seconds)
         speech_s = sum(b - a for a, b in speech) if speech else seconds
-        level = speech_level(wav, speech)
+        level = speech_level(meter, speech)
 
         if progress:
             progress("transcribing", seconds)
@@ -912,7 +944,7 @@ def run(source, language=None, progress=None, two_tracks=False, precise=False, v
             speakers, found = tell_voices(words, audio, speakers, progress, breaks)
 
         segments = lines_from_words(words, speakers, breaks)
-        phantoms = drop_phantoms(segments, wav, level)
+        phantoms = drop_phantoms(segments, meter, level)
 
     # Proper nouns are fixed here, on the output: see glossary().
     corrected = apply_glossary(segments, glossary())
@@ -933,9 +965,11 @@ def speech_map(source):
     the last. Silence lives in the audio, and is measured there.
     """
     with tempfile.TemporaryDirectory() as tmp:
-        wav = pathlib.Path(tmp) / "audio.wav"
-        seconds = prepare(source, wav)
-        return speech_regions(wav, seconds)
+        wav = pathlib.Path(tmp) / "levels.wav"
+        level_copy(source, wav)
+        import soundfile as sf
+        info = sf.info(str(wav))
+        return speech_regions(wav, info.frames / info.samplerate)
 
 
 def main() -> None:

@@ -13,7 +13,7 @@ flowchart TD
 
 ## 1. Prepare
 
-The recording is converted to 16 kHz mono and its loudness is normalized. A call recorded with a phone on the desk has one voice close and the others from the speaker; brought to one level, Whisper discards and retries fewer windows ([measured](benchmarks.md#other-settings)). A map of where people speak is measured from the audio and kept: it draws the call strip and decides, later, what counts as silence.
+The recording is converted to 16 kHz mono and its loudness is normalized. A call recorded with a phone on the desk has one voice close and the others from the speaker; brought to one level, Whisper discards and retries fewer windows ([measured](benchmarks.md#other-settings)). A map of where people speak is measured from the audio and kept: it draws the call strip and decides, later, what counts as silence. It is measured on a copy brought to the same loudness with one gain for the whole file, not on what Whisper hears: the normalizer lifts long quiet stretches, and a line's faint hiss would come out as loud as speech ([measured](benchmarks.md#long-pauses)).
 
 For a call recorded on two tracks, the tracks are mixed half and half for Whisper and kept apart for telling who spoke.
 

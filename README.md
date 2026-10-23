@@ -28,7 +28,7 @@ Drop a recorded call on the page, or record the call from it. You get the transc
 ## Why Sottovoce
 
 - **It shows where the text is weak.** The *call strip* draws the whole recording as one band: speech, silence, phrases removed, lines corrected. Click anywhere to listen from there.
-- **It removes what nobody said.** On silence, Whisper writes subtitles it learned from YouTube: *"Thanks for watching"*. Sottovoce drops them only where the audio is far below speech, and lists every removal.
+- **It removes what nobody said.** On silence, Whisper writes subtitles it learned from YouTube: *"Thanks for watching"*. Sottovoce drops them only where the audio is far below speech, and lists every removal. On a public test with long pauses it adds 47 words nobody said, where Whisper alone adds 318 ([measured](docs/benchmarks.md#long-pauses)).
 - **It knows who spoke.** A call recorded from the browser keeps your microphone and the call on two tracks: *You* and *Them* are measured, not guessed. On any recording, voices are told apart with no account and no token, at a [12% error rate on public meetings](docs/benchmarks.md#telling-voices-apart).
 - **It keeps your names right.** A glossary fixes client and product names after transcription, and can be applied again to older calls.
 - **It stays on your machine.** No account, no telemetry, no remote LLM. Every call is a folder of plain files; summaries and emails are written by a model that runs locally.
@@ -89,7 +89,7 @@ Recordings, transcripts and summaries never reach a third party: no cloud proces
 Yes, on your Wi-Fi with `--lan` and a PIN: read, correct, send recordings, share the follow-up email. See [From your phone](docs/lan.md).
 
 **How good is it?**
-Every figure we publish comes from a script in `research/` you can run: [Benchmarks](docs/benchmarks.md). What it doesn't do well yet: [Limitations](docs/limitations.md).
+On public Italian speech ([FLEURS](docs/benchmarks.md#italian-read-speech)) 4.3% of words come out wrong, the same as Whisper large-v3 alone; on whole English meetings ([AMI](docs/benchmarks.md#english-meetings-whole)) 25.4%, against 30.3%. Every figure we publish comes from a script in `research/` you can run: [Benchmarks](docs/benchmarks.md). What it doesn't do well yet: [Limitations](docs/limitations.md).
 
 ## Documentation
 

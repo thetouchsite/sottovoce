@@ -27,3 +27,6 @@ __pycache__/
 /.lan-pin
 # The documentation site, built by mkdocs
 /site/
+# Public datasets and results of research/wer.py, downloaded and written on first run
+/research/fleurs/
+/research/results/

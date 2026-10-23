@@ -45,6 +45,7 @@ The tests run on the fictional calls in `examples/`, on a temporary copy, with t
 
 | Script | What it measures | Data |
 | --- | --- | --- |
+| `research/wer.py` | Word error rate: Whisper alone against the whole engine, and words invented on long pauses | Public FLEURS Italian and AMI meetings, downloaded on first run |
 | `research/voices_ami.py` | Telling voices apart (DER) | Public AMI meetings, downloaded on first run |
 | `research/two_tracks.py` | Who said each word on two-track calls | Public AMI headset recordings |
 | `research/llm.py` | The built-in summary model: time and memory | The examples in the repo |

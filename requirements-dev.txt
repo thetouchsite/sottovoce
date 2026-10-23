@@ -13,6 +13,8 @@ fastapi>=0.110
 uvicorn>=0.30
 python-multipart>=0.0.9
 numpy>=1.24
+# ffmpeg itself, for the tests that measure levels on a small generated file.
+imageio-ffmpeg>=0.5
 httpx>=0.27
 pytest>=8
 # Grouping voice fingerprints (voices.group). The models themselves are not

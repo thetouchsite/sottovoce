@@ -22,6 +22,7 @@ What Sottovoce doesn't do, or doesn't do well yet. Most of these are on the [roa
 ## The text
 
 - **Whisper still makes mistakes**, on names above all: the [glossary](glossary.md) fixes the ones you know about.
+- **A sentence right after a long pause can be lost.** Whisper sometimes writes a subtitle phrase over it; the phrase is removed, the sentence isn't brought back: 34 words of 1,175 on the [long-pauses test](benchmarks.md#long-pauses). It's on the roadmap.
 - **Invented phrases are removed only when known.** The list covers the subtitle phrases Whisper is known to produce in several languages; a new one, or one said where the audio is not quiet, stays and is flagged *to check*.
 - **Measured languages:** the measurements so far are on Italian and English. Whisper understands many more, but they haven't been measured here.
 

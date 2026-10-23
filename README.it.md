@@ -28,7 +28,7 @@ Trascini sulla pagina una call registrata, oppure registri la call da lì. Ottie
 ## Perché Sottovoce
 
 - **Ti mostra dove il testo è debole.** La *striscia della call* disegna tutta la registrazione in una banda: parlato, silenzio, frasi tolte, righe corrette. Clicchi in un punto e ascolti da lì.
-- **Toglie quello che nessuno ha detto.** Sul silenzio Whisper scrive sottotitoli imparati da YouTube: *"Grazie per la visione"*. Sottovoce li toglie solo dove l'audio è molto sotto il parlato, ed elenca ogni rimozione.
+- **Toglie quello che nessuno ha detto.** Sul silenzio Whisper scrive sottotitoli imparati da YouTube: *"Grazie per la visione"*. Sottovoce li toglie solo dove l'audio è molto sotto il parlato, ed elenca ogni rimozione. Su un test pubblico con pause lunghe aggiunge 47 parole che nessuno ha detto, dove Whisper da solo ne aggiunge 318 ([misurato](docs/benchmarks.md#long-pauses)).
 - **Sa chi ha parlato.** Una call registrata dal browser tiene il tuo microfono e la call su due tracce: *Tu* e *Loro* sono misurati, non indovinati. Su qualsiasi registrazione separa le voci senza account e senza token, con un [errore del 12% su riunioni pubbliche](docs/benchmarks.md#telling-voices-apart).
 - **Tiene giusti i tuoi nomi.** Un glossario corregge i nomi di clienti e prodotti dopo la trascrizione, e si può riapplicare alle call vecchie.
 - **Resta sulla tua macchina.** Niente account, niente telemetria, niente LLM remoti. Ogni call è una cartella di file normali; riassunti ed email li scrive un modello che gira in locale.
@@ -89,7 +89,7 @@ Registrazioni, trascrizioni e riassunti non arrivano mai a terzi: nessun fornito
 Sì, sul tuo Wi-Fi con `--lan` e un PIN: leggi, correggi, mandi registrazioni, condividi l'email di follow-up. Vedi [From your phone](docs/lan.md).
 
 **Quanto è bravo?**
-Ogni cifra che pubblichiamo viene da uno script in `research/` che puoi rilanciare: [Benchmarks](docs/benchmarks.md). Quello che ancora non fa bene: [Limitations](docs/limitations.md).
+Sull'italiano pubblico ([FLEURS](docs/benchmarks.md#italian-read-speech)) sbaglia il 4,3% delle parole, quanto Whisper large-v3 da solo; su riunioni intere in inglese ([AMI](docs/benchmarks.md#english-meetings-whole)) il 25,4%, contro il 30,3%. Ogni cifra che pubblichiamo viene da uno script in `research/` che puoi rilanciare: [Benchmarks](docs/benchmarks.md). Quello che ancora non fa bene: [Limitations](docs/limitations.md).
 
 ## Documentazione
 
