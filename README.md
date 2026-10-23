@@ -35,13 +35,21 @@ Drop a recorded call on the page, or record the call from it. You get the transc
 
 ## Quick start
 
-You need an NVIDIA GPU and Python 3.10 or newer.
+One command, nothing to install first: it brings its own Python, needs no administrator rights, and picks the PyTorch that sees your GPU.
+
+**Windows**, in PowerShell:
+
+```powershell
+irm https://raw.githubusercontent.com/thetouchsite/sottovoce/main/installer/install.ps1 | iex
+```
+
+**Linux and macOS**, in a terminal:
 
 ```sh
-git clone https://github.com/thetouchsite/sottovoce && cd sottovoce
-Install.bat          # Linux/macOS: ./install.sh   (PyTorch with CUDA first, then the rest)
-Start.bat            # Linux/macOS: ./start.sh     (opens http://127.0.0.1:8200)
+curl -fsSL https://raw.githubusercontent.com/thetouchsite/sottovoce/main/installer/install.sh | bash
 ```
+
+Then open **Sottovoce** from the Start menu or the desktop (on Linux, the applications menu; on a Mac, `~/Applications`). Your calls are kept in a `Sottovoce` folder in your home folder. To update, run the same command again. An NVIDIA GPU is what makes it fast; without one, and on a Mac, it runs on the CPU.
 
 The first start downloads Whisper large-v3 (2.9 GB, once). Then drop a recording on the page, choose the language and the options, and press **Transcribe**.
 
@@ -52,7 +60,7 @@ pip install -r requirements-dev.txt
 python server.py --no-model --data examples/transcripts --glossary examples/glossary.txt
 ```
 
-Installing by hand, the command line and the API: [Getting started](docs/getting-started.md).
+Installing from a clone, updating, removing, the command line and the API: [Getting started](docs/getting-started.md).
 
 ## How it compares
 

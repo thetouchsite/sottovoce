@@ -5,8 +5,9 @@ What Sottovoce doesn't do, or doesn't do well yet. Most of these are on the [roa
 ## Hardware and platforms
 
 - **An NVIDIA GPU is expected.** Whisper large-v3 runs on CUDA; without it, it runs on the CPU, much slower. Apple Silicon and AMD GPUs are not accelerated yet.
-- **Tested on Windows.** The Linux and macOS install scripts are checked in CI for syntax, but have not been run end to end on a clean machine.
-- **No installer yet.** Installing means cloning the repo and running `Install.bat` or `install.sh`.
+- **Transcription is tested on Windows.** The installer runs end to end in CI on Windows, Ubuntu and macOS, with PyTorch for the CPU; nobody has yet transcribed with it on a Linux machine with an NVIDIA GPU, or on a Mac.
+- **The installer is a command, not a program to double-click.** A downloadable `.exe` would need a code-signing certificate, paid every year, or Windows warns that it *protected your PC*. A command pasted in PowerShell gets no such warning.
+- **Intel Macs are not supported:** PyTorch no longer ships for them.
 - **The built-in summary model needs about 8 GB of GPU memory** next to Whisper. On a smaller card, use LM Studio or Ollama with a smaller model.
 
 ## Recording

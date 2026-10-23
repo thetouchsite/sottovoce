@@ -1,5 +1,12 @@
 # Troubleshooting
 
+## The installer stops
+
+- **"Sottovoce is running"**: an update can't replace files in use. Stop it with the power button on the page, then run the command again.
+- **A download failed halfway**: run the command again. What was already downloaded is kept and not fetched twice.
+- **Behind a company proxy**: set `HTTPS_PROXY` before running it (in PowerShell, `$env:HTTPS_PROXY = "http://proxy:8080"`). The installer needs github.com, pypi.org, files.pythonhosted.org and download.pytorch.org.
+- **It says to update the driver**: an RTX 50 card needs NVIDIA driver 580 or newer, older cards 528 (525 on Linux). Update it from nvidia.com and run the command again.
+
 ## The GPU is not used
 
 Transcription works but is very slow, and the GPU stays idle. Almost always this is **the PyTorch trap**: installed as a dependency of `transformers`, pip pulls the default PyTorch from PyPI, which on RTX 50-series cards (Blackwell, `sm_120`) doesn't see the GPU. Everything runs on the CPU and nothing tells you.
@@ -7,8 +14,10 @@ Transcription works but is very slow, and the GPU stays idle. Almost always this
 Check:
 
 ```sh
-.venv\Scripts\python.exe -c "import torch; print(torch.__version__, torch.cuda.is_available())"
+%LOCALAPPDATA%\Programs\Sottovoce\app\.venv\Scripts\python.exe -c "import torch; print(torch.__version__, torch.cuda.is_available())"
 ```
+
+(In a clone, `.venv\Scripts\python.exe`; on Linux and macOS, `.venv/bin/python` in the program folder's `app`.)
 
 It should print a version ending in `+cu130` (or your CUDA) and `True`. If not, install PyTorch first, from the CUDA index, then the rest:
 
@@ -16,7 +25,9 @@ It should print a version ending in `+cu130` (or your CUDA) and `True`. If not, 
 pip install --force-reinstall torch --index-url https://download.pytorch.org/whl/cu130
 ```
 
-`Install.bat` and `install.sh` do it in this order.
+With the installer it's simpler: run the install command again, after updating the NVIDIA driver if it asked you to. It reinstalls the right PyTorch every time.
+
+The installer does it in this order; so does *From a clone* in [Getting started](getting-started.md#install).
 
 ## The first start is slow
 
@@ -47,5 +58,5 @@ On Windows, Hugging Face may warn that it can't create symlinks in its cache. It
 
 - **Port 8200 in use:** another copy is running, or another program uses it. Stop it, or start with `--port 8300`.
 - **A transcription was interrupted** (the server closed mid-way): the call goes back to *Not transcribed* at the next start. Open it and press **Transcribe**.
-- **A call was deleted by mistake:** it is in `transcripts/_deleted/`. Move its folder back into `transcripts/`.
+- **A call was deleted by mistake:** it is in `_deleted/` inside the folder of your calls (`Sottovoce/transcripts` in your home folder, or `transcripts/` in a clone). Move its folder back.
 - **A request answered 403:** the server only accepts requests addressed to its own name, and changes coming from its own page. Open it at `http://127.0.0.1:8200` (or the address printed with `--lan`), not through another name. See [SECURITY.md](https://github.com/thetouchsite/sottovoce/blob/main/SECURITY.md).

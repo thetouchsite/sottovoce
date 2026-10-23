@@ -1,6 +1,6 @@
 # From your phone
 
-Start the server with `--lan` (`Start.bat --lan`, `./start.sh --lan`, or `python server.py --lan`). It prints the address to open on your phone, on the same Wi-Fi, and a PIN:
+Start the server with `--lan`: from a terminal, `%LOCALAPPDATA%\Programs\Sottovoce\Sottovoce.cmd --lan` on Windows, `~/.local/share/sottovoce/sottovoce --lan` on Linux, `~/Library/Application\ Support/Sottovoce/sottovoce --lan` on a Mac, or `python server.py --lan` in a clone. It prints the address to open on your phone, on the same Wi-Fi, and a PIN:
 
 ```text
   ON YOUR NETWORK: other devices on this Wi-Fi can open it, with the PIN.

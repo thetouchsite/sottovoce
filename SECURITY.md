@@ -45,6 +45,6 @@ The limits, plainly:
 
 ## Supply chain
 
-- Python dependencies are installed from PyPI by `Install.bat` / `install.sh`; PyTorch from its own CUDA index.
+- The installer downloads uv at a fixed version and checks it against its SHA-256 before running it. Python dependencies come from PyPI, PyTorch from its own index, Python itself from uv's builds.
 - The voice models are pinned by SHA-256 (`voices.py`). Whisper and the summary model are fetched by name from Hugging Face, not pinned to a revision.
 - CI runs the tests on every push and pull request (`.github/workflows/tests.yml`). It has no secrets and does not publish anything.
