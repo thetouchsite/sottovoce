@@ -177,6 +177,8 @@ function Install-Sottovoce {
     $version = (Select-String -Path (Join-Path $App "server.py") -Pattern '^VERSION = "(.+)"').Matches[0].Groups[1].Value
     $uninstall = Join-Path $Program "uninstall.ps1"
     Copy-Item (Join-Path $App "installer\uninstall.ps1") $uninstall -Force
+    # Where the calls are, for the uninstall to ask about the right folder.
+    Set-Content (Join-Path $Program "data-folder.txt") -Value $Data -Encoding UTF8
     $key = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\Sottovoce"
     New-Item $key -Force | Out-Null
     # Without uv's cache: its files are the same ones as in .venv, linked,

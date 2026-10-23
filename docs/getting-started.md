@@ -73,7 +73,7 @@ Your calls are not in *Documents* on purpose: on many Windows computers OneDrive
 
 **Update:** stop Sottovoce, then run the same install command again. Only what changed is downloaded; your calls, the voice models and the PIN your phone knows stay.
 
-**Remove:** on Windows, **Settings → Apps → Sottovoce → Uninstall**. On Linux and macOS, run `uninstall.sh` in the program folder. Your calls stay. The models (about 11 GB) stay in the Hugging Face cache: delete it too if nothing else uses it.
+**Remove:** on Windows, **Settings → Apps → Sottovoce → Uninstall**; on Linux and macOS, run `uninstall.sh` in the program folder. It removes the program, the shortcuts and the start with Windows, then asks whether to delete your calls too, and the models Sottovoce downloaded (only those, not the rest of the cache). No keeps them. Yes to both leaves the computer as it was.
 
 ## Try it without a GPU
 

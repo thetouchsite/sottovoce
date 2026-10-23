@@ -73,7 +73,7 @@ import recorder
 import summary as S
 import transcribe as T
 
-VERSION = "1.7.0"
+VERSION = "1.7.1"
 ROOT = pathlib.Path(__file__).resolve().parent
 DATA = ROOT / "transcripts"            # set again by start() from --data
 INCOMING = DATA / "_incoming"
@@ -597,7 +597,8 @@ def voices_installed() -> bool:
 @app.get("/api/status")
 def api_status():
     import voices as V
-    return {**engine_state, "model": T.MODEL, "loaded": T.loaded(), "queued": line_up.qsize(), "version": VERSION,
+    return {**engine_state, "model": T.MODEL, "loaded": T.loaded(), "downloaded": T.downloaded(),
+            "queued": line_up.qsize(), "version": VERSION,
             # The page says "downloads 32 MB the first time" until it is on disk.
             "voices": voices_installed(), "voices_ready": V.ready()}
 

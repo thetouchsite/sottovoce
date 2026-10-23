@@ -567,6 +567,12 @@ def test_the_folders_open_in_explorer_only_on_the_computer(here, client, monkeyp
     assert len(opened) == 2
 
 
+def test_the_status_says_whether_whisper_is_on_disk(client, monkeypatch):
+    import transcribe
+    monkeypatch.setattr(transcribe, "downloaded", lambda: False)
+    assert client.get("/api/status").json()["downloaded"] is False
+
+
 def test_the_page_is_checked_again_at_every_load(client):
     # After an update, the window showed the page it had cached from before.
     assert client.get("/").headers["cache-control"] == "no-cache"

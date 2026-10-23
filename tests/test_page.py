@@ -357,6 +357,35 @@ def test_a_call_offers_to_open_its_folder_on_this_computer(page):
     assert page.locator(".menu.more .menu-list button").all_inner_texts() == ["Rename", "Open the folder", "Delete…"]
 
 
+def test_the_models_are_downloaded_only_when_the_user_says_so(page):
+    import json as _json
+    asked = []
+
+    def answer(d, yes):
+        asked.append(d.message)
+        d.accept() if yes else d.dismiss()
+
+    # Whisper not on disk: asked, and No means no.
+    page.route("**/api/status", lambda r: r.fulfill(
+        body=_json.dumps({"ready": True, "off": False, "downloaded": False, "version": "x"}),
+        content_type="application/json"))
+    page.reload()
+    page.wait_for_function("typeof whisperOnDisk !== 'undefined' && whisperOnDisk === false")
+    page.once("dialog", lambda d: answer(d, False))
+    assert page.evaluate("okToTranscribe()") is False
+    page.once("dialog", lambda d: answer(d, True))
+    assert page.evaluate("okToTranscribe()") is True
+    assert len(asked) == 2 and "2.9 GB" in asked[0]
+    # The summary model, built in and not on disk: asked too.
+    page.evaluate("llm = {available: true, builtin: true, downloaded: false, model: 'm'}")
+    page.once("dialog", lambda d: answer(d, False))
+    assert page.evaluate("okToWrite()") is False and "8 GB" in asked[-1]
+    # Once on disk, never again.
+    page.evaluate("whisperOnDisk = true; llm.downloaded = true")
+    assert page.evaluate("okToTranscribe() && okToWrite()") is True
+    assert len(asked) == 3
+
+
 def test_the_version_is_shown_in_the_side_bar(page):
     import server
     page.wait_for_function("document.getElementById('app-version').textContent.length > 0")
