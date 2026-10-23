@@ -1,8 +1,67 @@
 # Benchmarks
 
-Every number in these docs comes from a script in [`research/`](https://github.com/thetouchsite/sottovoce/tree/main/research), with the command to run it next to it. The first three sections use public or bundled data: anyone can check them. The last one records measurements made during development on a private call: they explain why the defaults are what they are, and will be replaced by measurements on public datasets (see the [roadmap](https://github.com/thetouchsite/sottovoce/blob/main/ROADMAP.md)).
+Every number in these docs comes from a script in [`research/`](https://github.com/thetouchsite/sottovoce/tree/main/research), with the command to run it next to it. The first four sections use public or bundled data: anyone can check them. The last one records measurements made during development on a private call: they explain why the defaults are what they are.
 
-**Machine:** NVIDIA GeForce RTX 5090 Laptop GPU (24 GB), Windows 11, Python 3.14, PyTorch 2.14.1 + CUDA 13.0.
+**Machine:** NVIDIA GeForce RTX 5090 Laptop GPU (24 GB), Windows 11, Python 3.14, PyTorch 2.14.1 + CUDA 13.0, transformers 5.20.
+
+## Transcription accuracy
+
+Word error rate (WER): words substituted, dropped and added, over the words of a hand-made transcript. Lower is better. Reference and transcript go through Whisper's own text normalizer first, so case, punctuation and filler words don't count.
+
+Three ways to transcribe the same audio:
+
+- **large-v3** and **turbo**: Whisper large-v3 and large-v3-turbo alone, through the Hugging Face pipeline with its defaults: what you get by running the model as it comes.
+- **Sottovoce**: the whole engine, `transcribe.run()`. Same model as large-v3, plus loudness normalization, the anti-hallucination settings and the removal of subtitle phrases on silence. The name glossary is off.
+
+```sh
+pip install jiwer
+python research/wer.py fleurs     # Italian, read speech
+python research/wer.py ami        # English meetings, whole
+python research/wer.py silence    # Italian, with long pauses
+```
+
+The data is downloaded on the first run, with no account: [FLEURS](https://huggingface.co/datasets/google/fleurs) and [AMI](https://groups.inf.ed.ac.uk/ami/corpus/), both CC BY 4.0.
+
+### Italian, read speech
+
+FLEURS `it_it`, the whole test split: 865 recordings, 211 minutes, 20,787 words. Short clean sentences read aloud.
+
+| | WER | Substituted | Dropped | Added | Speed |
+| --- | --- | --- | --- | --- | --- |
+| large-v3 | 4.3% | 1.7% | 0.2% | 2.4% | 7.1× real time |
+| turbo | 4.8% | 2.0% | 0.3% | 2.5% | 27.1× |
+| **Sottovoce** | **4.3%** | 1.7% | 0.2% | 2.4% | 5.9× |
+
+On clean speech the engine changes nothing in the text: the same model gives the same words. It is slower here because every clip is measured and normalized before transcribing, which on clips of a few seconds weighs more than on a call. Turbo is four times faster and makes about a tenth more errors.
+
+### English meetings, whole
+
+Four AMI test meetings, one from each series (`ES2004a`, `IS1009a`, `TS3003a`, `EN2002a`): 92 minutes, 14,993 words, the room's mixed headsets, each meeting transcribed in one go as a recording would be.
+
+| | WER | Substituted | Dropped | Added | Speed |
+| --- | --- | --- | --- | --- | --- |
+| large-v3 | 30.3% | 4.3% | 23.7% | 2.3% | 10.7× real time |
+| turbo | 28.4% | 4.2% | 23.2% | 0.9% | 35.4× |
+| **Sottovoce** | **25.4%** | 4.0% | 20.5% | 0.9% | 7.7× |
+
+Most errors are dropped words: in AMI four people talk over each other, and the reference has every word of every one of them, short *yeah*s included. Whisper writes one voice at a time. These figures are not comparable with leaderboards that cut AMI into single utterances first: here nobody has cut the meeting.
+
+### Long pauses
+
+Whisper invents on silence, and more on the faint hiss of a real line than on digital silence. Five files of 10 FLEURS sentences each, separated by 15 to 45 seconds of noise at -50 dB: 40 minutes, 28 of them noise, 1,175 words. Built the same way on every run (fixed seed).
+
+| | WER | Words added | Subtitle phrases | Words dropped |
+| --- | --- | --- | --- | --- |
+| large-v3 | 30.0% | 318 | 15 | 5 |
+| turbo | 41.2% | 444 | 16 | 8 |
+| **Sottovoce** | **10.0%** | **47** | **1** | 34 |
+
+*Words added* are words in the transcript and not in the reference. *Subtitle phrases* counts *"Grazie a tutti"*, *"Sottotitoli e revisione a cura di QTSS"* and the rest of the known list. The one left in Sottovoce's text follows a real sentence in the same line, so it isn't removed: it is flagged *to check*.
+
+Two things this test found:
+
+- **A bug, now fixed.** Silence used to be measured on the audio Whisper hears, after loudness normalization. In one pass the normalizer lifts long quiet stretches: the hiss at -50 dB came out at -19 dB, as loud as speech, and no phrase was ever dropped. Before the fix Sottovoce scored 14.5%, with 101 words added and 18 subtitle phrases.
+- **A limit, still open.** After a long pause Whisper's long-form mode sometimes writes a subtitle phrase over a window that ends in real speech, and the first sentence after the pause is never written. The phrase is removed; the sentence is still missing. That is most of the 34 words dropped. It's on the [roadmap](https://github.com/thetouchsite/sottovoce/blob/main/ROADMAP.md).
 
 ## Telling voices apart
 

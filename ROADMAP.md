@@ -8,7 +8,7 @@ The ideas come from projects that do this job well: [whisper.cpp](https://github
 
 ## Done in 1.2
 
-**Telling voices apart, for any recording.** The item that was number 4 here said "`pyannote` as an opt-in, with a Hugging Face token". It turned out the token wasn't needed: pyannote's segmentation model is MIT and redistributed without a gate by sherpa-onnx, and the voice fingerprints come from 3D-Speaker (Apache-2.0). So it's one tick on the page, nothing to sign up for. On a public meeting never seen while tuning: 12.6%, 11.8% and 11.9% error with four, three and two people, all counted right; 96% of words get the right voice end to end. Switching it off leaves 32 MB in `models/`, which can be deleted.
+**Telling voices apart, for any recording.** The item that was number 4 here said "`pyannote` as an opt-in, with a Hugging Face token". It turned out the token wasn't needed: pyannote's segmentation model is MIT and redistributed without a gate by sherpa-onnx, and the voice fingerprints come from 3D-Speaker (Apache-2.0). So it's one tick on the page, nothing to sign up for. On a public meeting never seen while tuning: 12.6%, 11.8% and 11.9% error with four, three and two people, all counted right. Switching it off leaves 32 MB in `models/`, which can be deleted.
 
 ## Done in 1.1
 
@@ -88,3 +88,11 @@ And a rule learned the hard way, on another project: **never decide on a single 
 **Still open.** Nobody has run them end to end. CI can't: the install downloads gigabytes and needs a GPU. And the author's machine runs Windows.
 
 **Done when** `install.sh` and `start.sh` work on a clean Ubuntu machine with an NVIDIA GPU, checked by someone who isn't the author.
+
+## 8. Get back the sentence an invented phrase replaced
+
+**Why.** After a long pause Whisper's long-form mode sometimes writes *"Sottotitoli e revisione a cura di QTSS"* over a window that ends in real speech, and the first sentence after the pause is never written. The phrase is removed, the sentence is still missing: on the long-pauses test, 34 words of 1,175 ([measured](docs/benchmarks.md#long-pauses)).
+
+**How.** Where a phrase was removed and the map of speech says someone speaks inside its window, transcribe that stretch again on its own.
+
+**Done when** words dropped on the long-pauses test fall to Whisper alone's (5 of 1,175) with no more words added, and FLEURS and AMI stay where they are.

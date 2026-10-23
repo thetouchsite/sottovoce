@@ -4,6 +4,14 @@ What changed in each release, newest first. The format follows [Keep a Changelog
 
 ## [Unreleased]
 
+### Fixed
+
+- **Invented phrases on long pauses are dropped again.** Silence was measured on the audio Whisper hears, after loudness normalization, and in one pass the normalizer lifts long quiet stretches: the faint hiss of a line, at -50 dB, came out at -19 dB, as loud as speech. The map of speech then saw speech nearly everywhere and no *"Grazie a tutti"* was ever dropped there. Levels are now measured on a copy with one gain for the whole file. On the long-pauses test, subtitle phrases left fell from 18 to 1, and words added from 101 to 47. The call strip draws silence where there is silence.
+
+### Added
+
+- **Word error rate on public data**, with `research/wer.py`: FLEURS Italian, four whole AMI meetings and a set with long pauses, each for Whisper large-v3 alone, large-v3-turbo alone and the whole engine. Results in [Benchmarks](docs/benchmarks.md#transcription-accuracy).
+
 ## [1.4.0] - 2026-10-23
 
 Safer on the network, notes and follow-up emails for every call, a summary model built in, and a documentation site.
