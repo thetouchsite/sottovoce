@@ -4,6 +4,12 @@ What changed in each release, newest first. The format follows [Keep a Changelog
 
 ## [Unreleased]
 
+## [1.6.1] - 2026-10-23
+
+### Fixed
+
+- **No more black windows flashing during a transcription.** In the window, Sottovoce has no console, so Windows gave each program it starts (ffmpeg, also inside Whisper's pipeline) a console of its own for an instant. They now start with none.
+
 ## [1.6.0] - 2026-10-23
 
 Sottovoce is a Windows program: one window, an icon by the clock, no terminal and no browser.
@@ -133,7 +139,8 @@ The first release. Local transcription for recorded business calls, with Whisper
 - `Install.bat`, `Start.bat` and `Stop.bat` for Windows. PyTorch is installed first, from the CUDA index.
 - An Italian README.
 
-[Unreleased]: https://github.com/thetouchsite/sottovoce/compare/v1.6.0...HEAD
+[Unreleased]: https://github.com/thetouchsite/sottovoce/compare/v1.6.1...HEAD
+[1.6.1]: https://github.com/thetouchsite/sottovoce/compare/v1.6.0...v1.6.1
 [1.6.0]: https://github.com/thetouchsite/sottovoce/compare/v1.5.0...v1.6.0
 [1.5.0]: https://github.com/thetouchsite/sottovoce/compare/v1.4.0...v1.5.0
 [1.4.0]: https://github.com/thetouchsite/sottovoce/compare/v1.3.0...v1.4.0

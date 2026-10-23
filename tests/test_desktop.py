@@ -59,3 +59,12 @@ def test_the_power_button_quits_the_program_in_the_window(client):
         assert quit == [True]
     finally:
         server.quit_app = None
+
+
+def test_child_programs_open_no_window_unless_asked_otherwise():
+    class Popen:                               # stands in for subprocess.Popen
+        def __init__(self, args, creationflags=0):
+            self.flags = creationflags
+    desktop.no_console_windows(Popen)
+    assert Popen(["ffmpeg"]).flags == desktop.NO_WINDOW
+    assert Popen(["x"], creationflags=0x200).flags == 0x200          # a caller's own choice stays

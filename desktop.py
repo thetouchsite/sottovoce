@@ -91,6 +91,24 @@ def finished(seen, jobs):
     return out
 
 
+NO_WINDOW = 0x08000000          # CREATE_NO_WINDOW
+
+
+def no_console_windows(popen=subprocess.Popen):
+    """Child programs (ffmpeg above all, also inside Whisper's pipeline) open
+    no window. pythonw has no console to lend them, so Windows gives each one
+    its own: a black window flashing at every step of a transcription. Here,
+    once, for every child, ours and the libraries'."""
+    start = popen.__init__
+
+    def quiet(self, *args, **kwargs):
+        if not kwargs.get("creationflags"):
+            kwargs["creationflags"] = NO_WINDOW
+        start(self, *args, **kwargs)
+
+    popen.__init__ = quiet
+
+
 def answers(port) -> bool:
     """Whether a Sottovoce is already serving on this port."""
     try:
@@ -174,6 +192,7 @@ def main(argv=None):
     sys.stdout = sys.stderr = open(ours.log, "w", encoding="utf-8", buffering=1)
     # Its own name for Windows, so the taskbar shows Sottovoce's icon, not Python's.
     ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(APP_ID)
+    no_console_windows()
 
     import uvicorn
     import server
