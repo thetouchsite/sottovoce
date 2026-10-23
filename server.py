@@ -1589,7 +1589,9 @@ def api_glossary_add(body: dict):
 
 @app.get("/", include_in_schema=False)
 def page():
-    return FileResponse(ROOT / "app" / "index.html")
+    # Checked with the server at every load: after an update the window,
+    # which keeps its cache between starts, showed the page from before.
+    return FileResponse(ROOT / "app" / "index.html", headers={"Cache-Control": "no-cache"})
 
 
 @app.get("/fonts/{name}", include_in_schema=False)

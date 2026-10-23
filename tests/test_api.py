@@ -497,3 +497,8 @@ def test_a_kept_recording_without_the_model_waits_with_the_choices_made(here, da
     listed = here.get("/api/recordings").json()["recordings"]
     assert [(x["name"], x["language"], x["voices"], x["from"]) for x in listed] == [("Weekly", "it", True, "computer")]
     assert listed[0]["bytes"] == 44 + 4 * 48000
+
+
+def test_the_page_is_checked_again_at_every_load(client):
+    # After an update, the window showed the page it had cached from before.
+    assert client.get("/").headers["cache-control"] == "no-cache"

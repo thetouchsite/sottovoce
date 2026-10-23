@@ -348,3 +348,9 @@ def test_a_recording_stops_when_another_call_opens(page, data):
     page.wait_for_function("window.players.length === 1")
     open_call(page, SUPPLIER)
     page.wait_for_function("window.players.every(a => a.paused && !a.ended)", timeout=3000)
+
+
+def test_the_version_is_shown_in_the_side_bar(page):
+    import server
+    page.wait_for_function("document.getElementById('app-version').textContent.length > 0")
+    assert page.locator("#app-version").inner_text() == "v" + server.VERSION
