@@ -92,6 +92,7 @@ def test_the_page_opens_on_a_new_transcription_not_on_a_call(page):
     page.wait_for_function("document.getElementById('engine-text').textContent.includes('browsing only')")
     # Adding a file needs no model: it only waits to be transcribed.
     assert page.locator("#drop .primary").is_enabled()
+    page.wait_for_selector(".item .name")                          # the list arrives after the page
     names = page.locator(".item .name").all_inner_texts()
     assert names[0].startswith("Supplier check-in")              # newest first
     assert len(names) == 4
