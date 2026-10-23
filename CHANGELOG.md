@@ -4,6 +4,10 @@ What changed in each release, newest first. The format follows [Keep a Changelog
 
 ## [Unreleased]
 
+## [1.4.0] - 2026-10-23
+
+Safer on the network, notes and follow-up emails for every call, a summary model built in, and a documentation site.
+
 ### Security
 
 - **Cross-site requests and DNS rebinding are refused.** Any page open in the browser could send requests to `127.0.0.1:8200`: a form posted to `/api/shutdown` stopped the server, and with DNS rebinding a page could have read `/api/history`. Now requests that change state are refused when the browser says they come from another site (`Origin`, `Sec-Fetch-Site`), and only the names the server is reached by are accepted in `Host` (`127.0.0.1`, `localhost`, `[::1]` on its port; with `--lan`, also this computer's addresses and name).
@@ -98,7 +102,8 @@ The first release. Local transcription for recorded business calls, with Whisper
 - `Install.bat`, `Start.bat` and `Stop.bat` for Windows. PyTorch is installed first, from the CUDA index.
 - An Italian README.
 
-[Unreleased]: https://github.com/thetouchsite/sottovoce/compare/v1.3.0...HEAD
+[Unreleased]: https://github.com/thetouchsite/sottovoce/compare/v1.4.0...HEAD
+[1.4.0]: https://github.com/thetouchsite/sottovoce/compare/v1.3.0...v1.4.0
 [1.3.0]: https://github.com/thetouchsite/sottovoce/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/thetouchsite/sottovoce/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/thetouchsite/sottovoce/compare/v1.0.0...v1.1.0
