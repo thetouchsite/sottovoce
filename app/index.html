@@ -1178,7 +1178,16 @@ function highlight(s, q){
 // The page opens here, never on a call. The two ways in sit side by side,
 // the same size: files you already have, and a call you are about to have.
 
+// The one player that may be sounding. A view drawn again while it plays
+// (another call, home, the same call after renaming it) used to leave it
+// playing, detached, with no button left on the page to stop it.
+let sounding = null;
+function silence(){
+  if (sounding){ sounding.pause(); sounding = null; }
+}
+
 function setView(v){
+  silence();
   view = v;
   $('#v-home').toggleAttribute('aria-current', v === 'home');
   $('#v-glossary').toggleAttribute('aria-current', v === 'glossary');
@@ -2107,6 +2116,7 @@ document.addEventListener('click', e => {
 });
 
 function show(l, jump){
+  silence();
   // Totals come from the parts as shown: if a line was corrected, the count
   // written in info.json is one correction old.
   const words = l.segments.reduce((s, p) =>
@@ -2736,6 +2746,7 @@ function readingPanel(l, st, jump){
     audio = el('audio');
     audio.preload = 'none';
     audio.src = '/api/audio/' + encodeURIComponent(l.folder);
+    sounding = audio;
     const player = el('div', 'player');
     const play = el('button');
     play.type = 'button';

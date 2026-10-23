@@ -330,3 +330,21 @@ def test_in_the_window_recording_opens_the_browser_and_the_power_button_quits(si
             p.locator("#record-panel button.primary").click()
         assert tab.value.url == site
         browser.close()
+
+
+def test_a_recording_stops_when_another_call_opens(page, data):
+    # The old player used to keep sounding, detached, with no button to stop it.
+    import math
+    import struct
+    import wave
+    with wave.open(str(data / "transcripts" / NORTHPINE / "Northpine launch sync.wav"), "wb") as w:
+        w.setnchannels(1), w.setsampwidth(2), w.setframerate(8000)
+        w.writeframes(b"".join(struct.pack("<h", int(8000 * math.sin(i / 10))) for i in range(8000 * 60)))
+    page.evaluate("""() => { window.players = [];
+        const play = HTMLMediaElement.prototype.play;
+        HTMLMediaElement.prototype.play = function(){ window.players.push(this); return play.call(this); }; }""")
+    open_call(page, NORTHPINE)
+    page.locator(".player button").click()
+    page.wait_for_function("window.players.length === 1")
+    open_call(page, SUPPLIER)
+    page.wait_for_function("window.players.every(a => a.paused && !a.ended)", timeout=3000)

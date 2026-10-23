@@ -43,8 +43,8 @@ WORDS = {
                    "Sottovoce continua a lavorare qui, vicino all'orologio. Per chiuderlo: Esci, dal menu di questa icona."),
     "done": ("Transcribed", "Trascritta"),
     "failed": ("Transcription failed", "Trascrizione non riuscita"),
-    "busy": ("A transcription is running: quitting now throws it away. Quit anyway?",
-             "C'è una trascrizione in corso: uscendo adesso si perde. Esci lo stesso?"),
+    "after": ("Sottovoce closes as soon as the transcription ends. To close it now, Quit again.",
+              "Sottovoce si chiude appena finisce la trascrizione. Per chiuderlo subito, Esci di nuovo."),
     "taken": ("Port {port} is used by another program: Sottovoce can't start.",
               "La porta {port} è usata da un altro programma: Sottovoce non può partire."),
 }
@@ -89,6 +89,29 @@ def finished(seen, jobs):
             seen.add(job_id)
             out.append((j.get("name") or "", "done" if j["state"] == "done" else "failed"))
     return out
+
+
+NO_WINDOW = 0x08000000          # CREATE_NO_WINDOW
+
+
+def no_console_windows(popen=subprocess.Popen):
+    """Child programs (ffmpeg above all, also inside Whisper's pipeline) open
+    no window. pythonw has no console to lend them, so Windows gives each one
+    its own: a black window flashing at every step of a transcription. Here,
+    once, for every child, ours and the libraries'."""
+    start = popen.__init__
+
+    def quiet(self, *args, **kwargs):
+        if not kwargs.get("creationflags"):
+            kwargs["creationflags"] = NO_WINDOW
+        start(self, *args, **kwargs)
+
+    popen.__init__ = quiet
+
+
+def busy(jobs, queued) -> bool:
+    """Whether quitting now would throw a transcription away."""
+    return bool(queued) or any(j["state"] == "running" for j in list(jobs.values()))
 
 
 def answers(port) -> bool:
@@ -146,10 +169,6 @@ def webview2_installed() -> bool:
     return False
 
 
-def ask(text) -> bool:
-    return ctypes.windll.user32.MessageBoxW(None, text, "Sottovoce", 0x4 | 0x30 | 0x40000) == 6
-
-
 def tell(text):
     ctypes.windll.user32.MessageBoxW(None, text, "Sottovoce", 0x10 | 0x40000)
 
@@ -174,6 +193,7 @@ def main(argv=None):
     sys.stdout = sys.stderr = open(ours.log, "w", encoding="utf-8", buffering=1)
     # Its own name for Windows, so the taskbar shows Sottovoce's icon, not Python's.
     ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(APP_ID)
+    no_console_windows()
 
     import uvicorn
     import server
@@ -192,7 +212,7 @@ def main(argv=None):
     from PIL import Image
 
     quitting = threading.Event()
-    state = {"window": None, "visible": not ours.hidden, "told": False}
+    state = {"window": None, "visible": not ours.hidden, "told": False, "leaving": False}
 
     def show(*_):
         w = state["window"]
@@ -204,9 +224,13 @@ def main(argv=None):
         state["visible"] = True
 
     def quit_app(*_):
-        if server.line_up.qsize() or any(j["state"] == "running" for j in server.jobs.values()):
-            if not ask(say("busy")):
-                return
+        # During a transcription, Quit waits for it to end; Quit again closes
+        # now. No dialog: one asked from the icon's thread froze while
+        # Whisper kept Python busy, and a second click stacked another.
+        if busy(server.jobs, server.line_up.qsize()) and not state["leaving"]:
+            state["leaving"] = True
+            icon.notify(say("after"), "Sottovoce")
+            return
         quitting.set()
         serving.should_exit = True
         icon.stop()
@@ -233,6 +257,8 @@ def main(argv=None):
             for name, how in finished(seen, server.jobs):
                 if not state["visible"]:
                     icon.notify(name, say(how))
+            if state["leaving"] and not busy(server.jobs, server.line_up.qsize()):
+                quit_app()
             time.sleep(2)
     threading.Thread(target=watch, daemon=True).start()
 
@@ -255,6 +281,9 @@ def main(argv=None):
             return True
         window.hide()
         state["visible"] = False
+        # Put away, it falls silent: a call left playing behind a hidden
+        # window is a voice from nowhere. Not waited for: this is the UI thread.
+        window.run_js("typeof silence === 'function' && silence()")
         if not state["told"]:
             icon.notify(say("still here"), "Sottovoce")
             state["told"] = True
