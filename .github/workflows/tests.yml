@@ -99,7 +99,7 @@ jobs:
           done
           kill "$server"
           wait "$server" || true
-          grep -q '"name"' calls.json
+          grep -q '"name"' calls.json || { echo "the installed server did not list the example calls:"; cat calls.json; exit 1; }
           bash "$SOTTOVOCE_DIR/uninstall.sh"
           test ! -e "$SOTTOVOCE_DIR"
           test -f "$SOTTOVOCE_HOME/glossary.txt"

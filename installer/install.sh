@@ -97,11 +97,12 @@ main() {
     if [ -n "${SOTTOVOCE_SOURCE:-}" ]; then
         echo "  Copying the code from $SOTTOVOCE_SOURCE..."
         mkdir -p "$new"
-        (cd "$SOTTOVOCE_SOURCE" && tar -cf - \
-            --exclude=.git --exclude=.venv --exclude=./transcripts --exclude=./models \
-            --exclude=__pycache__ --exclude=./site --exclude=./research/fleurs \
-            --exclude=./research/ami --exclude=./research/results \
-            --exclude=.lan-pin --exclude=./glossary.txt .) | tar -xf - -C "$new"
+        # The source's own folders by exact path: macOS tar matches an
+        # --exclude anywhere, and would skip examples/transcripts too.
+        (cd "$SOTTOVOCE_SOURCE" && find . \( -path ./.git -o -path ./.venv -o -path ./transcripts \
+                -o -path ./models -o -path ./site -o -path ./research/fleurs -o -path ./research/ami \
+                -o -path ./research/results -o -name __pycache__ \) -prune \
+            -o -type f ! -path ./.lan-pin ! -path ./glossary.txt -print | tar -cf - -T -) | tar -xf - -C "$new"
     else
         local tag=${SOTTOVOCE_VERSION:-}
         if [ -z "$tag" ]; then
