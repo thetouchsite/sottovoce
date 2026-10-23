@@ -431,6 +431,7 @@
   /* ---- progress ---------------------------------------------------------- */
   .stage{color:var(--muted);margin:0 0 12px}
   .bar{height:4px;background:var(--raised);border-radius:2px;overflow:hidden}
+  .working .bar{margin:10px 0 6px;max-width:320px}
   .bar i{display:block;height:100%;background:var(--chart-1);width:0;transition:width .9s linear}
   .bar.indeterminate i{width:30%;animation:slide 1.5s ease-in-out infinite}
   @keyframes slide{0%{margin-left:-30%}100%{margin-left:100%}}
@@ -770,6 +771,11 @@ const IT = {
   // states
   'Not transcribed': 'Da trascrivere', 'Failed': 'Fallita', 'Queued': 'In coda', 'Transcribing…': 'Trascrivo…',
   'queued': 'in coda', 'done': 'fatto', 'failed': 'fallita', 'almost done': 'quasi finito',
+  'downloading the model': 'scarico il modello',
+  'about ten seconds': 'una decina di secondi', '2.9 GB, once: a few minutes': '2,9 GB, una volta sola: qualche minuto',
+  'Starting…': 'Avvio…',
+  'Still working: the first time in a while, the model loads first, up to a minute.':
+    'Ancora al lavoro: la prima volta dopo una pausa il modello si carica, fino a un minuto.',
   'preparing the audio': "preparo l'audio", 'transcribing': 'trascrivo', 'telling the two voices apart': 'distinguo le due voci',
   'telling the voices apart': 'separo le voci', 'downloading the voice models (30 MB, once)': 'scarico i modelli delle voci (30 MB, una volta sola)',
   'Waiting for the transcriptions before it.': 'Aspetta le trascrizioni prima di lei.',
@@ -1649,6 +1655,11 @@ async function drawUnfinished(){
 function jobStageText(j){
   if (j.state === 'error') return j.error || 'failed';
   if (j.state === 'done') return 'done';
+  // Loading Whisper has no estimate, but it moves: the seconds say so.
+  if (j.stage === 'loading the model')
+    return T('loading the model') + ' · ' + j.elapsed + ' s · ' + T('about ten seconds');
+  if (j.stage === 'downloading the model')
+    return T('downloading the model') + ' · ' + j.elapsed + ' s · ' + T('2.9 GB, once: a few minutes');
   if (j.expected){
     const left = Math.max(0, j.expected - j.elapsed);
     return j.stage + ' · ' + Math.max(1, Math.round(j.duration / 60)) + ' min of audio · '
@@ -1974,6 +1985,29 @@ async function stopRecording(keep){
   }
 }
 
+/* ============================ waiting, shown ============================ */
+// Anything that takes a while says so, and shows it is moving: a sliding bar
+// and the seconds counted. A plain "the model is reading the call…" looked
+// stuck for the minute the summary model takes to load the first time.
+function working(text, later){
+  const box = el('div', 'working');
+  const p = el('p', 'quiet');
+  p.textContent = text;
+  const bar = el('div', 'bar indeterminate');
+  bar.append(el('i'));
+  const n = el('p', 'rec-note');
+  const t0 = Date.now();
+  const tick = () => {
+    if (!box.isConnected && Date.now() - t0 > 1000) return;
+    const s = Math.round((Date.now() - t0) / 1000);
+    n.textContent = s + ' s' + (later && s >= 8 ? ' · ' + T(later) : '');
+    setTimeout(tick, 1000);
+  };
+  box.append(p, bar, n);
+  tick();
+  return box;
+}
+
 /* ===================== recording from the computer itself ================= */
 // In Sottovoce's window on Windows the server records (recorder.py): your
 // microphone and everything the computer plays, any app, nothing shared on
@@ -2016,6 +2050,7 @@ function drawCaptureIdle(c){
 
 async function startCapture(name, button){
   button.disabled = true;
+  button.textContent = T('Starting…');
   let j;
   try{
     j = await (await fetch('/api/capture', {method:'POST', headers:{'Content-Type':'application/json'},
@@ -2024,6 +2059,7 @@ async function startCapture(name, button){
   } catch(e){ j = {error: 'the server did not answer'}; }
   if (j.error){
     button.disabled = false;
+    button.textContent = T('Start recording');
     const v = el('p', 'rec-note error');
     v.textContent = T('The recording did not start:') + ' ' + T(j.error);
     $('#record-body').append(v);
@@ -2449,9 +2485,8 @@ function followupPanel(l){
 
   async function write(redo){
     c.textContent = '';
-    const w = el('p', 'quiet');
-    w.textContent = 'the model is writing the email…';
-    c.append(w);
+    c.append(working(T('the model is writing the email…'),
+      'Still working: the first time in a while, the model loads first, up to a minute.'));
     try{
       const r = await (await fetch(api + (redo ? '?redo=true' : ''), {method:'POST'})).json();
       if (r.error) throw new Error(r.error);
@@ -3090,9 +3125,9 @@ function readingPanel(l, st, jump){
     box.className = 'reader';
     box.textContent = '';
     context.textContent = '';
-    const w = el('p', 'quiet');
+    const w = working(T('the model is reading the call…'),
+      'Still working: the first time in a while, the model loads first, up to a minute.');
     w.style.padding = '14px 0';
-    w.textContent = 'the model is reading the call…';
     box.append(w);
     try{
       const r = await (await fetch('/api/summary/' + encodeURIComponent(l.folder)

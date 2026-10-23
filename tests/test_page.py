@@ -364,3 +364,20 @@ def test_a_call_added_elsewhere_appears_in_the_list_by_itself(page, data):
     src = data / "transcripts" / NORTHPINE
     shutil.copytree(src, src.with_name("2026-10-23_Added elsewhere"))
     page.wait_for_function(f"document.querySelectorAll('.item').length > {before}", timeout=10000)
+
+
+def test_loading_whisper_shows_as_such_with_the_seconds_moving(page):
+    # The first transcription loads the model for ten seconds or so: it must
+    # not look stuck.
+    import json as _json
+    page.route("**/api/jobs", lambda r: r.fulfill(
+        body=_json.dumps({"jobs": [{"id": "j1", "name": "Weekly.wav", "folder": None}]}),
+        content_type="application/json"))
+    page.route("**/api/job/j1", lambda r: r.fulfill(
+        body=_json.dumps({"state": "running", "stage": "loading the model", "expected": 0,
+                          "elapsed": 4, "duration": 120, "name": "Weekly.wav"}),
+        content_type="application/json"))
+    page.reload()
+    page.wait_for_function("(document.querySelector('.queue-row .qstage') || {}).textContent"
+                           " === 'loading the model · 4 s · about ten seconds'", timeout=10000)
+    assert page.locator(".queue-row .bar.indeterminate").count() == 1

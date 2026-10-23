@@ -110,12 +110,48 @@ def ffmpeg() -> str:
     return imageio_ffmpeg.get_ffmpeg_exe()
 
 
-def engine():
-    """The pipeline, loaded once and kept in VRAM.
+# Seconds without a transcription before the server lets Whisper go: the
+# same as the built-in summary model (summary.IDLE).
+IDLE = 600
 
-    Loading it takes about twenty seconds: inside the server that is paid once
-    at startup and never again. From the command line it is paid for every
-    file, which is why the server is worth it for more than one.
+
+def loaded() -> bool:
+    return _engine is not None
+
+
+def downloaded() -> bool:
+    """Whether Whisper is already on disk: if not, the first load is a 2.9 GB download."""
+    try:
+        from huggingface_hub import try_to_load_from_cache
+        return isinstance(try_to_load_from_cache(MODEL, "config.json"), str)
+    except Exception:
+        return False
+
+
+def release():
+    """Frees Whisper's memory on the GPU (3.4 GB measured). The next call to
+    engine() loads it again, in about ten seconds."""
+    global _engine
+    with _lock:
+        if _engine is None:
+            return
+        _engine = None
+    import gc
+    gc.collect()
+    try:
+        import torch
+        torch.cuda.empty_cache()
+    except ImportError:
+        pass
+
+
+def engine():
+    """The pipeline, loaded on first use and kept in VRAM until released.
+
+    Loading it takes about ten seconds. The server loads it for the first
+    transcription and lets it go IDLE seconds after the last one, so a
+    Sottovoce left open all day holds the GPU only while it works. From the
+    command line it is paid for every file.
     """
     global _engine
     with _lock:
@@ -942,6 +978,12 @@ def run(source, language=None, progress=None, two_tracks=False, precise=False, v
         speech_s = sum(b - a for a, b in speech) if speech else seconds
         level = speech_level(meter, speech)
 
+        if not loaded():
+            # Ten seconds or so, minutes the very first time: said, so the
+            # page doesn't look stuck.
+            if progress:
+                progress("loading the model" if downloaded() else "downloading the model", seconds)
+            engine()
         if progress:
             progress("transcribing", seconds)
         words, used, breaks = listen(wav, language, speech[0][0] if speech else 0.0, precise)

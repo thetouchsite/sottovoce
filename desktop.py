@@ -136,9 +136,9 @@ def recording_icon(image):
 
 
 def answers(port) -> bool:
-    """Whether a Sottovoce is already serving on this port: "ok", or "loading"
-    while Whisper loads. Waiting for "ok" kept the window away until Whisper
-    was in memory, 12 s, and once Whisper waited for the window, forever."""
+    """Whether a Sottovoce is already serving on this port. "loading" is an
+    answer too (an older server said so until Whisper was in memory): waiting
+    for "ok" once kept the window away for 12 s."""
     try:
         with urllib.request.urlopen(f"http://127.0.0.1:{port}/health", timeout=1) as r:
             return r.read().strip() in (b"ok", b"loading")
@@ -229,10 +229,8 @@ def main(argv=None):
     ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(APP_ID)
     no_console_windows()
 
-    # The order is what makes it feel fast: the window at once, with
-    # "starting"; then the server, the icon and the page; then Whisper, which
-    # takes the whole of Python for seconds while it loads. Server and model
-    # together used to keep the window away for 12 s.
+    # The window at once, with "starting"; then the server, the icon and the
+    # page. Whisper waits for the first transcription (server.start).
     quitting = threading.Event()
     state = {"window": None, "visible": not ours.hidden, "told": False, "leaving": False,
              "recording": False, "server": None, "serving": None, "icon": None}
@@ -272,7 +270,6 @@ def main(argv=None):
         import uvicorn
         from PIL import Image
         import server
-        server.WARM_LATER = with_window
         args = server.options(rest)
         serving = uvicorn.Server(uvicorn.Config(server.app, host=server.configure(args),
                                                 port=args.port, log_level="warning"))
@@ -338,9 +335,6 @@ def main(argv=None):
 
         if state["window"] is not None:
             state["window"].load_url(url + "/?window")
-            # Whisper once the page is drawn (loaded(), below); this in case
-            # that never comes.
-            threading.Timer(10, server.warm_up_now).start()
         elif not ours.hidden:
             webbrowser.open(url)
 
@@ -380,9 +374,6 @@ def main(argv=None):
         browser = window.native.browser.webview
         browser.Invoke(Action(lambda: setattr(browser.CoreWebView2.Settings,
                                               "AreDefaultContextMenusEnabled", True)))
-        # The page is on screen: now Whisper may take Python for a while.
-        if state["server"] is not None and (window.get_current_url() or "").startswith(url):
-            state["server"].warm_up_now()
 
     window.events.closing += closing
     window.events.loaded += loaded

@@ -242,13 +242,27 @@ def folder(name: str) -> pathlib.Path:
     return DATA / pathlib.Path(name).name
 
 
-def warm_up():
-    """Loads the model at startup, in a thread, so the page opens at once."""
-    try:
-        T.engine()
-        engine_state["ready"] = True
-    except Exception as e:
-        engine_state["error"] = f"{type(e).__name__}: {e}"
+class Idle:
+    """Lets Whisper go T.IDLE seconds after the last transcription. Never
+    while one runs or waits: the clock starts when the line is empty."""
+
+    def __init__(self):
+        self.last_busy = time.time()
+
+    def check(self, now=None):
+        now = now or time.time()
+        if line_up.qsize() or any(j["state"] == "running" for j in list(jobs.values())):
+            self.last_busy = now
+        elif T.loaded() and now - self.last_busy > T.IDLE:
+            T.release()
+            print("  Whisper left the GPU: unused for ten minutes")
+
+
+def unload_when_idle():
+    idle = Idle()
+    while True:
+        time.sleep(30)
+        idle.check()
 
 
 def sweep():
@@ -448,10 +462,15 @@ def process(job_id: str, original: pathlib.Path, language: str | None,
             job["stage"] = stage
             if audio_seconds:
                 job["duration"] = audio_seconds
+            if stage in ("loading the model", "downloading the model"):
+                job["expected"] = 0             # no estimate: the page shows a moving bar and the seconds
+            elif audio_seconds:
                 # An honest estimate: the speed measured end to end on a real
                 # call. Not real progress (the pipeline does not expose it),
-                # but it is off by a few seconds over four minutes.
-                job["expected"] = round(audio_seconds / (T.SPEED_PRECISE if precise else T.SPEED)
+                # but it is off by a few seconds over four minutes. Counted
+                # from now, so loading the model doesn't eat into it.
+                job["expected"] = round(time.time() - job["started"]
+                                        + audio_seconds / (T.SPEED_PRECISE if precise else T.SPEED)
                                         # telling voices apart: about 2.5 s a minute, on the CPU
                                         + (audio_seconds / 24 if voices else 0))
 
@@ -510,20 +529,6 @@ def counter():
             line_up.task_done()
 
 
-# desktop.py puts Whisper off until the window shows the page: loading it
-# takes the whole of Python for seconds, and the server, then the window,
-# waited for it. Measured: the window appeared after 12 s, as Whisper did.
-WARM_LATER = False
-_warm_pending = threading.Event()
-
-
-def warm_up_now():
-    """Starts loading Whisper, once, if start() put it off."""
-    if _warm_pending.is_set():
-        _warm_pending.clear()
-        threading.Thread(target=warm_up, daemon=True).start()
-
-
 def start(data: pathlib.Path, glossary: pathlib.Path | None = None, model: bool = True):
     """Startup side effects, run once from __main__ after the options are read.
 
@@ -538,10 +543,12 @@ def start(data: pathlib.Path, glossary: pathlib.Path | None = None, model: bool 
     RECORDINGS = DATA / "_recordings"
     DATA.mkdir(parents=True, exist_ok=True)
     sweep()
-    if model and WARM_LATER:
-        _warm_pending.set()
-    elif model:
-        threading.Thread(target=warm_up, daemon=True).start()
+    # Whisper is loaded by the first transcription, not here: recording,
+    # reading and correcting don't need it, and loading it at start took the
+    # whole of Python for seconds and 3.4 GB of the GPU for the day.
+    if model:
+        engine_state["ready"] = True
+        threading.Thread(target=unload_when_idle, daemon=True).start()
     else:
         engine_state["off"] = True
     threading.Thread(target=counter, daemon=True).start()
@@ -590,7 +597,7 @@ def voices_installed() -> bool:
 @app.get("/api/status")
 def api_status():
     import voices as V
-    return {**engine_state, "model": T.MODEL, "queued": line_up.qsize(), "version": VERSION,
+    return {**engine_state, "model": T.MODEL, "loaded": T.loaded(), "queued": line_up.qsize(), "version": VERSION,
             # The page says "downloads 32 MB the first time" until it is on disk.
             "voices": voices_installed(), "voices_ready": V.ready()}
 
@@ -1757,7 +1764,8 @@ def configure(args) -> str:
     print(f"  transcripts in: {DATA}")
     print(f"  API reference: http://127.0.0.1:{args.port}/docs")
     print("  browsing only: Whisper is not loaded (--no-model)\n" if args.no_model else
-          "  (the first start loads 2.88 GB into VRAM: about twenty seconds)\n")
+          "  Whisper loads with the first transcription (2.9 GB of the GPU) and leaves\n"
+          "  ten minutes after the last one\n")
     # 127.0.0.1 by default: the server hands out client recordings and
     # transcripts to whoever reaches it. --lan opens it to the local network
     # on purpose, for reading and uploading from a phone, behind a PIN (see

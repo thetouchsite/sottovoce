@@ -535,6 +535,26 @@ def test_running_transcriptions_are_listed_whoever_started_them(client):
         server.jobs.pop("tray1"), server.jobs.pop("old")
 
 
+def test_whisper_leaves_the_gpu_ten_minutes_after_the_last_transcription(client, monkeypatch):
+    import server
+    import transcribe
+    released = []
+    monkeypatch.setattr(transcribe, "loaded", lambda: True)
+    monkeypatch.setattr(transcribe, "release", lambda: released.append(True))
+    idle = server.Idle()
+    t = idle.last_busy
+    server.jobs["long"] = {"state": "running", "name": "Long call"}
+    try:
+        idle.check(t + 3600)                      # an hour of transcribing: kept
+        assert released == []
+    finally:
+        server.jobs.pop("long")
+    idle.check(t + 3600 + 599)                    # just under ten minutes after: kept
+    assert released == []
+    idle.check(t + 3600 + 601)                    # then let go
+    assert released == [True]
+
+
 def test_the_page_is_checked_again_at_every_load(client):
     # After an update, the window showed the page it had cached from before.
     assert client.get("/").headers["cache-control"] == "no-cache"
