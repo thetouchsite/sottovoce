@@ -2,6 +2,7 @@
 
     python research/two_tracks.py              the held-out meeting
     python research/two_tracks.py --tune       the meeting to tune on
+    python research/two_tracks.py --old-rule   as before 1.7, for the comparison
 
 A call recorded from the page has your microphone on one track and the
 call's audio on the other. AMI meetings (CC BY 4.0) were recorded with a
@@ -206,7 +207,11 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--tune", action="store_true", help="the meeting to tune on, not the held-out one")
     ap.add_argument("--method", default="current", choices=sorted(METHODS))
+    ap.add_argument("--old-rule", action="store_true",
+                    help="before 1.7: a track's moment counts even at its background level")
     args = ap.parse_args()
+    if args.old_rule:
+        T.ABOVE_BACKGROUND = 0.0
     m = "ES2004a" if args.tune else "IS1009a"
     by_person, ref = headsets(m)
     print(f"\n  {m}, {'tuning' if args.tune else 'held out'}, method: {args.method}\n")

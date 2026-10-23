@@ -69,10 +69,11 @@ from fastapi import FastAPI, File, Form, Request, UploadFile
 from fastapi.responses import (FileResponse, HTMLResponse, JSONResponse, PlainTextResponse,
                                RedirectResponse, Response)
 
+import recorder
 import summary as S
 import transcribe as T
 
-VERSION = "1.6.2"
+VERSION = "1.7.0"
 ROOT = pathlib.Path(__file__).resolve().parent
 DATA = ROOT / "transcripts"            # set again by start() from --data
 INCOMING = DATA / "_incoming"
@@ -241,13 +242,27 @@ def folder(name: str) -> pathlib.Path:
     return DATA / pathlib.Path(name).name
 
 
-def warm_up():
-    """Loads the model at startup, in a thread, so the page opens at once."""
-    try:
-        T.engine()
-        engine_state["ready"] = True
-    except Exception as e:
-        engine_state["error"] = f"{type(e).__name__}: {e}"
+class Idle:
+    """Lets Whisper go T.IDLE seconds after the last transcription. Never
+    while one runs or waits: the clock starts when the line is empty."""
+
+    def __init__(self):
+        self.last_busy = time.time()
+
+    def check(self, now=None):
+        now = now or time.time()
+        if line_up.qsize() or any(j["state"] == "running" for j in list(jobs.values())):
+            self.last_busy = now
+        elif T.loaded() and now - self.last_busy > T.IDLE:
+            T.release()
+            print("  Whisper left the GPU: unused for ten minutes")
+
+
+def unload_when_idle():
+    idle = Idle()
+    while True:
+        time.sleep(30)
+        idle.check()
 
 
 def sweep():
@@ -447,10 +462,15 @@ def process(job_id: str, original: pathlib.Path, language: str | None,
             job["stage"] = stage
             if audio_seconds:
                 job["duration"] = audio_seconds
+            if stage in ("loading the model", "downloading the model"):
+                job["expected"] = 0             # no estimate: the page shows a moving bar and the seconds
+            elif audio_seconds:
                 # An honest estimate: the speed measured end to end on a real
                 # call. Not real progress (the pipeline does not expose it),
-                # but it is off by a few seconds over four minutes.
-                job["expected"] = round(audio_seconds / (T.SPEED_PRECISE if precise else T.SPEED)
+                # but it is off by a few seconds over four minutes. Counted
+                # from now, so loading the model doesn't eat into it.
+                job["expected"] = round(time.time() - job["started"]
+                                        + audio_seconds / (T.SPEED_PRECISE if precise else T.SPEED)
                                         # telling voices apart: about 2.5 s a minute, on the CPU
                                         + (audio_seconds / 24 if voices else 0))
 
@@ -523,8 +543,12 @@ def start(data: pathlib.Path, glossary: pathlib.Path | None = None, model: bool 
     RECORDINGS = DATA / "_recordings"
     DATA.mkdir(parents=True, exist_ok=True)
     sweep()
+    # Whisper is loaded by the first transcription, not here: recording,
+    # reading and correcting don't need it, and loading it at start took the
+    # whole of Python for seconds and 3.4 GB of the GPU for the day.
     if model:
-        threading.Thread(target=warm_up, daemon=True).start()
+        engine_state["ready"] = True
+        threading.Thread(target=unload_when_idle, daemon=True).start()
     else:
         engine_state["off"] = True
     threading.Thread(target=counter, daemon=True).start()
@@ -573,7 +597,7 @@ def voices_installed() -> bool:
 @app.get("/api/status")
 def api_status():
     import voices as V
-    return {**engine_state, "model": T.MODEL, "queued": line_up.qsize(), "version": VERSION,
+    return {**engine_state, "model": T.MODEL, "loaded": T.loaded(), "queued": line_up.qsize(), "version": VERSION,
             # The page says "downloads 32 MB the first time" until it is on disk.
             "voices": voices_installed(), "voices_ready": V.ready()}
 
@@ -633,9 +657,34 @@ async def api_transcribe_added(name: str, request: Request):
     info = read_info(d)
     return {"job": enqueue(d / audio, info.get("title") or audio,
                            language_of(body.get("language")),
-                           two_tracks=bool(body.get("two_tracks")),
+                           two_tracks=bool(body.get("two_tracks") or info.get("two_tracks")),
                            precise=bool(body.get("precise")),
                            voices=bool(body.get("voices")) and voices_installed())}
+
+
+@app.get("/api/calls/stamp")
+def api_calls_stamp():
+    """Changes when a call is added, removed or changed on disk: the page
+    redraws its list when it does, whoever made the change (Stop in the
+    icon's menu, a phone, another window). Cheap: a folder listing and a
+    stat per call."""
+    count, latest = 0, 0.0
+    for d in DATA.iterdir() if DATA.exists() else []:
+        if d.is_dir() and not d.name.startswith("_"):
+            count += 1
+            f = d / "info.json"
+            if f.exists():
+                latest = max(latest, f.stat().st_mtime)
+    return {"stamp": f"{count}:{latest:.3f}"}
+
+
+@app.get("/api/jobs")
+def api_jobs():
+    """The transcriptions running or waiting, whoever started them: Stop in
+    the icon's menu, a phone, a page opened half-way. The page follows them
+    all, not only the ones it asked for."""
+    return {"jobs": [{"id": k, "name": j.get("name"), "folder": j.get("folder")}
+                     for k, j in list(jobs.items()) if j["state"] == "running"]}
 
 
 @app.get("/api/job/{job_id}")
@@ -656,7 +705,12 @@ RID = re.compile(r"^[0-9a-f]{12}$")
 
 
 def recording(rid: str) -> pathlib.Path | None:
-    return RECORDINGS / f"{rid}.webm" if RID.match(rid) else None
+    """The recording's file: a .webm sent by the page, or a .wav recorded by
+    the computer itself (recorder.py). Both end the same way."""
+    if not RID.match(rid):
+        return None
+    wav = RECORDINGS / f"{rid}.wav"
+    return wav if wav.exists() else RECORDINGS / f"{rid}.webm"
 
 
 @app.post("/api/recordings")
@@ -687,26 +741,33 @@ async def api_recording_chunk(rid: str, request: Request):
 @app.post("/api/recordings/{rid}/finish")
 async def api_recording_finish(rid: str, request: Request):
     """Stops collecting and queues the recording for transcription, on two tracks."""
+    return finish_recording(rid, await request.json() if await request.body() else {})
+
+
+def finish_recording(rid: str, body: dict):
     f = recording(rid)
     if f is None or not f.exists():
         return JSONResponse({"error": "unknown recording"}, 404)
-    if f.stat().st_size == 0:
+    empty = 0
+    if f.suffix == ".wav":
+        recorder.repair(f)                 # cut off mid-call, its header is behind
+        empty = recorder.HEADER
+    if f.stat().st_size <= empty:
         return JSONResponse({"error": "the recording is empty"}, 400)
     refused = refuse_if_off()
     if refused:
         return refused
     meta_f = RECORDINGS / f"{rid}.json"
     meta = json.loads(meta_f.read_text(encoding="utf-8")) if meta_f.exists() else {}
-    body = await request.json() if await request.body() else {}
-    name = clean(body.get("name") or meta.get("name") or "Call") + ".webm"
-    language = language_of(body.get("language") or meta.get("language"))
-    dest = INCOMING / f"{rid}.webm"
+    choose = lambda k: body[k] if k in body else meta.get(k)          # noqa: E731
+    name = clean(choose("name") or "Call") + f.suffix
+    dest = INCOMING / f"{rid}{f.suffix}"
     shutil.move(str(f), dest)
     meta_f.unlink(missing_ok=True)
     original = take(dest, name)
-    return {"job": enqueue(original, name, language, two_tracks=True,
-                           precise=bool(body.get("precise")),
-                           voices=bool(body.get("voices")) and voices_installed())}
+    return {"job": enqueue(original, name, language_of(choose("language")), two_tracks=True,
+                           precise=bool(choose("precise")),
+                           voices=bool(choose("voices")) and voices_installed())}
 
 
 @app.get("/api/recordings")
@@ -714,9 +775,9 @@ def api_recordings():
     """Recordings that were never finished: the page offers to save them."""
     out = []
     for meta_f in sorted(RECORDINGS.glob("*.json")) if RECORDINGS.exists() else []:
-        f = meta_f.with_suffix(".webm")
-        if not f.exists():
-            continue
+        f = recording(meta_f.stem)
+        if f is None or not f.exists() or (capture and capture["id"] == meta_f.stem):
+            continue                       # the one recording now is not interrupted
         meta = json.loads(meta_f.read_text(encoding="utf-8"))
         out.append({"id": meta_f.stem, **meta, "bytes": f.stat().st_size,
                     "idle_s": round(time.time() - f.stat().st_mtime)})
@@ -731,6 +792,136 @@ def api_recording_delete(rid: str):
     f.unlink(missing_ok=True)
     (RECORDINGS / f"{rid}.json").unlink(missing_ok=True)
     return {"deleted": True}
+
+
+# --- recording from the computer itself (recorder.py) -----------------------------
+# Your microphone and everything the computer plays, on the same two tracks
+# as the page's: any call, nothing shared on screen. Only from the computer
+# Sottovoce runs on: a phone on the Wi-Fi (--lan) must not switch on this
+# computer's microphone.
+
+capture = None             # {"id", "capture": recorder.Capture, "name"} while one runs
+LOCAL = {"127.0.0.1", "::1"}
+
+
+def from_here(request: Request):
+    if (request.client.host if request.client else "") not in LOCAL:
+        return JSONResponse({"error": "recording works only on the computer running Sottovoce"}, 403)
+    return None
+
+
+def open_in_files(path: pathlib.Path):
+    """The folder, in the computer's own file manager."""
+    import sys
+    if sys.platform == "win32":
+        os.startfile(path)                                      # noqa: S606
+    else:
+        subprocess.Popen(["open" if sys.platform == "darwin" else "xdg-open", str(path)])
+
+
+@app.post("/api/folder")
+async def api_folder(request: Request):
+    """Opens the folder of the calls, or of one call (its recording and its
+    texts), in Explorer. Only on the computer itself: a phone can't open the
+    computer's windows."""
+    refused = from_here(request)
+    if refused:
+        return refused
+    body = await request.json() if await request.body() else {}
+    d = folder(body["name"]) if body.get("name") else DATA
+    if not d.is_dir():
+        return JSONResponse({"error": "not found"}, 404)
+    open_in_files(d)
+    return {"opened": True}
+
+
+@app.get("/api/capture")
+def api_capture():
+    now = None
+    if capture:
+        c = capture["capture"]
+        now = {"id": capture["id"], "name": capture["name"], "seconds": round(c.seconds, 1),
+               "levels": [round(v, 3) for v in c.levels], "error": c.error}
+    return {"available": recorder.available(), "recording": now}
+
+
+@app.post("/api/capture")
+async def api_capture_start(request: Request):
+    global capture
+    refused = from_here(request)
+    if refused:
+        return refused
+    if capture:
+        return JSONResponse({"error": "already recording"}, 409)
+    if not recorder.available():
+        return JSONResponse({"error": "recording the computer's sound needs Windows"}, 503)
+    body = await request.json() if await request.body() else {}
+    rid = uuid.uuid4().hex[:12]
+    RECORDINGS.mkdir(parents=True, exist_ok=True)
+    name = clean(body.get("name") or f"Call {time.strftime('%Y-%m-%d %H.%M')}")
+    meta_f = RECORDINGS / f"{rid}.json"
+    # The choices travel with the recording: Stop from the icon by the clock,
+    # or a recording saved after a crash, transcribes the way it was asked.
+    meta_f.write_text(json.dumps({
+        "started_at": time.strftime("%Y-%m-%d %H:%M"), "name": name,
+        "language": body.get("language") or "auto", "precise": bool(body.get("precise")),
+        "voices": bool(body.get("voices")), "from": "computer"}), encoding="utf-8")
+    c = recorder.Capture(RECORDINGS / f"{rid}.wav")
+    try:
+        c.start()
+    except Exception as e:
+        meta_f.unlink(missing_ok=True)
+        return JSONResponse({"error": f"the recording did not start: {e}"}, 503)
+    capture = {"id": rid, "capture": c, "name": name}
+    return {"id": rid}
+
+
+def stop_capture():
+    """Stops the recording and keeps its file, unfinished: what Quit does, so
+    the next start offers it like any interrupted recording. Returns its id."""
+    global capture
+    if not capture:
+        return None
+    now, capture = capture, None
+    now["capture"].stop()
+    return now["id"]
+
+
+@app.post("/api/capture/stop")
+async def api_capture_stop(request: Request):
+    refused = from_here(request)
+    if refused:
+        return refused
+    if not capture:
+        return JSONResponse({"error": "nothing is being recorded"}, 404)
+    body = await request.json() if await request.body() else {}
+    rid = stop_capture()
+    if not body.get("keep", True):
+        recording(rid).unlink(missing_ok=True)
+        (RECORDINGS / f"{rid}.json").unlink(missing_ok=True)
+        return {"discarded": True}
+    if not body.get("transcribe", True):
+        return keep_for_later(rid, body.get("name"))
+    return finish_recording(rid, {k: body[k] for k in ("name", "language", "precise", "voices") if k in body})
+
+
+def keep_for_later(rid: str, name: str | None = None):
+    """A stopped recording kept as a call to transcribe later, like an added
+    file: in the list, "Not transcribed", remembering its two tracks."""
+    f = recording(rid)
+    if f is None or not f.exists():
+        return JSONResponse({"error": "unknown recording"}, 404)
+    recorder.repair(f)
+    meta_f = RECORDINGS / f"{rid}.json"
+    meta = json.loads(meta_f.read_text(encoding="utf-8")) if meta_f.exists() else {}
+    dest = INCOMING / f"{rid}{f.suffix}"
+    shutil.move(str(f), dest)
+    meta_f.unlink(missing_ok=True)
+    original = take(dest, clean(name or meta.get("name") or "Call") + f.suffix)
+    write_info(original.parent, {"original": original.name, "status": "waiting", "two_tracks": True,
+                                 "uploaded_at": meta.get("started_at") or time.strftime("%Y-%m-%d %H:%M"),
+                                 "duration_s": probe_seconds(original)})
+    return {"folder": original.parent.name}
 
 
 # --- history ----------------------------------------------------------------------
@@ -1492,7 +1683,9 @@ def api_glossary_add(body: dict):
 
 @app.get("/", include_in_schema=False)
 def page():
-    return FileResponse(ROOT / "app" / "index.html")
+    # Checked with the server at every load: after an update the window,
+    # which keeps its cache between starts, showed the page from before.
+    return FileResponse(ROOT / "app" / "index.html", headers={"Cache-Control": "no-cache"})
 
 
 @app.get("/fonts/{name}", include_in_schema=False)
@@ -1528,6 +1721,8 @@ def api_shutdown():
     """
     if any(j["state"] == "running" for j in jobs.values()) or line_up.qsize():
         return JSONResponse({"error": "a transcription is running: wait for it to finish"}, 409)
+    if capture:
+        return JSONResponse({"error": "a call is being recorded: stop it first"}, 409)
 
     def shortly():
         time.sleep(0.4)          # time to answer the page
@@ -1594,7 +1789,8 @@ def configure(args) -> str:
     print(f"  transcripts in: {DATA}")
     print(f"  API reference: http://127.0.0.1:{args.port}/docs")
     print("  browsing only: Whisper is not loaded (--no-model)\n" if args.no_model else
-          "  (the first start loads 2.88 GB into VRAM: about twenty seconds)\n")
+          "  Whisper loads with the first transcription (2.9 GB of the GPU) and leaves\n"
+          "  ten minutes after the last one\n")
     # 127.0.0.1 by default: the server hands out client recordings and
     # transcripts to whoever reaches it. --lan opens it to the local network
     # on purpose, for reading and uploading from a phone, behind a PIN (see

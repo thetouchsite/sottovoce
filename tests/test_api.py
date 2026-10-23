@@ -5,6 +5,8 @@ guarantees: what it reads, what it writes, and what it refuses.
 """
 import json
 
+import pytest
+
 from conftest import NORTHPINE, SUPPLIER
 
 
@@ -181,6 +183,7 @@ def fake_run(monkeypatch, fail=False):
 
     monkeypatch.setattr(server.T, "run", run)
     monkeypatch.setitem(server.engine_state, "ready", True)
+    monkeypatch.setitem(server.engine_state, "off", False)
     monkeypatch.setitem(server.engine_state, "off", False)
 
 
@@ -440,3 +443,130 @@ def test_info_is_never_read_half_written(data):
     assert bad == [] and server.read_info(d)["n"] == 199
     assert not (d / "info.json.tmp").exists()
 
+
+
+# --- recording from the computer itself (recorder.py), with a stand-in -------------
+
+class FakeCapture:
+    """Writes a second of a quiet stereo WAV when stopped: no devices."""
+
+    def __init__(self, path):
+        self.path, self.seconds, self.levels, self.error = path, 0.0, [0.2, 0.1], None
+
+    def start(self):
+        import recorder
+        self.path.write_bytes(recorder.header(0))
+
+    def stop(self):
+        import recorder
+        self.path.write_bytes(recorder.header(0) + b"\x00\x00" * 2 * recorder.RATE)
+        return self.path
+
+
+@pytest.fixture
+def here(client, monkeypatch):
+    """The same server, asked from the computer it runs on."""
+    import recorder
+    import server
+    from fastapi.testclient import TestClient
+    monkeypatch.setattr(recorder, "available", lambda: True)
+    monkeypatch.setattr(recorder, "Capture", FakeCapture)
+    yield TestClient(server.app, client=("127.0.0.1", 50000))
+    server.capture = None
+
+
+def test_a_phone_cannot_switch_on_the_computers_microphone(here, client):
+    assert client.post("/api/capture", json={}).status_code == 403          # not 127.0.0.1
+    assert here.get("/api/capture").json() == {"available": True, "recording": None}
+
+
+def test_a_computer_recording_is_one_at_a_time_and_discarded_without_a_trace(here, data):
+    rid = here.post("/api/capture", json={"name": "Weekly"}).json()["id"]
+    now = here.get("/api/capture").json()["recording"]
+    assert now["id"] == rid and now["name"] == "Weekly" and now["levels"] == [0.2, 0.1]
+    assert here.post("/api/capture", json={}).status_code == 409
+    assert here.get("/api/recordings").json()["recordings"] == []          # live, not interrupted
+    assert here.post("/api/shutdown").status_code == 409                    # the power button waits
+    assert here.post("/api/capture/stop", json={"keep": False}).json() == {"discarded": True}
+    assert list((data / "transcripts" / "_recordings").iterdir()) == []
+
+
+def test_a_kept_recording_without_the_model_waits_with_the_choices_made(here, data):
+    here.post("/api/capture", json={"name": "Weekly", "language": "it", "voices": True})
+    r = here.post("/api/capture/stop", json={})
+    assert r.status_code == 503                                             # --no-model here
+    listed = here.get("/api/recordings").json()["recordings"]
+    assert [(x["name"], x["language"], x["voices"], x["from"]) for x in listed] == [("Weekly", "it", True, "computer")]
+    assert listed[0]["bytes"] == 44 + 4 * 48000
+
+
+def test_a_recording_stopped_without_transcribing_waits_in_the_list_on_two_tracks(here, data, monkeypatch):
+    import server
+    here.post("/api/capture", json={"name": "Weekly"})
+    folder = here.post("/api/capture/stop", json={"transcribe": False}).json()["folder"]
+    assert list((data / "transcripts" / "_recordings").iterdir()) == []
+    listed = {c["folder"]: c for c in here.get("/api/history").json()["history"]}
+    assert listed[folder]["status"] == "waiting" and listed[folder]["two_tracks"] is True
+    # Transcribed later with the page's choices, it is still on two tracks.
+    asked = {}
+    monkeypatch.setattr(server, "enqueue", lambda *a, **k: asked.update(k) or "job1")
+    monkeypatch.setitem(server.engine_state, "ready", True)
+    monkeypatch.setitem(server.engine_state, "off", False)
+    assert here.post(f"/api/transcribe/{folder}", json={"language": "it"}).json() == {"job": "job1"}
+    assert asked["two_tracks"] is True
+
+
+def test_the_list_stamp_changes_when_a_call_is_added_elsewhere(here):
+    before = here.get("/api/calls/stamp").json()["stamp"]
+    assert here.get("/api/calls/stamp").json()["stamp"] == before        # nothing changed
+    here.post("/api/capture", json={"name": "Weekly"})
+    here.post("/api/capture/stop", json={"transcribe": False})           # as from the icon's menu
+    assert here.get("/api/calls/stamp").json()["stamp"] != before
+
+
+def test_running_transcriptions_are_listed_whoever_started_them(client):
+    import server
+    server.jobs["tray1"] = {"state": "running", "name": "Weekly.wav", "folder": "2026-10-23_Weekly"}
+    server.jobs["old"] = {"state": "done", "name": "Old.wav"}
+    try:
+        assert client.get("/api/jobs").json()["jobs"] == [
+            {"id": "tray1", "name": "Weekly.wav", "folder": "2026-10-23_Weekly"}]
+    finally:
+        server.jobs.pop("tray1"), server.jobs.pop("old")
+
+
+def test_whisper_leaves_the_gpu_ten_minutes_after_the_last_transcription(client, monkeypatch):
+    import server
+    import transcribe
+    released = []
+    monkeypatch.setattr(transcribe, "loaded", lambda: True)
+    monkeypatch.setattr(transcribe, "release", lambda: released.append(True))
+    idle = server.Idle()
+    t = idle.last_busy
+    server.jobs["long"] = {"state": "running", "name": "Long call"}
+    try:
+        idle.check(t + 3600)                      # an hour of transcribing: kept
+        assert released == []
+    finally:
+        server.jobs.pop("long")
+    idle.check(t + 3600 + 599)                    # just under ten minutes after: kept
+    assert released == []
+    idle.check(t + 3600 + 601)                    # then let go
+    assert released == [True]
+
+
+def test_the_folders_open_in_explorer_only_on_the_computer(here, client, monkeypatch):
+    import server
+    opened = []
+    monkeypatch.setattr(server, "open_in_files", lambda p: opened.append(p.name))
+    assert here.post("/api/folder", json={}).json() == {"opened": True}
+    assert here.post("/api/folder", json={"name": NORTHPINE}).json() == {"opened": True}
+    assert opened == ["transcripts", NORTHPINE]
+    assert here.post("/api/folder", json={"name": "nope"}).status_code == 404
+    assert client.post("/api/folder", json={}).status_code == 403              # a phone
+    assert len(opened) == 2
+
+
+def test_the_page_is_checked_again_at_every_load(client):
+    # After an update, the window showed the page it had cached from before.
+    assert client.get("/").headers["cache-control"] == "no-cache"

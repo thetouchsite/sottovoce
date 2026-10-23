@@ -4,6 +4,31 @@ What changed in each release, newest first. The format follows [Keep a Changelog
 
 ## [Unreleased]
 
+## [1.7.0] - 2026-10-23
+
+Record any call from the Sottovoce window on Windows, who spoke right 19 times in 20, and a program that opens in two seconds and holds the GPU only while it works.
+
+### Added
+
+- **Record any call from the Sottovoce window** (Windows): your microphone and everything the computer plays, on two tracks, with `recorder.py` (WASAPI loopback through soundcard, BSD-3). Meet in a browser, the Teams or Zoom apps, WhatsApp, a phone call through the computer. Nothing is shared on screen. While it records, the output plays silence so Windows never stops sending: both tracks run on their devices' clocks (one minute, real devices: no correction needed, the file as long as the wall clock). Headphones that go or get plugged in mid-call are followed, the gap kept as silence. The file is written as it goes, its header kept current: a computer switched off mid-call leaves a recording that is offered at the next start. The icon by the clock gets a red dot, and **Stop recording and transcribe** in its menu. Quit asks to stop first; Quit again saves it among the interrupted recordings. A phone on the Wi-Fi can't start it.
+- **Stop, transcribe later**, in the window and in the icon's menu: the recording waits in the list, still on two tracks.
+- **Open the folder** of a call, or of all the calls, from the window (on the computer itself, not from a phone).
+- **The version** at the bottom of the side bar.
+
+### Changed
+
+- **Who spoke, on two tracks: 19 words in 20 on the right side instead of 9 in 10.** A moment counts for a track only where it stands 12 dB above that track's own background. On the held-out AMI meeting, 96.4%, 97.4%, 95.0% with headsets and 96.8%, 96.6%, 96.6% with speakers, against 89.8% to 91.8% before, on the same transcription (`research/two_tracks.py --old-rule`). Found when a recording made while the user only listened went to *You* word for word.
+- In the window on Windows, **Record** records from the computer; recording from a browser tab stays for Linux and macOS.
+- **Whisper loads when a transcription needs it**, not at start, and leaves the GPU ten minutes after the last one (3.4 GB measured): a Sottovoce left open all day holds the GPU only while it works. The first transcription after a pause shows *loading the model* for about ten seconds.
+- **The window opens in 2.4 s instead of 10.5**: at once with *starting*, then the page, without waiting for Whisper.
+- **Waits show they are moving**: a sliding bar and the seconds counted, for loading the model, the summary and the follow-up email.
+- **The window adapts to its size**: nothing runs past its edge between 960 and 1980 px, and a call scrolls once, with the tabs and the player kept at the top, instead of a box scrolling inside the page.
+
+### Fixed
+
+- A transcription started elsewhere (Stop in the icon's menu, a phone, a reloaded page) showed only once finished, and a recording stopped from the icon's menu only after reopening the window: the page now follows both by itself.
+- After an update, the window showed the page it had cached from before.
+
 ## [1.6.2] - 2026-10-23
 
 ### Fixed
@@ -147,7 +172,8 @@ The first release. Local transcription for recorded business calls, with Whisper
 - `Install.bat`, `Start.bat` and `Stop.bat` for Windows. PyTorch is installed first, from the CUDA index.
 - An Italian README.
 
-[Unreleased]: https://github.com/thetouchsite/sottovoce/compare/v1.6.2...HEAD
+[Unreleased]: https://github.com/thetouchsite/sottovoce/compare/v1.7.0...HEAD
+[1.7.0]: https://github.com/thetouchsite/sottovoce/compare/v1.6.2...v1.7.0
 [1.6.2]: https://github.com/thetouchsite/sottovoce/compare/v1.6.1...v1.6.2
 [1.6.1]: https://github.com/thetouchsite/sottovoce/compare/v1.6.0...v1.6.1
 [1.6.0]: https://github.com/thetouchsite/sottovoce/compare/v1.5.0...v1.6.0

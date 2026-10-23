@@ -36,6 +36,7 @@ APP_ID = "TouchSite.Sottovoce"
 # The menu and the notices, in the language Windows speaks.
 WORDS = {
     "open": ("Open Sottovoce", "Apri Sottovoce"),
+    "starting": ("Sottovoce is starting…", "Sottovoce si sta avviando…"),
     "calls": ("Folder of the calls", "Cartella delle call"),
     "startup": ("Start with Windows", "Avvia con Windows"),
     "quit": ("Quit", "Esci"),
@@ -43,6 +44,15 @@ WORDS = {
                    "Sottovoce continua a lavorare qui, vicino all'orologio. Per chiuderlo: Esci, dal menu di questa icona."),
     "done": ("Transcribed", "Trascritta"),
     "failed": ("Transcription failed", "Trascrizione non riuscita"),
+    "stop rec": ("Stop recording and transcribe", "Ferma la registrazione e trascrivi"),
+    "stop later": ("Stop recording, transcribe later", "Ferma la registrazione, trascrivi dopo"),
+    "saved": ("Recording saved: it waits in the list, to transcribe when you want.",
+              "Registrazione salvata: la trovi nell'elenco, da trascrivere quando vuoi."),
+    "transcribing": ("Recording stopped: it is being transcribed.", "Registrazione fermata: la sto trascrivendo."),
+    "kept": ("Recording saved: it waits among the interrupted recordings.",
+             "Registrazione salvata: la trovi tra le registrazioni interrotte."),
+    "recording": ("A call is being recorded. Stop it first, or Quit again: it is saved and offered at the next start.",
+                  "C'è una call in registrazione. Fermala prima, oppure Esci di nuovo: viene salvata e te la ripropone al prossimo avvio."),
     "after": ("Sottovoce closes as soon as the transcription ends. To close it now, Quit again.",
               "Sottovoce si chiude appena finisce la trascrizione. Per chiuderlo subito, Esci di nuovo."),
     "taken": ("Port {port} is used by another program: Sottovoce can't start.",
@@ -114,11 +124,24 @@ def busy(jobs, queued) -> bool:
     return bool(queued) or any(j["state"] == "running" for j in list(jobs.values()))
 
 
+def recording_icon(image):
+    """The icon with a red dot: a call is being recorded. Seen by you only."""
+    from PIL import ImageDraw
+    img = image.convert("RGBA").copy()
+    s = img.size[0]
+    r = s * 0.22
+    ImageDraw.Draw(img).ellipse([s - 2 * r - s * 0.02, s - 2 * r - s * 0.02, s - s * 0.02, s - s * 0.02],
+                                fill="#e5484d", outline="#111113", width=max(1, int(s * 0.04)))
+    return img
+
+
 def answers(port) -> bool:
-    """Whether a Sottovoce is already serving on this port."""
+    """Whether a Sottovoce is already serving on this port. "loading" is an
+    answer too (an older server said so until Whisper was in memory): waiting
+    for "ok" once kept the window away for 12 s."""
     try:
         with urllib.request.urlopen(f"http://127.0.0.1:{port}/health", timeout=1) as r:
-            return r.read().strip() == b"ok"
+            return r.read().strip() in (b"ok", b"loading")
     except OSError:
         return False
 
@@ -175,6 +198,17 @@ def tell(text):
 
 # --- the program ----------------------------------------------------------------------
 
+SPLASH = """<!doctype html><html><head><meta charset="utf-8"><style>
+html,body{height:100%;margin:0;background:#111113;color:#8a8c92;
+  font:15px/1.5 "Segoe UI",system-ui,sans-serif;display:grid;place-items:center}
+svg{width:56px;height:56px;display:block;margin:0 auto 16px}
+</style></head><body><div>
+<svg viewBox="0 0 22 22"><rect x="3" y="7" width="2.6" height="8" rx="1.3" fill="#4a8ad6"/>
+<rect x="9.7" y="3" width="2.6" height="16" rx="1.3" fill="#4a8ad6"/>
+<rect x="16.4" y="9" width="2.6" height="4" rx="1.3" fill="#4a8ad6"/></svg>
+<div>{text}</div></div></body></html>"""
+
+
 def main(argv=None):
     ours, rest = split_args(sys.argv[1:] if argv is None else argv)
     url = f"http://127.0.0.1:{ours.port}"
@@ -195,24 +229,12 @@ def main(argv=None):
     ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(APP_ID)
     no_console_windows()
 
-    import uvicorn
-    import server
-    args = server.options(rest)
-    serving = uvicorn.Server(uvicorn.Config(server.app, host=server.configure(args),
-                                            port=args.port, log_level="warning"))
-    serve = threading.Thread(target=serving.run, daemon=True)
-    serve.start()
-    while serve.is_alive() and not answers(args.port):
-        time.sleep(0.1)
-    if not answers(args.port):
-        tell(say("taken", port=args.port))
-        return
-
-    import pystray
-    from PIL import Image
-
+    # The window at once, with "starting"; then the server, the icon and the
+    # page. Whisper waits for the first transcription (server.start).
     quitting = threading.Event()
-    state = {"window": None, "visible": not ours.hidden, "told": False, "leaving": False}
+    state = {"window": None, "visible": not ours.hidden, "told": False, "leaving": False,
+             "recording": False, "server": None, "serving": None, "icon": None}
+    with_window = webview2_installed()
 
     def show(*_):
         w = state["window"]
@@ -227,53 +249,106 @@ def main(argv=None):
         # During a transcription, Quit waits for it to end; Quit again closes
         # now. No dialog: one asked from the icon's thread froze while
         # Whisper kept Python busy, and a second click stacked another.
-        if busy(server.jobs, server.line_up.qsize()) and not state["leaving"]:
+        # A call being recorded has no end to wait for: the first Quit says
+        # so, the second saves it among the interrupted recordings.
+        server, icon = state["server"], state["icon"]
+        working = busy(server.jobs, server.line_up.qsize())
+        if (working or server.capture) and not state["leaving"]:
             state["leaving"] = True
-            icon.notify(say("after"), "Sottovoce")
+            icon.notify(say("recording" if server.capture else "after"), "Sottovoce")
             return
+        server.stop_capture()
         quitting.set()
-        serving.should_exit = True
+        state["serving"].should_exit = True
         icon.stop()
         if state["window"] is not None:
             state["window"].destroy()
 
-    def toggle_startup(*_):
-        set_startup(not startup_on(), rest)
+    def boot():
+        """The server, the icon by the clock, then the page in the window."""
+        import pystray
+        import uvicorn
+        from PIL import Image
+        import server
+        args = server.options(rest)
+        serving = uvicorn.Server(uvicorn.Config(server.app, host=server.configure(args),
+                                                port=args.port, log_level="warning"))
+        serve = threading.Thread(target=serving.run, daemon=True)
+        serve.start()
+        while serve.is_alive() and not answers(args.port):
+            time.sleep(0.05)
+        if not answers(args.port):
+            tell(say("taken", port=args.port))
+            os._exit(1)
+        state["server"], state["serving"] = server, serving
 
-    icon = pystray.Icon("Sottovoce", Image.open(ICON), "Sottovoce", pystray.Menu(
-        pystray.MenuItem(say("open"), show, default=True),
-        pystray.MenuItem(say("calls"), lambda *_: subprocess.Popen(["explorer", str(server.DATA)])),
-        pystray.MenuItem(say("startup"), toggle_startup, checked=lambda _: startup_on()),
-        pystray.Menu.SEPARATOR,
-        pystray.MenuItem(say("quit"), quit_app)))
-    icon.run_detached()
-    server.show_window = show
-    server.quit_app = quit_app
+        plain = Image.open(ICON)
+        images = {False: plain, True: recording_icon(plain)}
 
-    # A transcription that ends while the window is hidden says so by the clock.
-    def watch():
-        seen = set(server.jobs)
-        while not quitting.is_set():
-            for name, how in finished(seen, server.jobs):
-                if not state["visible"]:
-                    icon.notify(name, say(how))
-            if state["leaving"] and not busy(server.jobs, server.line_up.qsize()):
-                quit_app()
-            time.sleep(2)
-    threading.Thread(target=watch, daemon=True).start()
+        def toggle_startup(*_):
+            set_startup(not startup_on(), rest)
 
-    if not webview2_installed():
-        if not ours.hidden:
+        def stop_recording(transcribe):
+            def stop():
+                rid = server.stop_capture()
+                if rid is None:
+                    return
+                if transcribe:
+                    done = server.finish_recording(rid, {})
+                    icon.notify(say("kept" if not isinstance(done, dict) else "transcribing"), "Sottovoce")
+                else:
+                    server.keep_for_later(rid)
+                    icon.notify(say("saved"), "Sottovoce")
+            threading.Thread(target=stop, daemon=True).start()
+
+        icon = pystray.Icon("Sottovoce", plain, "Sottovoce", pystray.Menu(
+            pystray.MenuItem(say("stop rec"), lambda *_: stop_recording(True),
+                             visible=lambda _: server.capture is not None),
+            pystray.MenuItem(say("stop later"), lambda *_: stop_recording(False),
+                             visible=lambda _: server.capture is not None),
+            pystray.MenuItem(say("open"), show, default=True),
+            pystray.MenuItem(say("calls"), lambda *_: subprocess.Popen(["explorer", str(server.DATA)])),
+            pystray.MenuItem(say("startup"), toggle_startup, checked=lambda _: startup_on()),
+            pystray.Menu.SEPARATOR,
+            pystray.MenuItem(say("quit"), quit_app)))
+        icon.run_detached()
+        state["icon"] = icon
+        server.show_window = show
+        server.quit_app = quit_app
+
+        # A transcription that ends while the window is hidden says so by the clock.
+        def watch():
+            seen = set(server.jobs)
+            while not quitting.is_set():
+                for name, how in finished(seen, server.jobs):
+                    if not state["visible"]:
+                        icon.notify(name, say(how))
+                now = server.capture is not None
+                if now != state["recording"]:          # the red dot, and Stop in the menu
+                    state["recording"] = now
+                    icon.icon = images[now]
+                    icon.update_menu()
+                if state["leaving"] and not now and not busy(server.jobs, server.line_up.qsize()):
+                    quit_app()
+                time.sleep(2)
+        threading.Thread(target=watch, daemon=True).start()
+
+        if state["window"] is not None:
+            state["window"].load_url(url + "/?window")
+        elif not ours.hidden:
             webbrowser.open(url)
+
+    if not with_window:
+        boot()
         quitting.wait()
         time.sleep(1)
         os._exit(0)
 
     import webview
     webview.settings["ALLOW_DOWNLOADS"] = True
-    window = webview.create_window("Sottovoce", url + "/?window", width=1360, height=880,
-                                   min_size=(960, 640), background_color="#111113",
-                                   hidden=ours.hidden)
+    window = webview.create_window("Sottovoce", html=SPLASH.replace("{text}", say("starting")),
+                                   width=1360, height=880, min_size=(960, 640),
+                                   background_color="#111113", hidden=ours.hidden)
     state["window"] = window
 
     def closing():
@@ -287,8 +362,8 @@ def main(argv=None):
         # from here it hung the window, the icon and its menu.
         threading.Thread(target=window.run_js, args=("typeof silence === 'function' && silence()",),
                          daemon=True).start()
-        if not state["told"]:
-            icon.notify(say("still here"), "Sottovoce")
+        if not state["told"] and state["icon"] is not None:
+            state["icon"].notify(say("still here"), "Sottovoce")
             state["told"] = True
         return False
 
@@ -302,11 +377,13 @@ def main(argv=None):
 
     window.events.closing += closing
     window.events.loaded += loaded
-    webview.start(gui="edgechromium", icon=str(ICON), private_mode=False,
+    webview.start(boot, gui="edgechromium", icon=str(ICON), private_mode=False,
                   storage_path=str(ours.log.parent / "webview"))
     quitting.set()
-    serving.should_exit = True
-    icon.stop()
+    if state["serving"] is not None:
+        state["serving"].should_exit = True
+    if state["icon"] is not None:
+        state["icon"].stop()
     # The model's threads would keep the process alive: a moment for the
     # server to answer its last request, then out.
     time.sleep(1)

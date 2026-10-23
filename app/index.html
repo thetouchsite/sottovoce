@@ -89,6 +89,7 @@
   .rail .bottom{margin-top:auto;display:flex;flex-direction:column;align-items:center;gap:6px}
   .rail .lang{font-size:11px;font-weight:600;letter-spacing:.04em;color:var(--muted)}
   .rail .lang:hover{color:var(--text)}
+  .rail .version{font-size:10px;color:var(--muted);opacity:.7;font-variant-numeric:tabular-nums}
   .rail svg{width:17px;height:17px;fill:none;stroke:currentColor;
     stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round}
 
@@ -110,6 +111,8 @@
   #search::placeholder{color:var(--muted)}
   #search:focus{outline:none;border-color:var(--accent)}
   .list{overflow-y:auto;min-height:0;padding:0 8px 16px}
+  .sidebar-foot{padding:8px 16px 14px;border-top:1px solid var(--rule)}
+  .sidebar-foot:has(button[hidden]){display:none}
   .item{display:block;width:100%;text-align:left;padding:9px 8px;
     border-radius:var(--radius-card);position:relative;line-height:1.35}
   .item:hover{background:var(--surface)}
@@ -346,7 +349,7 @@
      text scrolls. Summary and transcript are three views of the SAME panel,
      so the transcript is never pushed below the fold. A rail does not have to
      end level with the column next to it. */
-  .split{display:grid;grid-template-columns:664px 320px;gap:var(--gap);align-items:start}
+  .split{display:grid;grid-template-columns:minmax(0,664px) 320px;gap:var(--gap);align-items:start}
   .split>*{min-width:0}
   .side{position:sticky;top:0}
   .glossary-body table{margin-top:12px}
@@ -394,8 +397,11 @@
   .player svg{width:11px;height:11px;fill:currentColor}
   .player .clock{font-size:var(--fs-small);color:var(--muted);font-variant-numeric:tabular-nums}
 
-  .reader{padding:6px 20px 20px;max-height:452px;overflow-y:auto;
-    font-size:15px;line-height:1.7;position:relative}
+  /* One scroll for the whole call, as on a phone: the text used to scroll in
+     a box of its own inside the scrolling page, two bars one inside the
+     other. The tabs and the player stay at the top while the text moves. */
+  .reader{padding:6px 20px 20px;font-size:15px;line-height:1.7;position:relative}
+  .reading>header{position:sticky;top:calc(-1 * var(--pad));z-index:3;background:var(--surface)}
   .reader .empty{margin-top:14px}
   .context{display:flex;gap:14px;align-items:baseline}
   .lines p{display:flex;gap:16px;margin:0;padding:5px 0 5px 9px;
@@ -427,6 +433,7 @@
   /* ---- progress ---------------------------------------------------------- */
   .stage{color:var(--muted);margin:0 0 12px}
   .bar{height:4px;background:var(--raised);border-radius:2px;overflow:hidden}
+  .working .bar{margin:10px 0 6px;max-width:320px}
   .bar i{display:block;height:100%;background:var(--chart-1);width:0;transition:width .9s linear}
   .bar.indeterminate i{width:30%;animation:slide 1.5s ease-in-out infinite}
   @keyframes slide{0%{margin-left:-30%}100%{margin-left:100%}}
@@ -465,13 +472,18 @@
       transition:transform .18s ease} /* taste-skill-ignore */
     .sidebar.open{transform:none}
     .canvas.dragover::after{inset:48px 0 0 0}
-    .split{grid-template-columns:1fr}
-    .side{position:static}
     .figures{grid-template-columns:repeat(3,1fr)}
     .figures>div:nth-child(4){border-left:0}
     .figures>div:nth-child(n+4){border-top:1px solid var(--rule)}
   }
   @media (min-width:1101px){#open-list{display:none}}
+  /* The reading column and the side column need 664 + 320 px beside the call
+     list: narrower than that, the side panels go under the text instead of
+     pushing past the window's edge, which made it scroll sideways. */
+  @media (max-width:1420px){
+    .split{grid-template-columns:minmax(0,1fr)}
+    .side{position:static}
+  }
 
   /* ---- phone ------------------------------------------------------------- */
   /* Not the desktop squeezed: on a phone the page is used with a thumb, to
@@ -551,13 +563,12 @@
     /* reading: the tabs and the player stay at hand while the text scrolls */
     /* The canvas's padding is outside the sticky area: without the negative
        top, the text shows through a strip above the header. */
-    .reading>header{position:sticky;top:calc(-1 * var(--pad));z-index:3;background:var(--surface);
-      border-radius:0;flex-wrap:nowrap;gap:10px;padding-left:16px;padding-right:12px}
+    .reading>header{border-radius:0;flex-wrap:nowrap;gap:10px;padding-left:16px;padding-right:12px}
     .reading>header .right{gap:12px}
     .reading .player .clock{display:none}
     .tab-long{display:none}
     .tab-short{display:inline}
-    .reader{max-height:none;padding:4px 14px 16px}
+    .reader{padding:4px 14px 16px}
     .tabs{gap:16px}
     .player button{width:36px;height:36px}
     .player svg{width:12px;height:12px}
@@ -601,6 +612,7 @@
     <svg viewBox="0 0 20 20"><path d="M3.5 4.5a1 1 0 0 1 1-1h11v13h-11a1 1 0 0 1-1-1z"/><path d="M3.5 13.5h12M7 7h5"/></svg>
   </button>
   <div class="bottom">
+    <span class="version" id="app-version" translate="no"></span>
     <button class="lang" id="ui-lang" type="button" translate="no"></button>
     <button id="shutdown" type="button" title="Stop the server" aria-label="Stop the server">
       <svg viewBox="0 0 20 20"><path d="M10 3v6"/><path d="M14.5 6a6 6 0 1 1-9 0"/></svg>
@@ -622,6 +634,9 @@
     <input type="search" id="search" placeholder="Search every call">
   </div>
   <div class="list" id="list"></div>
+  <div class="sidebar-foot">
+    <button class="text-button" id="open-folder" type="button" hidden>Open the folder of the calls</button>
+  </div>
 </aside>
 
 <main class="canvas" id="canvas">
@@ -719,6 +734,21 @@ const IT = {
   'Quit Sottovoce': 'Esci da Sottovoce', 'Quit Sottovoce? The VRAM is freed.': 'Uscire da Sottovoce? La VRAM si libera.',
   'Record in the browser': 'Registra nel browser',
   'A call in a browser tab is recorded from the browser: this window can’t reach your tabs.': 'Una call in una scheda del browser si registra dal browser: questa finestra non vede le tue schede.',
+  'Start your call in any app:': 'Avvia la call con qualsiasi app:',
+  ', Teams, Zoom, WhatsApp, a phone call through the computer.': ', Teams, Zoom, WhatsApp, una telefonata dal computer.',
+  '. Nothing is shared on screen.': '. Sullo schermo non viene condiviso niente.',
+  'When the call ends, press': 'Quando la call finisce, premi',
+  'Your microphone and everything the computer plays are saved on two tracks, so the transcript says You and Them. Use headphones if you can, and tell the others you are recording.':
+    'Il tuo microfono e tutto quello che il computer riproduce finiscono su due tracce, così la trascrizione dice Tu e Loro. Se puoi usa le cuffie, e avvisa gli altri che registri.',
+  'The others (computer sound)': 'Gli altri (audio del computer)',
+  'Stop, transcribe later': 'Ferma, trascrivi dopo',
+  'Recording. Closing the window is fine: it goes on by the clock.': 'Registrazione in corso. Puoi chiudere la finestra: continua vicino all’orologio.',
+  'No sound from the computer yet. If the others are talking, check that the volume is not muted.':
+    'Ancora nessun suono dal computer. Se gli altri parlano, controlla che il volume non sia azzerato.',
+  'The recording did not start:': 'La registrazione non è partita:',
+  'a call is being recorded: stop it first': 'c’è una call in registrazione: fermala prima',
+  'Sottovoce was closed while recording. What was recorded until then is safe: transcribe it, or delete it.':
+    'Sottovoce è stato chiuso durante una registrazione. Quello registrato fin lì è al sicuro: trascrivilo, oppure eliminalo.',
   'Start recording': 'Avvia registrazione', 'Stop and transcribe': 'Ferma e trascrivi', 'Discard': 'Scarta',
   'Your microphone and the call are saved on two separate tracks, so the transcript says You and Them. With Separate voices on, the people on the call are told apart too. Use headphones, and tell the others you are recording.':
     'Il tuo microfono e la call finiscono su due tracce separate, quindi la trascrizione dice Tu e Loro. Con Separa le voci attivo, si distinguono anche le persone della call. Usa le cuffie, e avvisa gli altri che stai registrando.',
@@ -733,6 +763,7 @@ const IT = {
   'Transcribe again': 'Trascrivi di nuovo', 'Transcribing': 'In trascrizione', 'all done': 'tutto fatto', 'Clear': 'Pulisci',
   'The page was closed while recording. What was recorded until then is safe: transcribe it, or delete it.':
     'La pagina si è chiusa durante una registrazione. Quello registrato fino a lì è al sicuro: trascrivilo, o cancellalo.',
+  'Open the folder': 'Apri la cartella', 'Open the folder of the calls': 'Apri la cartella delle call',
   'Delete': 'Elimina', 'You (microphone)': 'Tu (microfono)', 'The call (tab)': 'La call (scheda)',
   'Keep this page open. Switching to the call’s tab is fine.': 'Tieni aperta questa pagina. Passare alla scheda della call va bene.',
   'No sound from the call yet. If the others are talking, the tab may be the wrong one, or shared without its audio.':
@@ -746,6 +777,11 @@ const IT = {
   // states
   'Not transcribed': 'Da trascrivere', 'Failed': 'Fallita', 'Queued': 'In coda', 'Transcribing…': 'Trascrivo…',
   'queued': 'in coda', 'done': 'fatto', 'failed': 'fallita', 'almost done': 'quasi finito',
+  'downloading the model': 'scarico il modello',
+  'about ten seconds': 'una decina di secondi', '2.9 GB, once: a few minutes': '2,9 GB, una volta sola: qualche minuto',
+  'Starting…': 'Avvio…',
+  'Still working: the first time in a while, the model loads first, up to a minute.':
+    'Ancora al lavoro: la prima volta dopo una pausa il modello si carica, fino a un minuto.',
   'preparing the audio': "preparo l'audio", 'transcribing': 'trascrivo', 'telling the two voices apart': 'distinguo le due voci',
   'telling the voices apart': 'separo le voci', 'downloading the voice models (30 MB, once)': 'scarico i modelli delle voci (30 MB, una volta sola)',
   'Waiting for the transcriptions before it.': 'Aspetta le trascrizioni prima di lei.',
@@ -1011,6 +1047,11 @@ async function checkEngine(){
   try{
     const d = await (await fetch('/api/status')).json();
     const light = $('.light'), t = $('#engine-text');
+    // Which Sottovoce this is: what to say when asking for help, or after an update.
+    if (d.version){
+      $('#app-version').textContent = 'v' + d.version;
+      $('#app-version').title = 'Sottovoce ' + d.version;
+    }
     voicesAvail = !!d.voices;
     voicesReady = !!d.voices_ready;
     const os = $('.options-summary span');
@@ -1415,6 +1456,7 @@ function drawRecordIdle(c){
   c = c || $('#record-body');
   if (!c) return;
   c.textContent = '';
+  if (inWindow && canCapture) return drawCaptureIdle(c);
   if (inWindow){
     const v = el('p', 'empty');
     v.textContent = 'A call in a browser tab is recorded from the browser: this window can’t reach your tabs.';
@@ -1565,14 +1607,16 @@ async function drawUnfinished(){
   try{ r = (await (await fetch('/api/recordings')).json()).recordings || []; }
   catch(e){ return; }
   // The one being recorded right now is not "interrupted".
-  r = r.filter(x => !(rec && rec.id === x.id));
+  r = r.filter(x => !(rec && rec.id === x.id) && !(capturing && capturing.id === x.id));
   box.textContent = '';
   if (!r.length) return;
   const p = panel('Interrupted recordings');
   const c = el('div', 'content');
   const n = el('p', 'note');
-  n.textContent = 'The page was closed while recording. What was recorded until then is safe: '
-    + 'transcribe it, or delete it.';
+  n.textContent = r.some(x => x.from === 'computer')
+    ? 'Sottovoce was closed while recording. What was recorded until then is safe: transcribe it, or delete it.'
+    : 'The page was closed while recording. What was recorded until then is safe: '
+      + 'transcribe it, or delete it.';
   c.append(n);
   for (const x of r){
     const row = el('div', 'queue-row');
@@ -1588,7 +1632,7 @@ async function drawUnfinished(){
         body: JSON.stringify({language: currentLanguage(), precise: precise(),
                               voices: voicesWanted()})})).json();
       if (j.error) return alert(T(j.error));
-      track(j.job, x.name + '.webm');
+      track(j.job, x.name);
       drawUnfinished();
     };
     const del = el('button', 'text-button danger');
@@ -1617,12 +1661,33 @@ async function drawUnfinished(){
 function jobStageText(j){
   if (j.state === 'error') return j.error || 'failed';
   if (j.state === 'done') return 'done';
+  // Loading Whisper has no estimate, but it moves: the seconds say so.
+  if (j.stage === 'loading the model')
+    return T('loading the model') + ' · ' + j.elapsed + ' s · ' + T('about ten seconds');
+  if (j.stage === 'downloading the model')
+    return T('downloading the model') + ' · ' + j.elapsed + ' s · ' + T('2.9 GB, once: a few minutes');
   if (j.expected){
     const left = Math.max(0, j.expected - j.elapsed);
     return j.stage + ' · ' + Math.max(1, Math.round(j.duration / 60)) + ' min of audio · '
       + (left > 0 ? 'about ' + left + ' s left' : 'almost done');
   }
   return j.stage + '…';
+}
+
+// What changed without this page: transcriptions it did not start, and
+// calls added or changed elsewhere (Stop in the icon's menu, a phone, this
+// page reloaded half-way). Before, they showed up only once finished, or
+// after closing and opening the window again.
+let callsStamp = null;
+async function keepUp(){
+  try{
+    const r = (await (await fetch('/api/jobs')).json()).jobs || [];
+    for (const j of r) if (!queue.some(q => q.id === j.id)) track(j.id, j.name);
+    const s = (await (await fetch('/api/calls/stamp')).json()).stamp;
+    if (callsStamp !== null && s !== callsStamp) loadCalls();
+    callsStamp = s;
+  } catch(e){ /* the server is restarting: try again later */ }
+  setTimeout(keepUp, 3000);
 }
 
 function track(id, name){
@@ -1924,6 +1989,193 @@ async function stopRecording(keep){
     alert(T('The recording is saved, but could not be sent to transcription:') + ' ' + e.message
       + '. It is listed under “Interrupted recordings”.');
   }
+}
+
+/* ========================= the folders, in Explorer ======================= */
+// The calls are plain folders: from the computer itself, one click opens
+// them, all of them or one call's recording and texts. Not from a phone,
+// which can't open the computer's windows.
+const onThisComputer = ['127.0.0.1', 'localhost', '[::1]'].includes(location.hostname);
+async function openFolder(name){
+  try{
+    const r = await (await fetch('/api/folder', {method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify(name ? {name} : {})})).json();
+    if (r.error) alert(T(r.error));
+  } catch(e){ /* nothing to say: the window did not open */ }
+}
+if (onThisComputer){
+  $('#open-folder').hidden = false;
+  $('#open-folder').onclick = () => openFolder();
+}
+
+/* ============================ waiting, shown ============================ */
+// Anything that takes a while says so, and shows it is moving: a sliding bar
+// and the seconds counted. A plain "the model is reading the call…" looked
+// stuck for the minute the summary model takes to load the first time.
+function working(text, later){
+  const box = el('div', 'working');
+  const p = el('p', 'quiet');
+  p.textContent = text;
+  const bar = el('div', 'bar indeterminate');
+  bar.append(el('i'));
+  const n = el('p', 'rec-note');
+  const t0 = Date.now();
+  const tick = () => {
+    if (!box.isConnected && Date.now() - t0 > 1000) return;
+    const s = Math.round((Date.now() - t0) / 1000);
+    n.textContent = s + ' s' + (later && s >= 8 ? ' · ' + T(later) : '');
+    setTimeout(tick, 1000);
+  };
+  box.append(p, bar, n);
+  tick();
+  return box;
+}
+
+/* ===================== recording from the computer itself ================= */
+// In Sottovoce's window on Windows the server records (recorder.py): your
+// microphone and everything the computer plays, any app, nothing shared on
+// screen. The page only starts, shows and stops it, so closing the window,
+// or reloading it, doesn't stop a call being recorded.
+
+let canCapture = false;
+let capturing = null;          // {id, name} while the computer records
+
+async function checkCapture(){
+  if (!inWindow) return;
+  let s;
+  try{ s = await (await fetch('/api/capture')).json(); } catch(e){ return; }
+  canCapture = !!s.available;
+  if (s.recording){
+    capturing = {id: s.recording.id, name: s.recording.name, quiet: 0};
+    drawCaptureLive();
+  } else drawRecordIdle();
+}
+
+function drawCaptureIdle(c){
+  const ol = el('ol', 'steps');
+  ol.innerHTML = '<li>Start your call in any app: <b>Google Meet</b>, Teams, Zoom, WhatsApp, a phone call through the computer.</li>'
+    + '<li>Press <b>Start recording</b>. Nothing is shared on screen.</li>'
+    + '<li>When the call ends, press <b>Stop and transcribe</b>.</li>';
+  const f = el('div', 'field');
+  f.innerHTML = '<label for="rec-name">Name of the call</label>'
+    + '<input id="rec-name" placeholder="e.g. Weekly sync with Northpine">';
+  const foot = el('div', 'rec-foot');
+  const b = el('button', 'primary');
+  b.type = 'button';
+  b.textContent = 'Start recording';
+  b.onclick = () => startCapture($('#rec-name').value.trim(), b);
+  foot.append(b);
+  const note = el('p', 'rec-note');
+  note.textContent = 'Your microphone and everything the computer plays are saved on two tracks, so the '
+    + 'transcript says You and Them. Use headphones if you can, and tell the others you are recording.';
+  c.append(ol, f, foot, note);
+}
+
+async function startCapture(name, button){
+  button.disabled = true;
+  button.textContent = T('Starting…');
+  let j;
+  try{
+    j = await (await fetch('/api/capture', {method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({name, language: currentLanguage(), precise: precise(),
+                            voices: voicesWanted()})})).json();
+  } catch(e){ j = {error: 'the server did not answer'}; }
+  if (j.error){
+    button.disabled = false;
+    button.textContent = T('Start recording');
+    const v = el('p', 'rec-note error');
+    v.textContent = T('The recording did not start:') + ' ' + T(j.error);
+    $('#record-body').append(v);
+    return;
+  }
+  capturing = {id: j.id, name: name, quiet: 0};
+  drawCaptureLive();
+  drawUnfinished();
+}
+
+function drawCaptureLive(){
+  const c = $('#record-body');
+  if (!c || !capturing) return;
+  c.textContent = '';
+  const live = el('div', 'live');
+  live.innerHTML = '<i class="dot"></i><span class="clock num" id="rec-clock">00:00</span>';
+  const m1 = el('div', 'meter');
+  m1.innerHTML = '<span>You (microphone)</span><div class="track"><i id="lvl-0"></i></div>';
+  const m2 = el('div', 'meter');
+  m2.id = 'meter-tab';
+  m2.innerHTML = '<span>The others (computer sound)</span><div class="track"><i id="lvl-1"></i></div>';
+  const hint = el('p', 'rec-note');
+  hint.id = 'rec-hint';
+  hint.textContent = 'Recording. Closing the window is fine: it goes on by the clock.';
+  const foot = el('div', 'rec-foot');
+  foot.style.marginTop = '16px';
+  const stop = el('button', 'primary stop');
+  stop.type = 'button';
+  stop.textContent = 'Stop and transcribe';
+  stop.onclick = () => stopCapture(true);
+  const later = el('button', 'secondary');
+  later.type = 'button';
+  later.textContent = 'Stop, transcribe later';
+  later.onclick = () => stopCapture(true, false);
+  const cancel = el('button', 'text-button danger');
+  cancel.type = 'button';
+  cancel.textContent = 'Discard';
+  cancel.onclick = () => { if (confirm(T('Discard this recording? Nothing will be kept.'))) stopCapture(false); };
+  foot.append(stop, later, cancel);
+  c.append(live, m1, m2, hint, foot);
+  tickCapture();
+}
+
+async function tickCapture(){
+  if (!capturing) return;
+  let s;
+  try{ s = await (await fetch('/api/capture')).json(); } catch(e){ s = null; }
+  if (s && !s.recording){                         // stopped elsewhere: by the icon by the clock
+    capturing = null;
+    drawRecordIdle();
+    loadCalls();
+    return;
+  }
+  if (s && s.recording){
+    const r = s.recording;
+    const clock = $('#rec-clock');
+    if (clock) clock.textContent = mmss(r.seconds);
+    r.levels.forEach((v, i) => { const bar = $('#lvl-' + i); if (bar) bar.style.width = (v * 100).toFixed(0) + '%'; });
+    // Twenty seconds without a sound from the computer: the volume is off,
+    // or the call plays on another device.
+    capturing.quiet = r.levels[1] < 0.01 ? capturing.quiet + 1 : 0;
+    const hint = $('#rec-hint'), mt = $('#meter-tab');
+    if (hint && r.error) hint.textContent = r.error;
+    else if (hint && capturing.quiet > 80){
+      hint.textContent = 'No sound from the computer yet. If the others are talking, check that the volume is not muted.';
+      if (mt) mt.classList.add('quiet-tab');
+    } else if (mt) mt.classList.remove('quiet-tab');
+  }
+  setTimeout(tickCapture, 250);
+}
+
+async function stopCapture(keep, transcribe = true){
+  const c = capturing;
+  if (!c || c.stopping) return;
+  c.stopping = true;
+  let j;
+  try{
+    j = await (await fetch('/api/capture/stop', {method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({keep, transcribe, language: currentLanguage(), precise: precise(),
+                            voices: voicesWanted()})})).json();
+  } catch(e){ j = {error: 'the server did not answer'}; }
+  capturing = null;
+  if (view !== 'home') showHome();
+  drawRecordIdle();
+  if (!keep) return;
+  if (!transcribe && !j.error){ loadCalls(); return; }       // in the list, "Not transcribed"
+  if (j.error){
+    drawUnfinished();
+    alert(T('The recording is saved, but could not be sent to transcription:') + ' ' + T(j.error)
+      + '. It is listed under “Interrupted recordings”.');
+    return;
+  }
+  track(j.job, c.name || 'Call');
 }
 
 /* ============================ the call strip ============================ */
@@ -2256,9 +2508,8 @@ function followupPanel(l){
 
   async function write(redo){
     c.textContent = '';
-    const w = el('p', 'quiet');
-    w.textContent = 'the model is writing the email…';
-    c.append(w);
+    c.append(working(T('the model is writing the email…'),
+      'Still working: the first time in a while, the model loads first, up to a minute.'));
     try{
       const r = await (await fetch(api + (redo ? '?redo=true' : ''), {method:'POST'})).json();
       if (r.error) throw new Error(r.error);
@@ -2310,7 +2561,15 @@ function moreMenu(l, h1){
   del.type = 'button';
   del.textContent = 'Delete…';
   del.onclick = () => { m.removeAttribute('open'); deleteCall(l); };
-  list.append(rn, del);
+  list.append(rn);
+  if (onThisComputer){
+    const fo = el('button');
+    fo.type = 'button';
+    fo.textContent = 'Open the folder';
+    fo.onclick = () => { m.removeAttribute('open'); openFolder(l.folder); };
+    list.append(fo);
+  }
+  list.append(del);
   m.append(s, list);
   return m;
 }
@@ -2897,9 +3156,9 @@ function readingPanel(l, st, jump){
     box.className = 'reader';
     box.textContent = '';
     context.textContent = '';
-    const w = el('p', 'quiet');
+    const w = working(T('the model is reading the call…'),
+      'Still working: the first time in a while, the model loads first, up to a minute.');
     w.style.padding = '14px 0';
-    w.textContent = 'the model is reading the call…';
     box.append(w);
     try{
       const r = await (await fetch('/api/summary/' + encodeURIComponent(l.folder)
@@ -3212,5 +3471,7 @@ showHome();
 checkEngine();
 checkLLM();
 loadCalls();
+checkCapture();
+keepUp();
 </script>
 </html>

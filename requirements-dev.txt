@@ -20,3 +20,5 @@ pytest>=8
 # Grouping voice fingerprints (voices.group). The models themselves are not
 # needed: the tests never download them.
 scipy>=1.10
+# The icon with a red dot while recording (desktop.recording_icon)
+pillow>=10

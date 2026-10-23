@@ -111,7 +111,7 @@ def test_a_call_reads_three_ways_and_the_strip_plays_from_a_point(page):
     tabs.nth(0).click()
     strip.click(position={"x": box["width"] * 0.6, "y": 10})
     assert tabs.nth(1).get_attribute("aria-selected") == "true"
-    assert page.evaluate("document.querySelector('.reader').scrollTop") > 50
+    assert page.evaluate("document.getElementById('canvas').scrollTop") > 50       # one scroll: the page's
 
 
 def test_getting_back_to_the_start(page):
@@ -348,3 +348,43 @@ def test_a_recording_stops_when_another_call_opens(page, data):
     page.wait_for_function("window.players.length === 1")
     open_call(page, SUPPLIER)
     page.wait_for_function("window.players.every(a => a.paused && !a.ended)", timeout=3000)
+
+
+def test_a_call_offers_to_open_its_folder_on_this_computer(page):
+    assert page.locator("#open-folder").is_visible()
+    open_call(page, NORTHPINE)
+    page.locator(".menu.more summary").click()
+    assert page.locator(".menu.more .menu-list button").all_inner_texts() == ["Rename", "Open the folder", "Delete…"]
+
+
+def test_the_version_is_shown_in_the_side_bar(page):
+    import server
+    page.wait_for_function("document.getElementById('app-version').textContent.length > 0")
+    assert page.locator("#app-version").inner_text() == "v" + server.VERSION
+
+
+def test_a_call_added_elsewhere_appears_in_the_list_by_itself(page, data):
+    # Stop in the icon's menu, or a phone, adds a call without this page.
+    import shutil
+    page.wait_for_selector(".item")
+    before = page.locator(".item").count()
+    src = data / "transcripts" / NORTHPINE
+    shutil.copytree(src, src.with_name("2026-10-23_Added elsewhere"))
+    page.wait_for_function(f"document.querySelectorAll('.item').length > {before}", timeout=10000)
+
+
+def test_loading_whisper_shows_as_such_with_the_seconds_moving(page):
+    # The first transcription loads the model for ten seconds or so: it must
+    # not look stuck.
+    import json as _json
+    page.route("**/api/jobs", lambda r: r.fulfill(
+        body=_json.dumps({"jobs": [{"id": "j1", "name": "Weekly.wav", "folder": None}]}),
+        content_type="application/json"))
+    page.route("**/api/job/j1", lambda r: r.fulfill(
+        body=_json.dumps({"state": "running", "stage": "loading the model", "expected": 0,
+                          "elapsed": 4, "duration": 120, "name": "Weekly.wav"}),
+        content_type="application/json"))
+    page.reload()
+    page.wait_for_function("(document.querySelector('.queue-row .qstage') || {}).textContent"
+                           " === 'loading the model · 4 s · about ten seconds'", timeout=10000)
+    assert page.locator(".queue-row .bar.indeterminate").count() == 1

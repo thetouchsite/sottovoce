@@ -74,7 +74,7 @@ def wait(condition, seconds):
 
 def up(url):
     try:
-        return urllib.request.urlopen(url + "/health", timeout=1).read() == b"ok"
+        return urllib.request.urlopen(url + "/health", timeout=1).read() in (b"ok", b"loading")
     except OSError:
         return False
 

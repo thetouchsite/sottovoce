@@ -74,3 +74,12 @@ def test_child_programs_open_no_window_unless_asked_otherwise():
     desktop.no_console_windows(Popen)
     assert Popen(["ffmpeg"]).flags == desktop.NO_WINDOW
     assert Popen(["x"], creationflags=0x200).flags == 0x200          # a caller's own choice stays
+
+
+def test_a_recording_shows_as_a_red_dot_on_the_icon():
+    from PIL import Image
+    plain = Image.open(desktop.ICON)
+    dot = desktop.recording_icon(plain)
+    assert dot.size == plain.size
+    r, g, b, a = dot.convert("RGBA").getpixel((int(plain.size[0] * 0.76), int(plain.size[1] * 0.76)))
+    assert r > 200 and g < 100 and b < 100

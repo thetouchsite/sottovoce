@@ -36,9 +36,9 @@ With the installer it's simpler: run the install command again, after updating t
 
 The installer does it in this order; so does *From a clone* in [Getting started](getting-started.md#install).
 
-## The first start is slow
+## The first transcription is slow
 
-The first start downloads Whisper large-v3 (2.9 GB), then loads it on the GPU. The first summary downloads the built-in model (8 GB) and the first voice separation downloads two small models (32 MB). Each happens once. Until Whisper is loaded the page says *Loading the model…* and transcription waits.
+The first transcription downloads Whisper large-v3 (2.9 GB), the first summary the built-in model (8 GB), the first voice separation two small models (32 MB). Each happens once, and the page shows it with a moving bar and the seconds counted. After a pause of ten minutes or more, Whisper is loaded again before transcribing: about ten seconds, shown as *loading the model*.
 
 On Windows, Hugging Face may warn that it can't create symlinks in its cache. It's harmless: files are copied instead.
 
@@ -50,9 +50,11 @@ On Windows, Hugging Face may warn that it can't create symlinks in its cache. It
 
 ## Recording
 
-- **"No sound from the call yet"**: the tab was shared without its audio. Stop, start again, pick the call's tab and leave **Also share tab audio** on.
-- **No Start recording button:** recording needs Chrome or Edge on the computer running Sottovoce. Firefox and Safari can't capture another tab's sound, and from a phone the browser doesn't allow it.
-- **The page closed during a call:** open it again. The interrupted recording is offered on the home screen: transcribe it, or delete it.
+- **"No sound from the computer yet"** (Windows): the others' voices don't reach the computer's output. Check the volume isn't muted, and that the call plays on this computer.
+- **"The recording did not start"** (Windows): another program holds the microphone in exclusive mode, or Windows has no default microphone or output. **Settings → System → Sound** shows both.
+- **"No sound from the call yet"** (browser): the tab was shared without its audio. Stop, start again, pick the call's tab and leave **Also share tab audio** on.
+- **No Start recording button** (browser): recording needs Chrome or Edge on the computer running Sottovoce. Firefox and Safari can't capture another tab's sound, and from a phone the browser doesn't allow it.
+- **Sottovoce closed during a call:** open it again. The interrupted recording is offered on the home screen: transcribe it, or delete it.
 
 ## The phone can't connect
 

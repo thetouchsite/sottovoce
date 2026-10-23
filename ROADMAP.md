@@ -31,19 +31,19 @@ The ideas come from projects that do this job well: [whisper.cpp](https://github
 
 Both look fixable: a stretch belongs to your track only where your track is the louder of the two (as the current labelling already decides), and stretches too short or too quiet are not sent to Whisper.
 
-**Measured.** `research/two_tracks.py` builds real two-track calls from AMI meetings, where every person wore a headset microphone: one person's headset on one side, the others on the other, with the room heard faintly in every microphone as in real life. On the held-out meeting the current way puts about **90%** of words on the right side (2 people 89.8%, 3 people 91.8%, 4 people 90.7%; with the call leaking from loudspeakers at -25 dB, 90.7%, 91.8%, 89.2%). Earlier figures of 99% came from tracks cut apart artificially, with no crosstalk: too kind.
+**Measured.** `research/two_tracks.py` builds real two-track calls from AMI meetings, where every person wore a headset microphone: one person's headset on one side, the others on the other, with the room heard faintly in every microphone as in real life. On the held-out meeting the current way puts about **96%** of words on the right side since 1.7 (2 people 96.4%, 3 people 97.4%, 4 people 95.0%; with the call leaking from loudspeakers at -25 dB, 96.8%, 96.6%, 96.6%), up from about 90% before each track was measured against its own background. Earlier figures of 99% came from tracks cut apart artificially, with no crosstalk: too kind.
 
 **Each track alone, on the same test** (`--method per_track`, with pieces taken only where a track is the louder of the two, and pieces under 0.4 s skipped): about **62%** of words on the right side, and half as many words again as there were, because every headset in an AMI room also hears the others clearly and Whisper transcribes them twice. It loses here. But a real Meet call is kinder to it than this test: the call's track never carries your voice, and with headphones your microphone doesn't carry theirs. So it is parked, not dropped, until it can be measured on real calls recorded here.
 
 **Done when** it beats those numbers in `research/two_tracks.py` and on several real calls recorded here (with and without headphones, two and three people), counted word by word, and never puts lines out of order. Transcribing each whole track without cutting was tried too: Whisper's times drift on a track that is silent half the time (median 2.3 s off).
 
-## 2. Record any call from the Sottovoce window
+## 2. Record any call, on Linux and macOS too
 
-**Why.** Recording from the page covers calls in a browser tab. Teams, Zoom and Webex desktop apps, and phone calls through the PC, don't have a tab to share; and since 1.6 Sottovoce is a window of its own on Windows, which can't reach the browser's tabs either, so **Record** sends you to the browser.
+**Done on Windows in 1.7.** The Sottovoce window records the microphone and everything the computer plays (WASAPI loopback), on the same two tracks as the browser, and recording from a browser tab is gone from the window. Tried on the author's laptop with a video playing and the user talking, Bluetooth headphones taken off mid-recording; a call in the Teams desktop app is still to be tried.
 
-**How.** In the window's process, where Python can do what a page can't: the sound the computer plays (WASAPI loopback) and the microphone, on the same two tracks as today. Then recording from the browser goes, on Windows: one way to record, the one that works for every call.
+**Still open.** Linux can record the output the same way (PulseAudio and PipeWire expose it as a "monitor" source, which soundcard reads). macOS has no loopback without ScreenCaptureKit or a virtual audio device: it needs its own piece, and a Mac to try it on.
 
-**Done when** a call in the Teams desktop app and one in Meet are recorded from the window and transcribed with *You* and *Them*, and the two-track measurement in the benchmarks holds on them.
+**Done when** a call is recorded and transcribed with *You* and *Them* from the Sottovoce window on Linux, and on a Mac, by someone who has one.
 
 ## 3. Check precise word timings against a reference
 
@@ -89,10 +89,6 @@ And a rule learned the hard way, on another project: **never decide on a single 
 
 **Done when** a call is transcribed after the one-command install on a clean Ubuntu machine with an NVIDIA GPU and on an Apple-silicon Mac, checked by someone who isn't the author, with the time it took written in the benchmarks.
 
-## Not planned: a signed `.exe`
-
-A downloadable installer looks friendlier than a command, but unsigned it meets *"Windows protected your PC"*, and Smart App Control can block it outright. Signing costs about €105 a year (Microsoft Artifact Signing), or about $309 the first year for a certificate. The command needs neither, and updates in place. If a signed installer is ever worth its cost, uv and the same scripts would sit inside it.
-
 ## 8. Get back the sentence an invented phrase replaced
 
 **Why.** After a long pause Whisper's long-form mode sometimes writes *"Sottotitoli e revisione a cura di QTSS"* over a window that ends in real speech, and the first sentence after the pause is never written. The phrase is removed, the sentence is still missing: on the long-pauses test, 34 words of 1,175 ([measured](docs/benchmarks.md#long-pauses)).
@@ -100,3 +96,7 @@ A downloadable installer looks friendlier than a command, but unsigned it meets 
 **How.** Where a phrase was removed and the map of speech says someone speaks inside its window, transcribe that stretch again on its own.
 
 **Done when** words dropped on the long-pauses test fall to Whisper alone's (5 of 1,175) with no more words added, and FLEURS and AMI stay where they are.
+
+## Not planned: a signed `.exe`
+
+A downloadable installer looks friendlier than a command, but unsigned it meets *"Windows protected your PC"*, and Smart App Control can block it outright. Signing costs about €105 a year (Microsoft Artifact Signing), or about $309 the first year for a certificate. The command needs neither, and updates in place. If a signed installer is ever worth its cost, uv and the same scripts would sit inside it.
