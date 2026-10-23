@@ -827,7 +827,9 @@ const IT = {
   'Delete this recording? It cannot be recovered.': 'Cancellare questa registrazione? Non si potrà recuperare.',
   'Discard this recording? Nothing will be kept.': 'Scartare questa registrazione? Non verrà tenuto niente.',
   'A call is being recorded: stop it first.': 'Stai registrando una call: fermala prima.',
-  'Stop the server? The VRAM is freed; start it again with Start.bat.': 'Spegnere il server? La VRAM si libera; per riaccenderlo usa Start.bat.',
+  'Stop the server? The VRAM is freed; start it again from the Sottovoce shortcut.': 'Spegnere il server? La VRAM si libera; per riaccenderlo usa il collegamento Sottovoce.',
+  'Server stopped': 'Server spento',
+  'The VRAM is free. To start it again, open Sottovoce from the Start menu or the desktop.': 'La VRAM è libera. Per riaccenderlo apri Sottovoce dal menu Start o dal desktop.',
   'The recording is saved, but could not be sent to transcription:': 'La registrazione è salvata, ma non è stato possibile mandarla in trascrizione:',
   'A call is being recorded: switching language reloads the page. The recording is kept and offered again.':
     'Stai registrando una call: cambiare lingua ricarica la pagina. La registrazione viene tenuta e riproposta.',
@@ -3148,7 +3150,7 @@ $('#file').onchange = e => { if (e.target.files.length) sendFiles([...e.target.f
 
 $('#shutdown').onclick = async () => {
   if (rec){ alert(T('A call is being recorded: stop it first.')); return; }
-  if (!confirm(T('Stop the server? The VRAM is freed; start it again with Start.bat.'))) return;
+  if (!confirm(T('Stop the server? The VRAM is freed; start it again from the Sottovoce shortcut.'))) return;
   try{
     const r = await (await fetch('/api/shutdown', {method:'POST'})).json();
     if (r.error){ alert(T(r.error)); return; }
@@ -3158,9 +3160,9 @@ $('#shutdown').onclick = async () => {
   document.body.style.placeItems = 'center';
   const d = el('div');
   d.style.textAlign = 'center';
-  d.innerHTML = '<h1 style="font-size:21px;margin-bottom:10px">Server stopped</h1>'
-    + '<p style="color:#8a8c92;margin:0">The VRAM is free. To start it again: '
-    + '<strong style="color:#fff">Start.bat</strong></p>';
+  d.innerHTML = '<h1 style="font-size:21px;margin-bottom:10px">' + T('Server stopped') + '</h1>'
+    + '<p style="color:#8a8c92;margin:0">'
+    + T('The VRAM is free. To start it again, open Sottovoce from the Start menu or the desktop.') + '</p>';
   document.body.append(d);
 };
 

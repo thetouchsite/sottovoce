@@ -41,8 +41,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - run: bash -n install.sh start.sh installer/install.sh installer/uninstall.sh
-      - run: shellcheck install.sh start.sh installer/install.sh installer/uninstall.sh
+      - run: bash -n installer/install.sh installer/uninstall.sh installer/start.sh
+      - run: shellcheck installer/install.sh installer/uninstall.sh installer/start.sh
 
   # The one-command install, end to end, as a user runs it: from this
   # checkout instead of the latest release, with PyTorch for the CPU (no GPU

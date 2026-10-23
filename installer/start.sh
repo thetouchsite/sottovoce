@@ -1,13 +1,14 @@
 #!/usr/bin/env bash
-# Starts Sottovoce and opens the page. The Linux and macOS twin of Start.bat.
-# Extra arguments go to server.py, so this works too:
-#   ./start.sh --no-model --data examples/transcripts --glossary examples/glossary.txt
+# Starts Sottovoce and opens the page once it answers. The installer's
+# launcher runs it; in a clone it works too, with .venv next to server.py.
+# Extra arguments go to server.py:
+#   installer/start.sh --no-model --data examples/transcripts --glossary examples/glossary.txt
 set -euo pipefail
-cd "$(dirname "$0")"
+cd "$(dirname "$0")/.."
 
 if [ ! -x .venv/bin/python ]; then
     echo
-    echo "  Not installed yet: run ./install.sh first."
+    echo "  Not installed yet: see https://thetouchsite.github.io/sottovoce/getting-started/"
     echo
     exit 1
 fi

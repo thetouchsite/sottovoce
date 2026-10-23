@@ -161,9 +161,9 @@ main() {
     cat > "$launcher" <<EOF
 #!/usr/bin/env bash
 # Starts Sottovoce with your calls in $data. Written by the installer.
-exec "$app/start.sh" --data "$data/transcripts" --glossary "$data/glossary.txt" "\$@"
+exec "$app/installer/start.sh" --data "$data/transcripts" --glossary "$data/glossary.txt" "\$@"
 EOF
-    chmod +x "$launcher" "$app/start.sh"
+    chmod +x "$launcher" "$app/installer/start.sh"
     cp "$app/installer/uninstall.sh" "$program/uninstall.sh"
     chmod +x "$program/uninstall.sh"
 

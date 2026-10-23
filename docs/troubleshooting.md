@@ -14,8 +14,10 @@ Transcription works but is very slow, and the GPU stays idle. Almost always this
 Check:
 
 ```sh
-.venv\Scripts\python.exe -c "import torch; print(torch.__version__, torch.cuda.is_available())"
+%LOCALAPPDATA%\Programs\Sottovoce\app\.venv\Scripts\python.exe -c "import torch; print(torch.__version__, torch.cuda.is_available())"
 ```
+
+(In a clone, `.venv\Scripts\python.exe`; on Linux and macOS, `.venv/bin/python` in the program folder's `app`.)
 
 It should print a version ending in `+cu130` (or your CUDA) and `True`. If not, install PyTorch first, from the CUDA index, then the rest:
 
@@ -23,7 +25,9 @@ It should print a version ending in `+cu130` (or your CUDA) and `True`. If not, 
 pip install --force-reinstall torch --index-url https://download.pytorch.org/whl/cu130
 ```
 
-The installer, `Install.bat` and `install.sh` all do it in this order.
+With the installer it's simpler: run the install command again, after updating the NVIDIA driver if it asked you to. It reinstalls the right PyTorch every time.
+
+The installer does it in this order; so does *From a clone* in [Getting started](getting-started.md#install).
 
 ## The first start is slow
 

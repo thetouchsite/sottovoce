@@ -5,7 +5,7 @@
 # Installed as a dependency of transformers, pip pulls the default PyTorch from
 # PyPI, which on RTX 50-series cards (Blackwell, sm_120) does not see the GPU:
 # everything works, on the CPU, ten times slower, and nothing tells you why.
-# Install.bat does it in the right order.
+# The installer (installer/install.ps1, installer/install.sh) does it in the right order.
 
 transformers>=5.0
 accelerate>=1.0

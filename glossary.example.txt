@@ -1,5 +1,6 @@
 # Names Whisper cannot know: your clients, products, people, internal jargon.
-# Install.bat copies this file to glossary.txt, which is yours and git-ignored.
+# The installer copies this file to glossary.txt in your Sottovoce folder. In a
+# clone, copy it to glossary.txt yourself: that one is yours, and git-ignored.
 #
 #     Right name <- how it gets written wrong, another way
 #

@@ -31,27 +31,21 @@
 
 === "From a clone"
 
-    For development, or to follow `main`:
+    For development, or to follow `main`. You need Python 3.10 or newer.
 
     ```sh
     git clone https://github.com/thetouchsite/sottovoce
     cd sottovoce
-    Install.bat          # Linux/macOS: ./install.sh
-    Start.bat            # Linux/macOS: ./start.sh
-    ```
-
-    The calls are kept in `transcripts/` inside the clone.
-
-=== "From source, by hand"
-
-    ```sh
     python -m venv .venv
     # Windows: .venv\Scripts\activate    Linux/macOS: source .venv/bin/activate
-    pip install torch --index-url https://download.pytorch.org/whl/cu130   # match your CUDA
+    python installer/gpu.py                  # which PyTorch: cu130, cu126, cpu or pypi
+    pip install torch --index-url https://download.pytorch.org/whl/cu130   # the one it said
     pip install -r requirements.txt
     cp glossary.example.txt glossary.txt
     python server.py
     ```
+
+    PyTorch goes first, from its own index: see [the PyTorch trap](troubleshooting.md#the-gpu-is-not-used). On a Mac, `pip install torch` from PyPI. The calls are kept in `transcripts/` inside the clone. `installer/start.cmd` (Windows) and `installer/start.sh` start the server and open the page once it answers.
 
 The first start downloads Whisper large-v3 (2.9 GB, once) and loads it on the GPU. After that the server keeps it loaded: each new file only pays for its own transcription.
 
@@ -96,7 +90,7 @@ Open <http://127.0.0.1:8200>. Everything works except transcribing and recording
 2. **Add a recording.** Drop it on the page or onto the list of calls. It waits there, tagged *Not transcribed*: open it to listen, rename it, then press **Transcribe**. Or [record a call](recording.md) from the page.
 3. **Read it.** Summary, paragraphs, line by line. Click a word to hear it. The call strip at the top shows where the text needs a look.
 
-Any format ffmpeg can open works: mp4, m4a, mp3, wav, ogg, opus, 3gp, webm. The **IT** button at the bottom of the side bar switches the page to Italian. Stop the server with the power button, or `Stop.bat`.
+Any format ffmpeg can open works: mp4, m4a, mp3, wav, ogg, opus, 3gp, webm. The **IT** button at the bottom of the side bar switches the page to Italian. Stop the server with the power button at the bottom of the side bar, or by closing its window.
 
 ## Command line
 

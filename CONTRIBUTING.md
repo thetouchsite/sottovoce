@@ -23,7 +23,7 @@ pip install -r requirements-dev.txt
 python server.py --no-model --data examples/transcripts --glossary examples/glossary.txt
 ```
 
-To transcribe, install the full set with PyTorch for your GPU first: `Install.bat` or `./install.sh`, or by hand as in [Getting started](docs/getting-started.md).
+To transcribe, install the full set with PyTorch for your GPU first, as in [Getting started](docs/getting-started.md#install), *From a clone*.
 
 ## Tests
 
@@ -74,7 +74,7 @@ The README stays short and points to the docs. Write in plain, short sentences. 
 ## Good first contributions
 
 - **Phrases Whisper invents on silence, in your language.** Add the ones you've seen to `SUBTITLE_PHRASES` in `transcribe.py`. Only phrases that belong to subtitles, never to conversation: a plain "thank you" would flag every polite line.
-- **A run of the Linux and macOS launchers** on a clean machine. `install.sh` and `start.sh` are checked for syntax in CI, but not run end to end.
+- **A transcription after the one-command install** on Linux with an NVIDIA GPU, or on an Apple-silicon Mac. CI installs and starts it on both, but has no GPU to transcribe with.
 - **Languages in the picker:** `LANGUAGES` in `app/index.html`, with Whisper's codes.
 
 ## Reporting a bug

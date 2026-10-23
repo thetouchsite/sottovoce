@@ -156,7 +156,7 @@ function Install-Sottovoce {
     $launcher = Join-Path $Program "Sottovoce.cmd"
     Set-Content $launcher -Encoding Ascii -Value @(
         "@echo off",
-        "call `"%~dp0app\Start.bat`" --data `"$where\transcripts`" --glossary `"$where\glossary.txt`" %*"
+        "call `"%~dp0app\installer\start.cmd`" --data `"$where\transcripts`" --glossary `"$where\glossary.txt`" %*"
     )
 
     $shell = New-Object -ComObject WScript.Shell
