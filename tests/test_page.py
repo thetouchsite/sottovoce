@@ -350,6 +350,13 @@ def test_a_recording_stops_when_another_call_opens(page, data):
     page.wait_for_function("window.players.every(a => a.paused && !a.ended)", timeout=3000)
 
 
+def test_a_call_offers_to_open_its_folder_on_this_computer(page):
+    assert page.locator("#open-folder").is_visible()
+    open_call(page, NORTHPINE)
+    page.locator(".menu.more summary").click()
+    assert page.locator(".menu.more .menu-list button").all_inner_texts() == ["Rename", "Open the folder", "Delete…"]
+
+
 def test_the_version_is_shown_in_the_side_bar(page):
     import server
     page.wait_for_function("document.getElementById('app-version').textContent.length > 0")

@@ -555,6 +555,18 @@ def test_whisper_leaves_the_gpu_ten_minutes_after_the_last_transcription(client,
     assert released == [True]
 
 
+def test_the_folders_open_in_explorer_only_on_the_computer(here, client, monkeypatch):
+    import server
+    opened = []
+    monkeypatch.setattr(server, "open_in_files", lambda p: opened.append(p.name))
+    assert here.post("/api/folder", json={}).json() == {"opened": True}
+    assert here.post("/api/folder", json={"name": NORTHPINE}).json() == {"opened": True}
+    assert opened == ["transcripts", NORTHPINE]
+    assert here.post("/api/folder", json={"name": "nope"}).status_code == 404
+    assert client.post("/api/folder", json={}).status_code == 403              # a phone
+    assert len(opened) == 2
+
+
 def test_the_page_is_checked_again_at_every_load(client):
     # After an update, the window showed the page it had cached from before.
     assert client.get("/").headers["cache-control"] == "no-cache"

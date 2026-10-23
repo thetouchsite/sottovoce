@@ -810,6 +810,31 @@ def from_here(request: Request):
     return None
 
 
+def open_in_files(path: pathlib.Path):
+    """The folder, in the computer's own file manager."""
+    import sys
+    if sys.platform == "win32":
+        os.startfile(path)                                      # noqa: S606
+    else:
+        subprocess.Popen(["open" if sys.platform == "darwin" else "xdg-open", str(path)])
+
+
+@app.post("/api/folder")
+async def api_folder(request: Request):
+    """Opens the folder of the calls, or of one call (its recording and its
+    texts), in Explorer. Only on the computer itself: a phone can't open the
+    computer's windows."""
+    refused = from_here(request)
+    if refused:
+        return refused
+    body = await request.json() if await request.body() else {}
+    d = folder(body["name"]) if body.get("name") else DATA
+    if not d.is_dir():
+        return JSONResponse({"error": "not found"}, 404)
+    open_in_files(d)
+    return {"opened": True}
+
+
 @app.get("/api/capture")
 def api_capture():
     now = None
