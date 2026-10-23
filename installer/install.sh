@@ -165,6 +165,8 @@ exec "$app/installer/start.sh" --data "$data/transcripts" --glossary "$data/glos
 EOF
     chmod +x "$launcher" "$app/installer/start.sh"
     cp "$app/installer/uninstall.sh" "$program/uninstall.sh"
+    # Where the calls are, for the uninstall to ask about the right folder.
+    printf '%s\n' "$data" > "$program/data-folder.txt"
     chmod +x "$program/uninstall.sh"
 
     local where

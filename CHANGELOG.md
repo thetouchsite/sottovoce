@@ -4,6 +4,14 @@ What changed in each release, newest first. The format follows [Keep a Changelog
 
 ## [Unreleased]
 
+## [1.7.1] - 2026-10-23
+
+### Added
+
+- **Asked before downloading a model.** The first transcription would download Whisper (2.9 GB) and the first summary its model (8 GB) on a click that said Transcribe or Summarize. Now the page asks, once, until the model is on disk. From the icon's menu, which has no page to ask in, a recording is kept to transcribe and a notice says so.
+- **Uninstalling asks what to keep.** Two Windows dialogs: delete the calls too, delete the models too (only Sottovoce's, not the rest of the cache). No is already chosen. Yes to both leaves the computer as it was before Sottovoce. The installer writes down where the calls are, for the uninstall to find them; `-Keep` (`--keep` on Linux and macOS) skips the questions.
+
+
 ## [1.7.0] - 2026-10-23
 
 Record any call from the Sottovoce window on Windows, who spoke right 19 times in 20, and a program that opens in two seconds and holds the GPU only while it works.
@@ -172,7 +180,8 @@ The first release. Local transcription for recorded business calls, with Whisper
 - `Install.bat`, `Start.bat` and `Stop.bat` for Windows. PyTorch is installed first, from the CUDA index.
 - An Italian README.
 
-[Unreleased]: https://github.com/thetouchsite/sottovoce/compare/v1.7.0...HEAD
+[Unreleased]: https://github.com/thetouchsite/sottovoce/compare/v1.7.1...HEAD
+[1.7.1]: https://github.com/thetouchsite/sottovoce/compare/v1.7.0...v1.7.1
 [1.7.0]: https://github.com/thetouchsite/sottovoce/compare/v1.6.2...v1.7.0
 [1.6.2]: https://github.com/thetouchsite/sottovoce/compare/v1.6.1...v1.6.2
 [1.6.1]: https://github.com/thetouchsite/sottovoce/compare/v1.6.0...v1.6.1

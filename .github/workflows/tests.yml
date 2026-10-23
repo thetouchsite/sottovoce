@@ -100,7 +100,7 @@ jobs:
           }
           Stop-Process -Id $server.Id -Force
           if (@($calls.history).Count -lt 1) { throw "the installed server did not list the example calls" }
-          powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $env:SOTTOVOCE_DIR "uninstall.ps1")
+          powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $env:SOTTOVOCE_DIR "uninstall.ps1") -Keep
           if (Test-Path $env:SOTTOVOCE_DIR) { throw "the program folder is still there" }
           if (-not (Test-Path (Join-Path $env:SOTTOVOCE_HOME "glossary.txt"))) { throw "the calls folder was removed" }
       - if: runner.os != 'Windows'
@@ -120,6 +120,6 @@ jobs:
           kill "$server"
           wait "$server" || true
           grep -q '"name"' calls.json || { echo "the installed server did not list the example calls:"; cat calls.json; exit 1; }
-          bash "$SOTTOVOCE_DIR/uninstall.sh"
+          bash "$SOTTOVOCE_DIR/uninstall.sh" --keep
           test ! -e "$SOTTOVOCE_DIR"
           test -f "$SOTTOVOCE_HOME/glossary.txt"

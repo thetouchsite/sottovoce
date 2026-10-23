@@ -73,7 +73,7 @@ import recorder
 import summary as S
 import transcribe as T
 
-VERSION = "1.7.0"
+VERSION = "1.7.1"
 ROOT = pathlib.Path(__file__).resolve().parent
 DATA = ROOT / "transcripts"            # set again by start() from --data
 INCOMING = DATA / "_incoming"
