@@ -111,7 +111,7 @@ def test_a_call_reads_three_ways_and_the_strip_plays_from_a_point(page):
     tabs.nth(0).click()
     strip.click(position={"x": box["width"] * 0.6, "y": 10})
     assert tabs.nth(1).get_attribute("aria-selected") == "true"
-    assert page.evaluate("document.querySelector('.reader').scrollTop") > 50
+    assert page.evaluate("document.getElementById('canvas').scrollTop") > 50       # one scroll: the page's
 
 
 def test_getting_back_to_the_start(page):
