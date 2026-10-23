@@ -4,6 +4,19 @@ What changed in each release, newest first. The format follows [Keep a Changelog
 
 ## [Unreleased]
 
+## [1.6.0] - 2026-10-23
+
+Sottovoce is a Windows program: one window, an icon by the clock, no terminal and no browser.
+
+### Added
+
+- **A Windows program, not a browser tab.** The shortcuts open Sottovoce in a window of its own (WebView2, through pywebview), with its icon, and no terminal. Closing the window hides it by the clock, where it keeps working and says when a transcription is done; clicking the icon, or the shortcut again, brings it back instead of starting a second copy. The icon's menu: the folder of the calls, **Start with Windows** (off until ticked, removed by the uninstall), and **Quit**, which the page's power button now is too. Without WebView2 it opens the browser and keeps the icon. The server's messages go to `sottovoce.log` in the program folder. `Sottovoce.cmd` there still starts it with a terminal, for options like `--lan`.
+- **The page speaks the system's language** until the IT/EN button is used.
+
+### Changed
+
+- In the window, **Record** opens the page in the browser: a call in a browser tab can't be picked from another program. Recording from the window itself comes next.
+
 ## [1.5.0] - 2026-10-23
 
 Install with one command on Windows, Linux and macOS, and transcription measured on public data.
@@ -120,7 +133,8 @@ The first release. Local transcription for recorded business calls, with Whisper
 - `Install.bat`, `Start.bat` and `Stop.bat` for Windows. PyTorch is installed first, from the CUDA index.
 - An Italian README.
 
-[Unreleased]: https://github.com/thetouchsite/sottovoce/compare/v1.5.0...HEAD
+[Unreleased]: https://github.com/thetouchsite/sottovoce/compare/v1.6.0...HEAD
+[1.6.0]: https://github.com/thetouchsite/sottovoce/compare/v1.5.0...v1.6.0
 [1.5.0]: https://github.com/thetouchsite/sottovoce/compare/v1.4.0...v1.5.0
 [1.4.0]: https://github.com/thetouchsite/sottovoce/compare/v1.3.0...v1.4.0
 [1.3.0]: https://github.com/thetouchsite/sottovoce/compare/v1.2.0...v1.3.0

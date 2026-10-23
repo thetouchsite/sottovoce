@@ -55,7 +55,7 @@ function Install-Sottovoce {
     # A running copy keeps its files open, and they can't be replaced.
     $running = $true
     try { Invoke-WebRequest "http://127.0.0.1:8200/health" -UseBasicParsing -TimeoutSec 2 | Out-Null } catch { $running = $false }
-    if ($running) { throw "Sottovoce is running: stop it (the power button on the page), then run this again." }
+    if ($running) { throw "Sottovoce is running: quit it (right-click its icon by the clock, then Quit), then run this again." }
 
     New-Item -ItemType Directory -Force -Path (Join-Path $Program "bin") | Out-Null
 
@@ -150,8 +150,10 @@ function Install-Sottovoce {
     $glossary = Join-Path $Data "glossary.txt"
     if (-not (Test-Path $glossary)) { Copy-Item (Join-Path $App "glossary.example.txt") $glossary }
 
-    # %USERPROFILE% rather than the path itself: cmd reads a .cmd in the
-    # console's code page, and a user name with an accent would break.
+    # The shortcuts open the window (desktop.py), with no console. The same
+    # with a console, for options such as --lan: Sottovoce.cmd. %USERPROFILE%
+    # there rather than the path itself: cmd reads a .cmd in the console's
+    # code page, and a user name with an accent would break.
     $where = if ($DefaultData) { "%USERPROFILE%\Sottovoce" } else { $Data }
     $launcher = Join-Path $Program "Sottovoce.cmd"
     Set-Content $launcher -Encoding Ascii -Value @(
@@ -162,8 +164,11 @@ function Install-Sottovoce {
     $shell = New-Object -ComObject WScript.Shell
     foreach ($folder in [Environment]::GetFolderPath("Programs"), [Environment]::GetFolderPath("Desktop")) {
         $link = $shell.CreateShortcut((Join-Path $folder "Sottovoce.lnk"))
-        $link.TargetPath = $launcher
+        $link.TargetPath = Join-Path $App ".venv\Scripts\pythonw.exe"
+        $link.Arguments = "`"$(Join-Path $App 'desktop.py')`" --data `"$(Join-Path $Data 'transcripts')`" " +
+            "--glossary `"$glossary`" --log `"$(Join-Path $Program 'sottovoce.log')`""
         $link.WorkingDirectory = $App
+        $link.IconLocation = Join-Path $App "app\icon.ico"
         $link.Description = "Transcribe calls on this computer"
         $link.Save()
     }

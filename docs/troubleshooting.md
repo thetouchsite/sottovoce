@@ -1,8 +1,15 @@
 # Troubleshooting
 
+## The window
+
+- **Nothing seems to happen at a double-click:** Sottovoce may be running already, hidden by the clock: the window comes back. If it doesn't, look for its icon by the clock (it may sit under the arrow **^**).
+- **It opens in the browser instead of a window:** the window needs Microsoft's WebView2, part of Windows 11 and of most Windows 10 machines. Install the *Evergreen* runtime from microsoft.com and start it again.
+- **What it was doing:** the server's messages, which a terminal used to show, are in `sottovoce.log` in the program folder (`%LOCALAPPDATA%\Programs\Sottovoce`), rewritten at every start.
+- **With a terminal, for options like `--lan`:** `%LOCALAPPDATA%\Programs\Sottovoce\Sottovoce.cmd`.
+
 ## The installer stops
 
-- **"Sottovoce is running"**: an update can't replace files in use. Stop it with the power button on the page, then run the command again.
+- **"Sottovoce is running"**: an update can't replace files in use. Quit it (right-click its icon by the clock, then **Quit**), then run the command again.
 - **A download failed halfway**: run the command again. What was already downloaded is kept and not fetched twice.
 - **Behind a company proxy**: set `HTTPS_PROXY` before running it (in PowerShell, `$env:HTTPS_PROXY = "http://proxy:8080"`). The installer needs github.com, pypi.org, files.pythonhosted.org and download.pytorch.org.
 - **It says to update the driver**: an RTX 50 card needs NVIDIA driver 580 or newer, older cards 528 (525 on Linux). Update it from nvidia.com and run the command again.

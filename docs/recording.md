@@ -2,6 +2,8 @@
 
 Sottovoce records calls that run in a browser tab: Google Meet, and Zoom or Teams on the web.
 
+On Windows, the Sottovoce window can't reach the tabs of your browser: **Record in the browser** opens the page there, where the call already is, and the steps below are the same. Recording straight from the window, any call including the Teams and Zoom apps, is the next step on the [roadmap](https://github.com/thetouchsite/sottovoce/blob/main/ROADMAP.md).
+
 1. Open the call in a tab of Chrome or Edge.
 2. In Sottovoce, give the call a name and press **Start recording**. The browser asks which tab to share: pick the call's tab and leave **Also share tab audio** on.
 3. Talk. When the call ends, press **Stop and transcribe**.

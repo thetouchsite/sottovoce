@@ -49,7 +49,7 @@ irm https://raw.githubusercontent.com/thetouchsite/sottovoce/main/installer/inst
 curl -fsSL https://raw.githubusercontent.com/thetouchsite/sottovoce/main/installer/install.sh | bash
 ```
 
-Then open **Sottovoce** from the Start menu or the desktop (on Linux, the applications menu; on a Mac, `~/Applications`). Your calls are kept in a `Sottovoce` folder in your home folder. To update, run the same command again. An NVIDIA GPU is what makes it fast; without one, and on a Mac, it runs on the CPU.
+Then open **Sottovoce** from the Start menu or the desktop. On Windows it is a program of its own: one window, and an icon by the clock where it keeps working when you close the window; **Quit** in the icon's menu stops it. On Linux it starts from the applications menu, on a Mac from `~/Applications`, and opens in the browser. Your calls are kept in a `Sottovoce` folder in your home folder. To update, run the same command again. An NVIDIA GPU is what makes it fast; without one, and on a Mac, it runs on the CPU.
 
 The first start downloads Whisper large-v3 (2.9 GB, once). Then drop a recording on the page, choose the language and the options, and press **Transcribe**.
 

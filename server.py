@@ -72,7 +72,7 @@ from fastapi.responses import (FileResponse, HTMLResponse, JSONResponse, PlainTe
 import summary as S
 import transcribe as T
 
-VERSION = "1.5.0"
+VERSION = "1.6.0"
 ROOT = pathlib.Path(__file__).resolve().parent
 DATA = ROOT / "transcripts"            # set again by start() from --data
 INCOMING = DATA / "_incoming"
@@ -1531,6 +1531,9 @@ def api_shutdown():
 
     def shortly():
         time.sleep(0.4)          # time to answer the page
+        if quit_app is not None:
+            quit_app()
+            return
         import os
         import signal
         os.kill(os.getpid(), signal.SIGTERM)
@@ -1539,9 +1542,27 @@ def api_shutdown():
     return {"stopped": True}
 
 
-if __name__ == "__main__":
-    import uvicorn
+# --- the desktop window ------------------------------------------------------------
+#
+# desktop.py runs this server inside a window with an icon by the clock. A
+# second double-click on the shortcut finds the server already up and asks it,
+# here, to bring that window back instead of starting another copy.
 
+show_window = None        # set by desktop.py; None when the server runs on its own
+quit_app = None           # the same: the power button then closes the program, icon and all
+
+
+@app.post("/api/window/show")
+def api_window_show():
+    if show_window is None:
+        return JSONResponse({"error": "no window: this server runs without one"}, 404)
+    show_window()
+    return {"shown": True}
+
+
+# --- starting up --------------------------------------------------------------------
+
+def options(argv=None) -> argparse.Namespace:
     ap = argparse.ArgumentParser(description="Sottovoce local server.")
     ap.add_argument("--port", type=int, default=8200)
     ap.add_argument("--data", type=pathlib.Path, default=ROOT / "transcripts",
@@ -1558,8 +1579,13 @@ if __name__ == "__main__":
                          "with a PIN asked once per device")
     ap.add_argument("--pin", default=None,
                     help="the PIN for --lan (default: one made up the first time, then kept)")
-    args = ap.parse_args()
+    return ap.parse_args(argv)
 
+
+def configure(args) -> str:
+    """Everything before serving: the data, the model, who may connect.
+    Returns the address to listen on."""
+    global allowed_hosts
     # Browsing only means no GPU work at all: the built-in LLM stays off too.
     S.builtin_allowed = not (args.no_model or args.no_llm)
     start(args.data, args.glossary, model=not args.no_model)
@@ -1604,4 +1630,11 @@ if __name__ == "__main__":
         print(f"  PIN: {pin}      (asked once per device; this computer is never asked)")
         print("  Plain http: fine at home or in the office, not on public Wi-Fi.")
         print("  Windows may ask whether Python can use private networks: say yes.\n")
-    uvicorn.run(app, host=host, port=args.port, log_level="warning")
+    return host
+
+
+if __name__ == "__main__":
+    import uvicorn
+
+    args = options()
+    uvicorn.run(app, host=configure(args), port=args.port, log_level="warning")

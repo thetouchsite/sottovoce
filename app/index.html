@@ -716,6 +716,9 @@ const IT = {
   'Also share tab audio': "Condividi anche l'audio della scheda", 'on.': '.',
   'Talk. When the call ends, press': 'Parla. Quando la call finisce, premi',
   'Name of the call': 'Nome della call', 'e.g. Weekly sync with Northpine': 'es. Riunione settimanale con Northpine',
+  'Quit Sottovoce': 'Esci da Sottovoce', 'Quit Sottovoce? The VRAM is freed.': 'Uscire da Sottovoce? La VRAM si libera.',
+  'Record in the browser': 'Registra nel browser',
+  'A call in a browser tab is recorded from the browser: this window can’t reach your tabs.': 'Una call in una scheda del browser si registra dal browser: questa finestra non vede le tue schede.',
   'Start recording': 'Avvia registrazione', 'Stop and transcribe': 'Ferma e trascrivi', 'Discard': 'Scarta',
   'Your microphone and the call are saved on two separate tracks, so the transcript says You and Them. With Separate voices on, the people on the call are told apart too. Use headphones, and tell the others you are recording.':
     'Il tuo microfono e la call finiscono su due tracce separate, quindi la trascrizione dice Tu e Loro. Con Separa le voci attivo, si distinguono anche le persone della call. Usa le cuffie, e avvisa gli altri che stai registrando.',
@@ -912,7 +915,10 @@ const IT_RULES = [
 // texts that carry a number. Calls are never touched: transcripts, summaries,
 // names of calls and of people are marked as data and left as they are.
 // Switching language reloads the page, so nothing half-translated stays.
-const UI = store.get('sottovoce-ui') === 'it' ? 'it' : 'en';
+// The language chosen with the IT/EN button; before any choice, the system's.
+const chosenUI = store.get('sottovoce-ui');
+const UI = chosenUI ? (chosenUI === 'it' ? 'it' : 'en')
+  : ((navigator.language || '').toLowerCase().startsWith('it') ? 'it' : 'en');
 document.documentElement.lang = UI;
 const KEEP = '.data, [translate=no], .reader span.text, .reader .summary, .recent td:first-child, '
   + '.waiting-row>span:first-child, .qname, .hit span, .suspect span, script, style';
@@ -1382,6 +1388,9 @@ function filesPanel(){
 // computer do, Firefox and Safari do not.
 const canRecord = () => !!(navigator.mediaDevices && navigator.mediaDevices.getDisplayMedia
   && window.MediaRecorder && window.AudioContext);
+// Inside Sottovoce's own window (desktop.py opens /?window) a call running in
+// a browser tab can't be picked: the window is not that browser.
+const inWindow = new URLSearchParams(location.search).has('window');
 
 function recordPanel(){
   const p = panel('Record a call');
@@ -1397,6 +1406,17 @@ function drawRecordIdle(c){
   c = c || $('#record-body');
   if (!c) return;
   c.textContent = '';
+  if (inWindow){
+    const v = el('p', 'empty');
+    v.textContent = 'A call in a browser tab is recorded from the browser: this window can’t reach your tabs.';
+    const b = el('button', 'primary');
+    b.type = 'button';
+    b.style.marginTop = '14px';
+    b.textContent = 'Record in the browser';
+    b.onclick = () => window.open(location.origin + '/', '_blank');
+    c.append(v, b);
+    return;
+  }
   if (!canRecord()){
     const v = el('p', 'empty');
     // Opened from another device (--lan), the browser refuses the microphone
@@ -3148,9 +3168,15 @@ side.addEventListener('drop', e => {
 });
 $('#file').onchange = e => { if (e.target.files.length) sendFiles([...e.target.files]); e.target.value = ''; };
 
+// In the window the power button is Quit: the program closes, icon and all.
+if (inWindow){
+  $('#shutdown').title = 'Quit Sottovoce';
+  $('#shutdown').setAttribute('aria-label', 'Quit Sottovoce');
+}
 $('#shutdown').onclick = async () => {
   if (rec){ alert(T('A call is being recorded: stop it first.')); return; }
-  if (!confirm(T('Stop the server? The VRAM is freed; start it again from the Sottovoce shortcut.'))) return;
+  if (!confirm(T(inWindow ? 'Quit Sottovoce? The VRAM is freed.'
+                          : 'Stop the server? The VRAM is freed; start it again from the Sottovoce shortcut.'))) return;
   try{
     const r = await (await fetch('/api/shutdown', {method:'POST'})).json();
     if (r.error){ alert(T(r.error)); return; }
