@@ -4,6 +4,12 @@ What changed in each release, newest first. The format follows [Keep a Changelog
 
 ## [Unreleased]
 
+## [1.6.2] - 2026-10-23
+
+### Fixed
+
+- **After closing the window, Sottovoce stopped answering**: the icon, its menu and the window could not be opened again. Pausing the recording on close waited for the window while the window was closing. It now runs a moment later, on its own. A new test opens the real window on Windows, closes it, brings it back and quits, also in CI.
+
 ## [1.6.1] - 2026-10-23
 
 ### Fixed
@@ -141,7 +147,8 @@ The first release. Local transcription for recorded business calls, with Whisper
 - `Install.bat`, `Start.bat` and `Stop.bat` for Windows. PyTorch is installed first, from the CUDA index.
 - An Italian README.
 
-[Unreleased]: https://github.com/thetouchsite/sottovoce/compare/v1.6.1...HEAD
+[Unreleased]: https://github.com/thetouchsite/sottovoce/compare/v1.6.2...HEAD
+[1.6.2]: https://github.com/thetouchsite/sottovoce/compare/v1.6.1...v1.6.2
 [1.6.1]: https://github.com/thetouchsite/sottovoce/compare/v1.6.0...v1.6.1
 [1.6.0]: https://github.com/thetouchsite/sottovoce/compare/v1.5.0...v1.6.0
 [1.5.0]: https://github.com/thetouchsite/sottovoce/compare/v1.4.0...v1.5.0
