@@ -31,6 +31,10 @@ LONG-FORM with Whisper's own mechanism, not in chunks.
     loop of the same three words forty times in a row. Do not add it to go
     faster.
 
+TWO PROGRAMS, ONE MODEL. The same Whisper large-v3 runs through PyTorch on
+an NVIDIA card and through OpenVINO on an Intel GPU or on the processor,
+whichever is fastest on this computer. See "where Whisper runs" below.
+
 WORD TIMESTAMPS, two ways. By default each line's time is shared among its
 words: as fast as before. On request (--precise) from Whisper's own
 alignment, no second model: same quality, twice the time. See listen().
@@ -54,7 +58,9 @@ from __future__ import annotations
 
 import argparse
 import difflib
+import importlib.util
 import json
+import os
 import pathlib
 import re
 import subprocess
@@ -63,12 +69,6 @@ import threading
 import time
 
 MODEL = "openai/whisper-large-v3"
-
-# How much faster than real time, end to end. Used to tell the page how long
-# is left: the estimate must say how long the person waits (upload, audio
-# conversion, transcription), not how long the GPU works.
-SPEED = 7.0
-SPEED_PRECISE = 3.8    # precise word timings: 395 s instead of 200 on the same call
 
 # Phrases Whisper learned from YouTube subtitles and produces on silence. In a
 # call they mean nothing. They are flagged when found and dropped only where
@@ -101,13 +101,173 @@ TAG = "|".join(SPEAKERS) + r"|Voice \d{1,2}"
 
 ROOT = pathlib.Path(__file__).resolve().parent
 
+def ffmpeg() -> str:
+    import imageio_ffmpeg
+    return imageio_ffmpeg.get_ffmpeg_exe()
+
+
+# --- where Whisper runs -------------------------------------------------------------
+#
+# The same model, Whisper large-v3, through two programs:
+#
+#     cuda        PyTorch on an NVIDIA card, float16
+#     intel-gpu   OpenVINO on an Intel GPU, Arc or built into the processor, int8
+#     cpu         OpenVINO on the processor, Intel or AMD, int8
+#
+# OpenVINO's large-v3 is the OpenVINO organisation's int8 conversion on
+# Hugging Face. On a processor it is about five times faster than PyTorch
+# (research/intel.py and research/cpu.py, the first ten FLEURS clips). Whole,
+# end to end, research/wer.py with the sottovoce@<path> configs: the same error
+# rate within a few tenths on every path, on FLEURS, AMI and the long pauses.
+#
+# Not used: OpenVINO on an NVIDIA card, through OpenCL (2.0x real time on
+# those ten clips, research/intel.py --configs nvidia, far below PyTorch on the
+# same card), and the NPU of the Core Ultra tried (95% of words wrong,
+# --configs npu-turbo). A GPU that is neither NVIDIA nor Intel, AMD's for one,
+# runs on the processor for now.
+
+PATHS = {"cuda": "NVIDIA GPU", "intel-gpu": "Intel GPU", "cpu": "processor"}
+
+# (program, turbo) -> the model. Turbo is the user's choice on a slow computer:
+# about twice as fast through OpenVINO (SPEEDS), with more mistakes, above all
+# on names (see MODEL above).
+REPOS = {
+    ("torch", False): "openai/whisper-large-v3",
+    ("torch", True): "openai/whisper-large-v3-turbo",
+    ("openvino", False): "OpenVINO/whisper-large-v3-int8-ov",
+    ("openvino", True): "OpenVINO/whisper-large-v3-turbo-int8-ov",
+}
+# Measured on disk, for the page to say what the first transcription downloads.
+SIZE_GB = {"openai/whisper-large-v3": 2.9, "openai/whisper-large-v3-turbo": 1.6,
+           "OpenVINO/whisper-large-v3-int8-ov": 1.5, "OpenVINO/whisper-large-v3-turbo-int8-ov": 0.8}
+
+# How much faster than real time, from the start of transcribing to the end:
+# the page's estimate of how long is left. By (path, turbo), then (segments,
+# precise word timings); None where not measured, and the page shows a moving
+# bar. These are the defaults; once a call of a minute or more has been
+# transcribed here, the speed this computer really had is used instead
+# (`measured`, kept by the server).
+#
+# cuda: 200 s for the 27-minute call, 395 s with precise word timings, on an
+# RTX 5090 Laptop. The others: the four whole AMI test meetings, 92 minutes,
+# on a Core Ultra 9 285H with its Arc 140T (research/wer.py ami, configs
+# sottovoce@intel-gpu, sottovoce@cpu and the same +turbo). A smaller computer
+# is slower: its first call corrects the estimate.
+SPEEDS = {
+    ("cuda", False): (7.0, 3.8),
+    ("intel-gpu", False): (10.8, None),
+    ("intel-gpu", True): (28.5, None),
+    ("cpu", False): (5.2, None),
+    ("cpu", True): (9.2, None),
+}
+measured: dict[str, float] = {}
+
+# What the user chose. path None: the first found. SOTTOVOCE_ENGINE, if set,
+# wins over both: a way to try OpenVINO on a computer with an NVIDIA card.
+chosen = {"path": None, "turbo": False}
+
+_found: list[str] | None = None
+_found_lock = threading.Lock()
+_intel: str | None = None
 _engine = None
 _lock = threading.Lock()
 
 
-def ffmpeg() -> str:
-    import imageio_ffmpeg
-    return imageio_ffmpeg.get_ffmpeg_exe()
+def _intel_gpu() -> str | None:
+    """OpenVINO's name for the first Intel GPU, "GPU.0", or None.
+
+    OpenVINO lists an NVIDIA card as a GPU too, through OpenCL: only Intel's
+    are kept."""
+    try:
+        import openvino as ov
+        core = ov.Core()
+        for d in core.available_devices:
+            if d.startswith("GPU") and "intel" in str(core.get_property(d, "FULL_DEVICE_NAME")).lower():
+                return d
+    except Exception:
+        pass
+    return None
+
+
+def openvino() -> bool:
+    return importlib.util.find_spec("openvino_genai") is not None
+
+
+def found() -> list[str]:
+    """The paths this computer has, the likely fastest first. Looked up once:
+    the hardware does not change while the program runs."""
+    global _found
+    with _found_lock:
+        if _found is None:
+            _found = _look()
+    return _found
+
+
+def looked() -> bool:
+    """Whether found() has already looked: the first time imports PyTorch
+    and asks OpenVINO for its devices, seconds the page should not wait."""
+    return _found is not None
+
+
+def _look() -> list[str]:
+    global _intel
+    out = []
+    try:
+        import torch
+        if torch.cuda.is_available():
+            out.append("cuda")
+    except ImportError:
+        pass
+    if openvino():
+        _intel = _intel_gpu()
+        if _intel:
+            out.append("intel-gpu")
+    return out + ["cpu"]
+
+
+def path() -> str:
+    """Where Whisper runs: forced, else chosen, else the first found."""
+    want = os.environ.get("SOTTOVOCE_ENGINE") or chosen["path"]
+    return want if want in found() else found()[0]
+
+
+def program(p=None) -> str:
+    """ "torch" or "openvino". The processor falls back to PyTorch where
+    OpenVINO is not installed."""
+    p = p or path()
+    return "torch" if p == "cuda" or not openvino() else "openvino"
+
+
+def model(p=None, turbo=None) -> str:
+    """The model that runs on path p, by default the one in use."""
+    return REPOS[(program(p), chosen["turbo"] if turbo is None else turbo)]
+
+
+def choose(p=None, turbo=None):
+    """Sets where Whisper runs and which model. Lets the loaded one go if
+    that changes them: the next transcription loads the new one."""
+    before = (path(), model())
+    if p is not None:
+        chosen["path"] = p or None             # "" back to automatic
+    if turbo is not None:
+        chosen["turbo"] = bool(turbo)
+    if (path(), model()) != before:
+        release()
+
+
+def key(precise=False, p=None, turbo=None) -> str:
+    """What a measured speed is about: path, model, kind of word timings."""
+    return f"{p or path()}|{model(p, turbo)}|{'precise' if precise else 'segments'}"
+
+
+def speed(precise=False, p=None, turbo=None) -> float | None:
+    """Times faster than real time here, measured or by default: None when
+    neither is known, and the page shows a moving bar instead of a countdown."""
+    k = key(precise, p, turbo)
+    if k in measured:
+        return measured[k]
+    s = SPEEDS.get((p or path(), chosen["turbo"] if turbo is None else turbo))
+    return (s[1] if precise else s[0]) if s else None
 
 
 # Seconds without a transcription before the server lets Whisper go: the
@@ -119,18 +279,18 @@ def loaded() -> bool:
     return _engine is not None
 
 
-def downloaded() -> bool:
-    """Whether Whisper is already on disk: if not, the first load is a 2.9 GB download."""
+def downloaded(repo=None) -> bool:
+    """Whether the model is already on disk: if not, the first load downloads it (SIZE_GB)."""
     try:
         from huggingface_hub import try_to_load_from_cache
-        return isinstance(try_to_load_from_cache(MODEL, "config.json"), str)
+        return isinstance(try_to_load_from_cache(repo or model(), "config.json"), str)
     except Exception:
         return False
 
 
 def release():
-    """Frees Whisper's memory on the GPU (3.4 GB measured). The next call to
-    engine() loads it again, in about ten seconds."""
+    """Frees Whisper's memory (3.4 GB of the GPU measured with PyTorch). The
+    next call to engine() loads it again, in about ten seconds."""
     global _engine
     with _lock:
         if _engine is None:
@@ -146,7 +306,7 @@ def release():
 
 
 def engine():
-    """The pipeline, loaded on first use and kept in VRAM until released.
+    """Whisper, loaded on first use and kept until released.
 
     Loading it takes about ten seconds. The server loads it for the first
     transcription and lets it go IDLE seconds after the last one, so a
@@ -156,14 +316,176 @@ def engine():
     global _engine
     with _lock:
         if _engine is None:
-            import torch
-            from transformers import pipeline
-            _engine = pipeline(
-                "automatic-speech-recognition", model=MODEL,
-                dtype=torch.float16,
-                device="cuda" if torch.cuda.is_available() else "cpu",
-                model_kwargs={"attn_implementation": "sdpa"})
+            p = path()
+            if program(p) == "openvino":
+                found()
+                _engine = _OpenVINO(model(p), _intel if p == "intel-gpu" else "CPU")
+            else:
+                _engine = _Torch(model(p), "cuda" if p == "cuda" else "cpu")
         return _engine
+
+
+class _Torch:
+    """Whisper through the transformers pipeline."""
+
+    def __init__(self, repo, device):
+        import torch
+        from transformers import pipeline
+        self.p = pipeline(
+            "automatic-speech-recognition", model=repo,
+            dtype=torch.float16 if device == "cuda" else torch.float32,
+            device=device, model_kwargs={"attn_implementation": "sdpa"})
+
+    def segments(self, wav, language, speech=None):
+        r = self.p(str(wav), return_timestamps=True, generate_kwargs=_decode(language))
+        return r.get("chunks", [])
+
+    def words(self, wav, language):
+        r = self.p(str(wav), return_timestamps="word", generate_kwargs=_decode(language))
+        out = []
+        for c in r.get("chunks", []):
+            token = c["text"].strip()
+            a, b = c["timestamp"]
+            if token and a is not None:
+                out.append([a, b if b is not None else a, token])
+        return out
+
+    def language(self, audio):
+        r = self.p({"raw": audio, "sampling_rate": 16000}, return_language=True,
+                   return_timestamps=True, generate_kwargs={"task": "transcribe"})
+        return next((c.get("language") for c in r.get("chunks", []) if c.get("language")), None)
+
+
+# Whisper's own limit: text that compresses more than this has looped
+# ("un'esplosione di un'esplosione di..."). The PyTorch engine redoes such a
+# window by itself (DECODE); OpenVINO has no such setting, so _OpenVINO does it.
+LOOPED = 2.4
+
+
+def looped(text) -> bool:
+    import zlib
+    b = text.encode("utf-8")
+    return len(b) > 40 and len(b) / len(zlib.compress(b)) > LOOPED
+
+
+def unloop(text):
+    """One copy of a phrase of up to eight words said three times or more in a row."""
+    words, out, i = text.split(), [], 0
+    while i < len(words):
+        for n in range(1, 9):
+            unit, times = words[i:i + n], 1
+            while len(unit) == n and words[i + times * n:i + (times + 1) * n] == unit:
+                times += 1
+            if times >= 3:
+                out += unit
+                i += times * n
+                break
+        else:
+            out.append(words[i])
+            i += 1
+    return " ".join(out)
+
+
+class _OpenVINO:
+    """Whisper through OpenVINO GenAI, on an Intel GPU or the processor.
+
+    Its decoding is greedy, without the settings of DECODE: no retry of a
+    window that came out badly, no skipping a window of silence. On the
+    long-pauses test that let one window loop a phrase a hundred times, so a
+    looped window is done again here (_again), the way the PyTorch engine
+    would. What it costs and saves is measured, not assumed: research/wer.py
+    with the sottovoce@intel-gpu and sottovoce@cpu configs.
+    """
+
+    def __init__(self, repo, device):
+        self.repo, self.device = repo, device
+        self.p, self.with_words = self._pipeline(False), False
+
+    def _pipeline(self, words):
+        import openvino_genai as og
+        from huggingface_hub import snapshot_download
+        folder = pathlib.Path(snapshot_download(self.repo))
+        # Compiled for this device the first time and kept beside the model,
+        # so it goes with it: loading again takes seconds instead of a minute.
+        props = {"CACHE_DIR": str(folder.parent.parent / "openvino-cache")}
+        if words:
+            props["word_timestamps"] = True
+        return og.WhisperPipeline(str(folder), self.device, **props)
+
+    def _generate(self, audio, language, words=False, temperature=0.0):
+        if words and not self.with_words:
+            # Word timings need a pipeline built for them: built when first
+            # asked, and kept.
+            self.p, self.with_words = self._pipeline(True), True
+        c = self.p.get_generation_config()
+        c.task = "transcribe"
+        c.return_timestamps = True
+        if language:
+            c.language = f"<|{language}|>"
+        if words:
+            c.word_timestamps = True
+        if temperature:
+            c.do_sample, c.temperature, c.rng_seed = True, temperature, 0
+        return self.p.generate(audio, c)
+
+    @staticmethod
+    def _audio(wav):
+        import soundfile as sf
+        audio, rate = sf.read(str(wav), dtype="float32")
+        assert rate == 16000, rate
+        return audio
+
+    def segments(self, wav, language, speech=None):
+        audio = self._audio(wav)
+        out = []
+        for c in self._generate(audio, language).chunks or []:
+            a, b = c.start_ts, c.end_ts
+            if not looped(c.text):
+                out.append({"text": c.text, "timestamp": (a, b)})
+                continue
+            # No ending time: the loop ran to the end of its 30-second window.
+            b = b if b > a else min(a + 30, len(audio) / 16000)
+            out += self._again(audio, a, b, language, speech)
+        return out
+
+    def _again(self, audio, a, b, language, speech):
+        """A looped stretch, done again as the PyTorch engine would: skipped
+        if nobody speaks in it (by the map of speech), else only its spoken
+        part, greedy and then a little warmer each time; if every try loops,
+        one copy of what it repeats."""
+        if speech is not None:
+            spoken = [x for x, y in speech if x < b and a < y]
+            if not spoken:
+                return []
+            a = max(a, spoken[0] - 0.3)
+        clip = audio[int(a * 16000):int(b * 16000)]
+        chunks = []
+        for t in DECODE["temperature"]:
+            chunks = self._generate(clip, language, temperature=t).chunks or []
+            if not any(looped(x.text) for x in chunks):
+                break
+        fix = unloop if any(looped(x.text) for x in chunks) else str
+        return [{"text": fix(x.text), "timestamp": (a + x.start_ts, a + x.end_ts if x.end_ts > x.start_ts else b)}
+                for x in chunks]
+
+    def words(self, wav, language):
+        r = self._generate(self._audio(wav), language, words=True)
+        return join_pieces([(w.start_ts, w.end_ts, w.word) for w in r.words or []])
+
+    def language(self, audio):
+        return self._generate(audio, None).language or None
+
+
+def join_pieces(pieces):
+    """Words from OpenVINO's word timings, which come in pieces: a piece that
+    does not start with a space belongs to the word before ("L" + "'incidente")."""
+    out = []
+    for a, b, text in pieces:
+        if out and text and not text[0].isspace():
+            out[-1][1], out[-1][2] = b, out[-1][2] + text
+        elif text.strip():
+            out.append([a, b, text.strip()])
+    return out
 
 
 LOUDNORM = "loudnorm=I=-16:TP=-1.5:LRA=11"
@@ -382,14 +704,23 @@ DECODE = {
 
 def _code(language):
     """Detection reports a name ("italian"), a forced language is a code
-    ("it"): only codes are stored, so the page has one thing to show."""
+    ("it"), OpenVINO a token ("<|it|>"): only codes are stored, so the page
+    has one thing to show."""
+    language = language.strip("<|>") if language else language
     if language and len(language) > 3:
         from transformers.models.whisper.tokenization_whisper import TO_LANGUAGE_CODE
         return TO_LANGUAGE_CODE.get(language.lower(), language)
     return language
 
 
-def listen(wav, language=None, speech_start=0.0, precise=False):
+def _decode(language):
+    kwargs = dict(DECODE)
+    if language:
+        kwargs["language"] = language
+    return kwargs
+
+
+def listen(wav, language=None, speech_start=0.0, precise=False, speech=None):
     """The transcription, word by word. `language` is a Whisper code or None.
 
     Returns (words, language, breaks): words as [start, end, token]; breaks is
@@ -407,31 +738,25 @@ def listen(wav, language=None, speech_start=0.0, precise=False):
     speed and spreads each line's time over its words by their length, which
     lands a click near the word; `precise` is the choice when it has to land
     on it.
+
+    With no language given, it is found first, from where people start
+    speaking (a call often opens with silence), and the whole call is
+    transcribed in it. `speech`, the map of where people speak, lets the
+    OpenVINO engine skip a looped window of silence.
     """
-    p = engine()
-    kwargs = dict(DECODE)
-    if language:
-        kwargs["language"] = language
+    e = engine()
+    if not language:
+        language = detect_language(wav, speech_start)
     words, breaks = [], None
     if precise:
         try:
-            r = p(str(wav), return_timestamps="word", generate_kwargs=kwargs)
-            for c in r.get("chunks", []):
-                token = c["text"].strip()
-                a, b = c["timestamp"]
-                if token and a is not None:
-                    words.append([a, b if b is not None else a, token])
-        except Exception as e:                              # pragma: no cover
-            print(f"  word timestamps failed ({type(e).__name__}): using segments")
+            words = e.words(wav, language)
+        except Exception as x:                              # pragma: no cover
+            print(f"  word timestamps failed ({type(x).__name__}): using segments")
             precise = False
     if not precise:
-        r = p(str(wav), return_timestamps=True, generate_kwargs=kwargs)
-        words, breaks = spread(r.get("chunks", []))
-    words = tidy(words)
-    if not language:
-        # From where people start speaking: a call often opens with silence.
-        language = detect_language(wav, speech_start)
-    return words, _code(language), breaks
+        words, breaks = spread(e.segments(wav, language, speech))
+    return tidy(words), _code(language), breaks
 
 
 def spread(chunks):
@@ -475,18 +800,16 @@ def tidy(words):
 
 
 def detect_language(wav, start=0.0):
-    """The language Whisper hears in 30 seconds of audio, when none was chosen.
+    """The language Whisper hears in 30 seconds of audio, as a code, or None.
 
     Only one window: it is what Whisper itself uses to decide, and decoding the
     whole call again just to name its language would cost minutes.
     """
     try:
         import soundfile as sf
-        audio, rate = sf.read(str(wav), dtype="float32",
-                              start=int(start * 16000), frames=30 * 16000)
-        r = engine()({"raw": audio, "sampling_rate": rate}, return_language=True,
-                     return_timestamps=True, generate_kwargs={"task": "transcribe"})
-        return next((c.get("language") for c in r.get("chunks", []) if c.get("language")), None)
+        audio, _ = sf.read(str(wav), dtype="float32",
+                           start=int(start * 16000), frames=30 * 16000)
+        return _code(engine().language(audio))
     except Exception:
         return None
 
@@ -986,7 +1309,10 @@ def run(source, language=None, progress=None, two_tracks=False, precise=False, v
             engine()
         if progress:
             progress("transcribing", seconds)
-        words, used, breaks = listen(wav, language, speech[0][0] if speech else 0.0, precise)
+        # Timed for the page's next estimate (speed()): what the user waits
+        # for once the model is loaded, without telling voices apart.
+        t0 = time.time()
+        words, used, breaks = listen(wav, language, speech[0][0] if speech else 0.0, precise, speech)
 
         speakers = None
         if two_tracks and words:
@@ -1002,16 +1328,20 @@ def run(source, language=None, progress=None, two_tracks=False, precise=False, v
             else:
                 import soundfile as sf
                 audio, _ = sf.read(str(wav), dtype="float32")
+            t1 = time.time()
             speakers, found = tell_voices(words, audio, speakers, progress, breaks)
+            t0 += time.time() - t1
 
         segments = lines_from_words(words, speakers, breaks)
         phantoms = drop_phantoms(segments, meter, level)
+        busy = time.time() - t0
 
     # Proper nouns are fixed here, on the output: see glossary().
     corrected = apply_glossary(segments, glossary())
     out = {"segments": segments, "seconds": seconds, "speech_seconds": speech_s,
            "corrected": corrected, "phantoms": phantoms, "speech": speech,
-           "language": used, "word_times": "precise" if breaks is None else "estimated"}
+           "language": used, "word_times": "precise" if breaks is None else "estimated",
+           "transcribing_seconds": round(busy, 1), "engine": key(precise)}
     if found is not None:
         out["speakers_found"] = found
     return out
@@ -1036,7 +1366,9 @@ def speech_map(source):
 def main() -> None:
     ap = argparse.ArgumentParser(
         description="Transcribe a recording locally with Whisper large-v3.")
-    ap.add_argument("file", help="audio or video file")
+    ap.add_argument("file", nargs="?", help="audio or video file")
+    ap.add_argument("--where", action="store_true",
+                    help="say where Whisper runs on this computer, and stop")
     ap.add_argument("--language", default=None,
                     help='Whisper language code, e.g. "it" or "en" (default: detect)')
     ap.add_argument("--formats", default="txt,md",
@@ -1048,6 +1380,12 @@ def main() -> None:
     ap.add_argument("--voices", action="store_true",
                     help="tell the voices apart: Voice 1, Voice 2... (about 2 s a minute, on the CPU)")
     args = ap.parse_args()
+    if args.where:
+        names = [f"{PATHS[p]} ({'OpenVINO' if program(p) == 'openvino' else 'PyTorch'})" for p in found()]
+        print(f"  Whisper large-v3 runs on: {names[0]}" + (f"; also possible: {', '.join(names[1:])}" if names[1:] else ""))
+        return
+    if not args.file:
+        ap.error("the file to transcribe is missing")
 
     source = pathlib.Path(args.file).expanduser()
     if not source.exists():

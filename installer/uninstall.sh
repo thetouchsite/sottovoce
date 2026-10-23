@@ -23,7 +23,7 @@ fi
 # Sottovoce's own models only, not the whole cache: other programs may use it.
 hub="${HF_HOME:-$HOME/.cache/huggingface}/hub"
 models=()
-for m in models--openai--whisper-large-v3 models--Qwen--Qwen3-4B-Instruct-2507; do
+for m in models--openai--whisper-large-v3 models--openai--whisper-large-v3-turbo models--OpenVINO--whisper-large-v3-int8-ov models--OpenVINO--whisper-large-v3-turbo-int8-ov models--Qwen--Qwen3-4B-Instruct-2507; do
     if [ -d "$hub/$m" ]; then
         models+=("$hub/$m")
     fi

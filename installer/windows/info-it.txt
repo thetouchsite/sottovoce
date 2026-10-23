@@ -1,0 +1,29 @@
+﻿SOTTOVOCE
+Trascrizione delle call, sul tuo computer.
+TouchSite Software
+
+PRIMA DI INSTALLARE
+
+Tutto resta su questo computer.
+Le registrazioni, le trascrizioni, i riassunti e le email non vengono inviati a nessun servizio esterno. Non serve un account e non c'è telemetria. Sottovoce risponde solo a questo computer, non alla rete, a meno che tu non lo chieda.
+
+Cosa scarica.
+Durante l'installazione: Python e PyTorch, circa 2 GB, scelti in base alla tua scheda video. Più avanti, solo quando li usi per la prima volta e dopo avertelo chiesto: il modello di trascrizione (2,9 GB) e il modello dei riassunti (8 GB).
+
+Cosa serve.
+Windows 10 o 11 a 64 bit. Una scheda video NVIDIA rende la trascrizione molto più veloce; senza, funziona sul processore, più lentamente. Circa 15 GB liberi su disco.
+
+Registrare una conversazione.
+In molti paesi registrare una conversazione richiede di informare gli altri partecipanti, o il loro consenso. È tua responsabilità informarli e rispettare le leggi che ti riguardano, compreso il GDPR per i dati personali che le registrazioni contengono.
+
+Le trascrizioni sono automatiche.
+Sono prodotte da modelli di intelligenza artificiale e possono contenere errori, soprattutto nei nomi e nei numeri, e attribuire una frase alla persona sbagliata. Controllale prima di usarle per decisioni, contratti o comunicazioni.
+
+Nessuna garanzia.
+Sottovoce è software libero con licenza MIT, fornito "così com'è", senza garanzie di alcun tipo. Il testo della licenza è nella pagina successiva.
+
+Disinstallare.
+Da Impostazioni > App > Sottovoce. Ti verrà chiesto se eliminare anche le tue call e i modelli scaricati: rispondendo sì a entrambe le domande il computer torna com'era.
+
+Codice sorgente e documentazione: https://github.com/thetouchsite/sottovoce
+Contatti: info@touchsitesoftware.it

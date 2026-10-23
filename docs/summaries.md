@@ -18,10 +18,16 @@ The summary and the email are deleted when the lines they were written from chan
 
 ## Which model writes them
 
-Two ways, the first that is there:
+Chosen once in **Settings → Summaries and emails**, and remembered:
 
-1. **A local LLM server you already run.** LM Studio (port 1234), Ollama (11434) or llama-server (8080), over the OpenAI-compatible API. This is the way to a faster or larger model, or to a GPU too small for both models.
-2. **The model built in.** With no server running, Sottovoce uses **Qwen3 4B Instruct** (Apache-2.0, no account), the way it uses Whisper: downloaded from Hugging Face the first time (8 GB), loaded on the GPU when asked, unloaded after ten minutes unused so the memory goes back to Whisper.
+- **Automatic**, the default: a local LLM server that is already running (LM Studio on port 1234, Ollama on 11434, llama-server on 8080), over the OpenAI-compatible API; if none is, the model built in.
+- **Built in: Qwen3 4B Instruct** (Apache-2.0, no account), the way Sottovoce uses Whisper: downloaded from Hugging Face the first time (8 GB), loaded on the GPU when asked, unloaded after ten minutes unused so the memory goes back to Whisper. It needs an NVIDIA GPU.
+- **One of your LM Studio models.** Settings lists them, with their size, from LM Studio's own command line (`lms ls`). LM Studio doesn't need to be open: when a summary is asked, Sottovoce starts its server without a window (`lms server start`), LM Studio loads the model for the request and lets it go ten minutes after (the request's `ttl`). If LM Studio's just-in-time loading is turned off, Sottovoce loads the model with `lms load`.
+- **One of your Ollama models**, read from Ollama's models folder, so Ollama doesn't need to be running to list them. Sottovoce starts `ollama serve` when a summary is asked; Ollama loads the model and lets it go after five minutes, as it always does.
+
+Whatever Sottovoce started, it stops when it quits: the computer is left as it was found. A server you started yourself is left alone.
+
+This is the way to a faster or larger model, to summaries on a computer without an NVIDIA GPU, or to a GPU too small for both models.
 
 Nothing is ever sent to a remote LLM.
 

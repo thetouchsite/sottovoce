@@ -1,0 +1,29 @@
+﻿Sottovoce is (c) 2026 TouchSite Software, under the MIT licence (LICENSE).
+
+It is built on the work of others. Installed with it, or downloaded on first use:
+
+  uv                        Astral Software          MIT or Apache-2.0
+  Python                    Python Software Foundation   PSF License
+  PyTorch                   The Linux Foundation and contributors   BSD-3-Clause
+  Transformers              Hugging Face             Apache-2.0
+  OpenVINO, OpenVINO GenAI  Intel                    Apache-2.0
+  FastAPI, Uvicorn          their authors            MIT, BSD-3-Clause
+  pywebview                 Roman Sirokov and contributors   BSD-3-Clause
+  pystray                   Moses Palmér             LGPL-3.0
+  soundcard                 Bastian Bechtold         BSD-3-Clause
+  sherpa-onnx               k2-fsa                   Apache-2.0
+  ONNX Runtime              Microsoft                MIT
+  FFmpeg (imageio-ffmpeg)   the FFmpeg developers    LGPL / GPL, as built by imageio
+  Public Sans (font)        USWDS                    SIL Open Font License 1.1
+
+Models, downloaded on first use and after asking:
+
+  Whisper large-v3                       OpenAI          Apache-2.0
+  Whisper large-v3, int8 for OpenVINO    OpenVINO (Intel)   Apache-2.0
+  Whisper large-v3-turbo, if chosen      OpenAI; OpenVINO   MIT
+  Qwen3-4B-Instruct-2507                 Qwen team, Alibaba   Apache-2.0
+  pyannote segmentation-3.0 (via sherpa-onnx)   pyannote   MIT
+  3D-Speaker ERes2Net                    Alibaba DAMO    Apache-2.0
+
+Each keeps its own licence; the full texts come with each package, and are
+linked from https://github.com/thetouchsite/sottovoce.

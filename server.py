@@ -48,6 +48,7 @@ loads nothing from the internet, not even its fonts. (The API reference at
 from __future__ import annotations
 
 import argparse
+import atexit
 import hashlib
 import hmac
 import importlib.util
@@ -59,6 +60,7 @@ import queue
 import re
 import shutil
 import subprocess
+import tempfile
 import threading
 import time
 import urllib.parse
@@ -73,7 +75,7 @@ import recorder
 import summary as S
 import transcribe as T
 
-VERSION = "1.7.1"
+VERSION = "1.8.0"
 ROOT = pathlib.Path(__file__).resolve().parent
 DATA = ROOT / "transcripts"            # set again by start() from --data
 INCOMING = DATA / "_incoming"
@@ -251,7 +253,8 @@ class Idle:
 
     def check(self, now=None):
         now = now or time.time()
-        if line_up.qsize() or any(j["state"] == "running" for j in list(jobs.values())):
+        if (line_up.qsize() or measuring["state"] == "running"
+                or any(j["state"] == "running" for j in list(jobs.values()))):
             self.last_busy = now
         elif T.loaded() and now - self.last_busy > T.IDLE:
             T.release()
@@ -469,16 +472,19 @@ def process(job_id: str, original: pathlib.Path, language: str | None,
                 # call. Not real progress (the pipeline does not expose it),
                 # but it is off by a few seconds over four minutes. Counted
                 # from now, so loading the model doesn't eat into it.
-                job["expected"] = round(time.time() - job["started"]
-                                        + audio_seconds / (T.SPEED_PRECISE if precise else T.SPEED)
+                fast = T.speed(precise)
+                job["expected"] = round(time.time() - job["started"] + audio_seconds / fast
                                         # telling voices apart: about 2.5 s a minute, on the CPU
-                                        + (audio_seconds / 24 if voices else 0))
+                                        + (audio_seconds / 24 if voices else 0)) if fast else 0
 
         t0 = time.time()
         r = T.run(original, language, progress, two_tracks=two_tracks, precise=precise,
                   voices=voices)
         taken = round(time.time() - t0)
         segments, seconds = r["segments"], r["seconds"]
+        used = r.get("engine") or T.key(precise)
+        if seconds >= 60 and r.get("transcribing_seconds"):
+            remember_speed(used, seconds / r["transcribing_seconds"])
 
         (d / f"{stem}.txt").write_text(T.as_txt(segments), encoding="utf-8")
         (d / f"{stem}.md").write_text(T.as_md(segments, stem, seconds), encoding="utf-8")
@@ -487,7 +493,8 @@ def process(job_id: str, original: pathlib.Path, language: str | None,
             **keep,
             "original": original.name,
             "transcribed_at": time.strftime("%Y-%m-%d %H:%M"),
-            "model": T.MODEL,
+            "model": used.split("|")[1],
+            "engine": used.split("|")[0],
             "language": r["language"],
             "language_requested": language or "auto",
             "duration_s": round(seconds, 1),
@@ -524,7 +531,7 @@ def counter():
     while True:
         args = line_up.get()
         try:
-            process(*args)
+            args() if callable(args) else process(*args)
         finally:
             line_up.task_done()
 
@@ -543,12 +550,15 @@ def start(data: pathlib.Path, glossary: pathlib.Path | None = None, model: bool 
     RECORDINGS = DATA / "_recordings"
     DATA.mkdir(parents=True, exist_ok=True)
     sweep()
+    load_settings()
+    atexit.register(S.stop_started)
     # Whisper is loaded by the first transcription, not here: recording,
     # reading and correcting don't need it, and loading it at start took the
     # whole of Python for seconds and 3.4 GB of the GPU for the day.
     if model:
         engine_state["ready"] = True
         threading.Thread(target=unload_when_idle, daemon=True).start()
+        threading.Thread(target=T.found, daemon=True).start()
     else:
         engine_state["off"] = True
     threading.Thread(target=counter, daemon=True).start()
@@ -597,7 +607,11 @@ def voices_installed() -> bool:
 @app.get("/api/status")
 def api_status():
     import voices as V
-    return {**engine_state, "model": T.MODEL, "loaded": T.loaded(), "downloaded": T.downloaded(),
+    # Until the hardware has been looked at (seconds, at start-up) the
+    # engine is not named rather than the page kept waiting.
+    engine = ({"model": T.model(), "downloaded": T.downloaded(), "engine": T.path(),
+               "download_gb": T.SIZE_GB.get(T.model())} if T.looked() else {})
+    return {**engine_state, **engine, "loaded": T.loaded(),
             "queued": line_up.qsize(), "version": VERSION,
             # The page says "downloads 32 MB the first time" until it is on disk.
             "voices": voices_installed(), "voices_ready": V.ready()}
@@ -1464,6 +1478,182 @@ def api_voices(name: str):
         _voices_busy.release()
 
 
+# --- settings: where Whisper runs, who writes the summaries ---------------------------
+# One small file among the calls: what the user chose, and how fast this
+# computer turned out to be. Kept with the calls so it survives updating the
+# program.
+
+def settings_file() -> pathlib.Path:
+    return DATA / "_settings.json"
+
+
+def read_settings() -> dict:
+    try:
+        return json.loads(settings_file().read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+
+
+def load_settings():
+    s = read_settings()
+    e = s.get("engine") or {}
+    T.chosen.update(path=e.get("path") if e.get("path") in T.PATHS else None, turbo=bool(e.get("turbo")))
+    T.measured.clear()
+    T.measured.update({k: float(v) for k, v in (s.get("speeds") or {}).items()
+                       if isinstance(v, (int, float)) and v > 0})
+    llm = s.get("llm") or {}
+    S.choice.update(program=llm.get("program"), model=llm.get("model"))
+
+
+def save_settings(**more):
+    data = {**read_settings(), **more, "engine": dict(T.chosen), "speeds": dict(T.measured),
+            "llm": dict(S.choice)}
+    tmp = settings_file().with_suffix(".tmp")
+    tmp.write_text(json.dumps(data, indent=1), encoding="utf-8")
+    os.replace(tmp, settings_file())
+
+
+def remember_speed(key: str, speed: float):
+    """The speed this computer had, averaged with the one before: one slow
+    call (the laptop on battery) moves the estimate half way, not all."""
+    old = T.measured.get(key)
+    T.measured[key] = round(speed if old is None else (old + speed) / 2, 2)
+    save_settings()
+
+
+def to_measure() -> list[str]:
+    """The paths worth timing against each other: the GPUs, and the
+    processor when the only GPU is Intel's (a small one can lose to it)."""
+    paths = T.found()
+    gpus = [p for p in paths if p != "cpu"]
+    if "cuda" in paths:
+        return gpus if len(gpus) > 1 else []
+    return paths if gpus else []
+
+
+def latest_call():
+    """(audio, language) of the call transcribed last, to measure on."""
+    calls = []
+    for d in DATA.iterdir() if DATA.exists() else []:
+        if d.is_dir() and not d.name.startswith("_") and (d / "info.json").exists():
+            audio = audio_in(d)
+            if audio and next(d.glob("*.txt"), None) is not None:
+                calls.append(((d / "info.json").stat().st_mtime, d / audio, read_info(d).get("language")))
+    return max(calls)[1:] if calls else None
+
+
+def engine_view() -> dict:
+    s = read_settings()
+    paths = []
+    for p in T.found():
+        m = T.model(p)
+        paths.append({"id": p, "name": T.PATHS[p], "program": T.program(p), "model": m,
+                      "downloaded": T.downloaded(m), "download_gb": T.SIZE_GB.get(m),
+                      "speed": T.speed(False, p), "measured": T.key(False, p) in T.measured})
+    return {"path": T.path(), "automatic": T.chosen["path"] is None,
+            "forced": os.environ.get("SOTTOVOCE_ENGINE") or None, "turbo": T.chosen["turbo"],
+            "model": T.model(), "speed": T.speed(), "paths": paths,
+            "can_measure": len(to_measure()) > 1, "has_call": latest_call() is not None,
+            "measured_at": (s.get("calibrated") or {}).get("at"), "measuring": measuring}
+
+
+@app.get("/api/engine")
+def api_engine():
+    """Where Whisper runs on this computer, the other paths it has, how fast each is."""
+    return engine_view()
+
+
+@app.post("/api/engine")
+def api_engine_set(body: dict):
+    """{"path": "intel-gpu"} or "" for automatic, {"turbo": true}: remembered."""
+    if any(j["state"] == "running" for j in jobs.values()) or line_up.qsize() or measuring["state"] == "running":
+        return JSONResponse({"error": "a transcription is running: wait for it to finish"}, 409)
+    p = body.get("path")
+    if p not in (None, "") and p not in T.found():
+        return JSONResponse({"error": f"{p} is not on this computer"}, 400)
+    T.choose(p, body.get("turbo"))
+    save_settings()
+    return engine_view()
+
+
+measuring = {"state": "idle"}
+SAMPLE_SECONDS = 180
+
+
+def measure_engines():
+    """Which path is fastest here: three minutes of the latest call, through
+    each, after a short warm-up off the clock. The fastest is then chosen."""
+    before = dict(T.chosen)
+    results = {}
+    try:
+        call = latest_call()
+        if call is None:
+            raise RuntimeError("no transcribed call to measure on yet")
+        source, language = call
+        with tempfile.TemporaryDirectory() as tmp:
+            clip, warm = pathlib.Path(tmp) / "clip.wav", pathlib.Path(tmp) / "warm.wav"
+            for out, secs in ((clip, SAMPLE_SECONDS), (warm, 15)):
+                subprocess.run([T.ffmpeg(), "-hide_banner", "-loglevel", "error", "-y", "-i", str(source),
+                                "-t", str(secs), "-c:a", "pcm_s16le", str(out)], check=True,
+                               **({"creationflags": subprocess.CREATE_NO_WINDOW} if os.name == "nt" else {}))
+            for p in to_measure():
+                T.choose(p, before["turbo"])
+                measuring.update(stage="loading", path=p)
+                T.engine()
+                T.run(warm, language)
+                measuring.update(stage="measuring", path=p)
+                r = T.run(clip, language)
+                speed = r["seconds"] / r["transcribing_seconds"]
+                results[p] = round(speed, 2)
+                remember_speed(r["engine"], speed)
+        best = max(results, key=results.get)
+        T.choose(best, before["turbo"])
+        save_settings(calibrated={"at": time.strftime("%Y-%m-%d %H:%M"), "speeds": results,
+                                  "seconds": SAMPLE_SECONDS})
+        measuring.update(state="done", stage=None, path=best, results=results)
+    except Exception as e:
+        T.choose(before["path"] or "", before["turbo"])
+        measuring.update(state="error", stage=None, error=f"{type(e).__name__}: {e}", results=results)
+
+
+@app.post("/api/engine/measure")
+def api_engine_measure():
+    """Times the paths against each other once, in the line with the
+    transcriptions so the two don't slow each other down."""
+    if measuring["state"] == "running":
+        return {"measuring": measuring}
+    if len(to_measure()) < 2:
+        return JSONResponse({"error": "this computer has one way to run Whisper: nothing to compare"}, 400)
+    if latest_call() is None:
+        return JSONResponse({"error": "no transcribed call to measure on yet"}, 400)
+    measuring.clear()
+    measuring.update(state="running", stage="waiting", started=time.time())
+    line_up.put(measure_engines)
+    return {"measuring": measuring}
+
+
+@app.get("/api/llm/programs")
+def api_llm_programs():
+    """What can write summaries here, with its models: the built-in model,
+    LM Studio and Ollama if installed. Slower than /api/llm (it asks LM
+    Studio's command line): for the settings, not for every page."""
+    return {"programs": S.programs(), "choice": dict(S.choice)}
+
+
+@app.post("/api/llm/choice")
+def api_llm_choice(body: dict):
+    """{"program": "LM Studio", "model": "gemma-4-e4b-it"}; {"program": null}
+    for automatic. Remembered."""
+    program, m = body.get("program"), body.get("model")
+    if program not in (None, "Sottovoce", "LM Studio", "Ollama"):
+        return JSONResponse({"error": f"unknown program {program!r}"}, 400)
+    if program in ("LM Studio", "Ollama") and not m:
+        return JSONResponse({"error": "which model?"}, 400)
+    S.choice.update(program=program, model=m if program in ("LM Studio", "Ollama") else None)
+    save_settings()
+    return {"choice": dict(S.choice)}
+
+
 # --- the summary --------------------------------------------------------------
 # Written by an LLM running on this machine, spoken to over the OpenAI
 # protocol. Not loaded inside this process: see summary.py for why.
@@ -1786,7 +1976,7 @@ def configure(args) -> str:
     S.builtin_allowed = not (args.no_model or args.no_llm)
     start(args.data, args.glossary, model=not args.no_model)
     print(f"\n  Sottovoce {VERSION} on  http://127.0.0.1:{args.port}")
-    print(f"  model: {T.MODEL}")
+    print("  Whisper large-v3: on the fastest of " + ", ".join(T.PATHS.values()) + " this computer has")
     print(f"  transcripts in: {DATA}")
     print(f"  API reference: http://127.0.0.1:{args.port}/docs")
     print("  browsing only: Whisper is not loaded (--no-model)\n" if args.no_model else

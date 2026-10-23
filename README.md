@@ -23,7 +23,7 @@
 
 ![A tour of Sottovoce on fictional calls: the home screen, a call's summary, the call strip, three voices named in the Voices panel, a call recorded on two tracks](docs/images/demo.gif)
 
-Drop a recorded call on the page, or record the call from it. You get the transcript, who said what, a summary, notes for the client's folder, the follow-up email, and a map of the places to double-check. Whisper large-v3 on your GPU. Nothing leaves the machine.
+Drop a recorded call on the page, or record the call from it. You get the transcript, who said what, a summary, notes for the client's folder, the follow-up email, and a map of the places to double-check. Whisper large-v3 on an NVIDIA or Intel GPU, or on the processor alone. Nothing leaves the machine.
 
 ## Why Sottovoce
 
@@ -31,11 +31,14 @@ Drop a recorded call on the page, or record the call from it. You get the transc
 - **It removes what nobody said.** On silence, Whisper writes subtitles it learned from YouTube: *"Thanks for watching"*. Sottovoce drops them only where the audio is far below speech, and lists every removal. On a public test with long pauses it adds 47 words nobody said, where Whisper alone adds 318 ([measured](docs/benchmarks.md#long-pauses)).
 - **It knows who spoke.** A call recorded here keeps your microphone and the call on two tracks, from any app on Windows, from a browser tab elsewhere: *You* and *Them* are measured, not guessed. On any recording, voices are told apart with no account and no token, at a [12% error rate on public meetings](docs/benchmarks.md#telling-voices-apart).
 - **It keeps your names right.** A glossary fixes client and product names after transcription, and can be applied again to older calls.
-- **It stays on your machine.** No account, no telemetry, no remote LLM. Every call is a folder of plain files; summaries and emails are written by a model that runs locally.
+- **It runs on the computer you have.** An NVIDIA card through PyTorch, an Intel GPU (Arc, or the one inside the processor) or any processor through OpenVINO, at the same accuracy. It picks the fastest by itself, and can measure it: on the laptop tested, the Intel GPU built into the processor beat the RTX card ([measured](docs/benchmarks.md#where-it-runs)).
+- **It stays on your machine.** No account, no telemetry, no remote LLM. Every call is a folder of plain files; summaries and emails are written by a model that runs locally: the one built in, or one you already have in LM Studio or Ollama, which Sottovoce starts and stops by itself.
 
 ## Quick start
 
-One command, nothing to install first: it brings its own Python, needs no administrator rights, and picks the PyTorch that sees your GPU.
+**Windows:** download **Sottovoce-Setup-….exe** from the [latest release](https://github.com/thetouchsite/sottovoce/releases/latest) and open it. No administrator rights needed. The setup isn't signed yet, so Windows may say it *protected your PC*: **More info**, then **Run anyway**.
+
+Or with one command, on every system: it brings its own Python, needs no administrator rights, and picks what runs Whisper fastest on your computer.
 
 **Windows**, in PowerShell:
 
@@ -49,9 +52,9 @@ irm https://raw.githubusercontent.com/thetouchsite/sottovoce/main/installer/inst
 curl -fsSL https://raw.githubusercontent.com/thetouchsite/sottovoce/main/installer/install.sh | bash
 ```
 
-Then open **Sottovoce** from the Start menu or the desktop. On Windows it is a program of its own: one window, and an icon by the clock where it keeps working when you close the window; **Quit** in the icon's menu stops it. On Linux it starts from the applications menu, on a Mac from `~/Applications`, and opens in the browser. Your calls are kept in a `Sottovoce` folder in your home folder. To update, run the same command again. An NVIDIA GPU is what makes it fast; without one, and on a Mac, it runs on the CPU.
+Then open **Sottovoce** from the Start menu or the desktop. On Windows it is a program of its own: one window, and an icon by the clock where it keeps working when you close the window; **Quit** in the icon's menu stops it. On Linux it starts from the applications menu, on a Mac from `~/Applications`, and opens in the browser. Your calls are kept in a `Sottovoce` folder in your home folder. To update, open the new setup or run the same command again.
 
-The first transcription downloads Whisper large-v3 (2.9 GB, once). Then drop a recording on the page, choose the language and the options, and press **Transcribe**.
+The first transcription downloads Whisper large-v3, once, after asking: 2.9 GB for an NVIDIA card, 1.5 GB for an Intel GPU or the processor. Then drop a recording on the page, choose the language and the options, and press **Transcribe**.
 
 **No GPU at hand?** Browse the four fictional calls in `examples/`:
 
@@ -68,16 +71,16 @@ Installing from a clone, updating, removing, the command line and the API: [Gett
 | --- | --- | --- | --- | --- | --- | --- |
 | Records calls | Mic + system audio on Windows, browser tab + mic elsewhere, **on two separate tracks** | Mic + system audio | Mic, system audio, phone | Files | Mic, live | Files |
 | Who spoke | Two tracks, or voices **with no account** | Pro edition, coming soon | Yes | Yes (pyannote) | Yes | Yes (Hugging Face token) |
-| Summaries | **Local only**: built-in model, LM Studio, Ollama | Ollama or cloud APIs | Ollama or Claude API | – | Plugin | – |
+| Summaries | **Local only**: built-in model, or your LM Studio or Ollama model, started for you | Ollama or cloud APIs | Ollama or Claude API | – | Plugin | – |
 | Shows where the text needs checking | **Call strip, removals listed** | – | – | – | – | – |
 | Interface | Web page, computer and phone | Desktop app | Desktop app | Desktop app | Desktop app | Command line, Python |
-| GPU | NVIDIA | Apple, Vulkan; CUDA from source | NVIDIA, AMD, Intel, Apple | NVIDIA, Apple Silicon | NVIDIA, Apple Silicon, Vulkan | NVIDIA |
-| Installer | Scripts | Windows, macOS | Windows, macOS, Linux | Windows, macOS, Linux | Windows, macOS, Linux | pip |
+| GPU | NVIDIA, Intel; any x86 processor | Apple, Vulkan; CUDA from source | NVIDIA, AMD, Intel, Apple | NVIDIA, Apple Silicon | NVIDIA, Apple Silicon, Vulkan | NVIDIA |
+| Installer | Windows setup; one command on Windows, Linux, macOS | Windows, macOS | Windows, macOS, Linux | Windows, macOS, Linux | Windows, macOS, Linux | pip |
 | Licence | MIT | MIT, paid Pro | MIT | GPL-3.0 | MIT | BSD-2-Clause |
 
 <sub>From each project's README on 23 October 2026. If something has changed, open an issue and the table will be fixed.</sub>
 
-Sottovoce is built for business calls: recorded or recorded here, read and corrected, filed with the client. If you need any GPU, a native app on macOS or Linux, or live captions today, Vibe and Buzz are excellent choices.
+Sottovoce is built for business calls: recorded or recorded here, read and corrected, filed with the client. If you need an AMD or Apple GPU, a native app on macOS or Linux, or live captions today, Vibe and Buzz are excellent choices.
 
 ## FAQ
 
@@ -85,7 +88,7 @@ Sottovoce is built for business calls: recorded or recorded here, read and corre
 No. Transcription, voice separation and summaries run locally, and the page loads nothing from the internet. Models are downloaded once, on first use, from Hugging Face and GitHub. See [SECURITY.md](SECURITY.md).
 
 **Which GPU do I need?**
-An NVIDIA card. Whisper large-v3 runs on it in half precision; the built-in summary model needs about 8 GB more, or use LM Studio or Ollama with a smaller one. Without an NVIDIA GPU it runs on the CPU, much slower.
+None is required. Whisper large-v3 runs on an NVIDIA card (PyTorch), on an Intel GPU, Arc or built into the processor, or on the processor alone, Intel or AMD (both through OpenVINO), with the same accuracy. On the laptop measured, an hour of call took about 6 minutes on its Intel GPU, 8 on its RTX card and 12 on its processor ([where it runs](docs/benchmarks.md#where-it-runs)); a smaller computer is slower, and the page shows how long it takes on yours. The built-in summary model needs an NVIDIA card with about 8 GB free; without one, pick a model you have in LM Studio or Ollama.
 
 **Which languages?**
 Whisper understands many and detects the language by itself. Sottovoce is measured on Italian and English, and its page is in both.
@@ -97,7 +100,7 @@ Recordings, transcripts and summaries never reach a third party: no cloud proces
 Yes, on your Wi-Fi with `--lan` and a PIN: read, correct, send recordings, share the follow-up email. See [From your phone](docs/lan.md).
 
 **How good is it?**
-On public Italian speech ([FLEURS](docs/benchmarks.md#italian-read-speech)) 4.3% of words come out wrong, the same as Whisper large-v3 alone; on whole English meetings ([AMI](docs/benchmarks.md#english-meetings-whole)) 25.4%, against 30.3%. Every figure we publish comes from a script in `research/` you can run: [Benchmarks](docs/benchmarks.md). What it doesn't do well yet: [Limitations](docs/limitations.md).
+On public Italian speech ([FLEURS](docs/benchmarks.md#italian-read-speech)) 4.3% of words come out wrong, the same as Whisper large-v3 alone; on whole English meetings ([AMI](docs/benchmarks.md#english-meetings-whole)) 25.4%, against 30.3%. On an Intel GPU or the processor, through OpenVINO, the same within a few tenths ([where it runs](docs/benchmarks.md#where-it-runs)). Every figure we publish comes from a script in `research/` you can run: [Benchmarks](docs/benchmarks.md). What it doesn't do well yet: [Limitations](docs/limitations.md).
 
 ## Documentation
 
@@ -117,6 +120,6 @@ Issues and pull requests are welcome: see [CONTRIBUTING.md](CONTRIBUTING.md) and
 
 ## Licence
 
-[MIT](LICENSE) © 2026 TouchSite Software. Third-party parts keep their licences: Whisper large-v3 (Apache-2.0), Qwen3 4B Instruct (Apache-2.0), pyannote segmentation-3.0 (MIT), 3D-Speaker ERes2Net (Apache-2.0), sherpa-onnx (Apache-2.0), Public Sans (SIL OFL 1.1), ffmpeg (through `imageio-ffmpeg`, not shipped here). The models are downloaded on first use, not shipped in this repository.
+[MIT](LICENSE) © 2026 TouchSite Software. Third-party parts keep their licences: Whisper large-v3 (Apache-2.0) and its OpenVINO conversion (Apache-2.0), OpenVINO (Apache-2.0), Qwen3 4B Instruct (Apache-2.0), pyannote segmentation-3.0 (MIT), 3D-Speaker ERes2Net (Apache-2.0), sherpa-onnx (Apache-2.0), Public Sans (SIL OFL 1.1), ffmpeg (through `imageio-ffmpeg`, not shipped here). The models are downloaded on first use, not shipped in this repository.
 
 *Sotto voce* is Italian for "in a low voice": the phrases that fall below the level of speech are the ones it removes, and it works quietly, on your own machine.

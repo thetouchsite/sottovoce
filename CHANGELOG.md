@@ -4,6 +4,29 @@ What changed in each release, newest first. The format follows [Keep a Changelog
 
 ## [Unreleased]
 
+## [1.8.0] - 2026-10-24
+
+Sottovoce runs on the computer you have, not only on an NVIDIA card; a Windows setup to double-click; and summaries from a model you already have in LM Studio or Ollama.
+
+### Added
+
+- **Whisper on an Intel GPU or on the processor**, through OpenVINO (Apache-2.0), with the same model, Whisper large-v3, in OpenVINO's int8 conversion (1.5 GB). The paths, the fastest first: an NVIDIA card (PyTorch, as before), an Intel GPU, Arc or built into the processor, the processor alone, Intel or AMD. On the four whole AMI test meetings (92 minutes), on one laptop: Intel Arc 140T 25.3% of words wrong at 10.8× real time, RTX 5090 Laptop 25.4% at 7.6×, Core Ultra 9 285H 25.5% at 5.2× (`research/wer.py ami --configs sottovoce@intel-gpu,...`). On a processor OpenVINO is about five times faster than PyTorch, on the first ten FLEURS clips (`research/intel.py`, `research/cpu.py`).
+- **Settings**, a new view: where Whisper runs, every path this computer has and how long an hour of call takes on each; **Measure which is fastest**, on three minutes of your latest call, for computers with more than one path; **Faster model, turbo**, offered when this computer is slow; and who writes the summaries. Remembered in `_settings.json` with the calls. `SOTTOVOCE_ENGINE` forces a path.
+- **Estimates from this computer's own speed:** after a call of a minute or more, the time left is computed from how fast this computer really was, not from a figure measured elsewhere.
+- **Your own LM Studio or Ollama model for summaries and emails**, picked once in Settings from the models those programs have. They need not be open: Sottovoce starts LM Studio's server (`lms server start`) or `ollama serve` when asked, the model is loaded for the request and leaves after ten minutes unused, and at quit Sottovoce puts back what it started: the model, the server, LM Studio's background service. Measured with LM Studio off: Gemma 4 E4B summarised an example call in 39.6 s, starting included.
+- **Sottovoce-Setup-1.8.0.exe**, a Windows setup made with Inno Setup: TouchSite Software's name and the licence on it, no administrator rights, a progress page while it downloads what this computer needs, and an uninstaller that asks about the calls and the models. Not signed yet.
+- `python transcribe.py --where` says where Whisper runs on this computer.
+
+### Changed
+
+- **A looped window is done again on OpenVINO**, as PyTorch does by itself: only where the map of speech says someone talks, a little warmer each try, at worst one copy of the phrase. On the long-pauses test it took OpenVINO from 235 invented words to 54 (PyTorch: 47).
+- With the language on *detect*, it is found first, from where people start speaking, and the whole call is transcribed in it.
+- The uninstallers offer to delete every model Sottovoce downloaded, the OpenVINO and turbo ones included.
+
+### Fixed
+
+- The licence of Whisper large-v3 in the setup's notice: Apache-2.0, not MIT.
+
 ## [1.7.1] - 2026-10-23
 
 ### Added

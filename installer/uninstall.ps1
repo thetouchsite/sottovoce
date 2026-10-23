@@ -32,7 +32,7 @@ $where = Join-Path $Program "data-folder.txt"
 if (Test-Path $where) { $Data = (Get-Content $where -Raw).Trim() }
 # Sottovoce's own models only, not the whole cache: other programs may use it.
 $hub = if ($env:HF_HOME) { Join-Path $env:HF_HOME "hub" } else { Join-Path $env:USERPROFILE ".cache\huggingface\hub" }
-$models = "models--openai--whisper-large-v3", "models--Qwen--Qwen3-4B-Instruct-2507" |
+$models = "models--openai--whisper-large-v3", "models--openai--whisper-large-v3-turbo", "models--OpenVINO--whisper-large-v3-int8-ov", "models--OpenVINO--whisper-large-v3-turbo-int8-ov", "models--Qwen--Qwen3-4B-Instruct-2507" |
     ForEach-Object { Join-Path $hub $_ } | Where-Object { Test-Path $_ }
 
 $dropCalls = $false

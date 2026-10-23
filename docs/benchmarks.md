@@ -2,7 +2,7 @@
 
 Every number in these docs comes from a script in [`research/`](https://github.com/thetouchsite/sottovoce/tree/main/research), with the command to run it next to it. The first four sections use public or bundled data: anyone can check them. The last one records measurements made during development on a private call: they explain why the defaults are what they are.
 
-**Machine:** NVIDIA GeForce RTX 5090 Laptop GPU (24 GB), Windows 11, Python 3.14, PyTorch 2.14.1 + CUDA 13.0, transformers 5.20.
+**Machine:** a laptop with an NVIDIA GeForce RTX 5090 Laptop GPU (24 GB) and an Intel Core Ultra 9 285H (16 threads) with its Arc 140T GPU built in; Windows 11, Python 3.14, PyTorch 2.14.1 + CUDA 13.0, transformers 5.20, OpenVINO 2026.4.1. Unless a section says otherwise, Whisper runs on the NVIDIA card; [Where it runs](#where-it-runs) compares the three paths.
 
 ## Transcription accuracy
 
@@ -62,6 +62,46 @@ Two things this test found:
 
 - **A bug, now fixed.** Silence used to be measured on the audio Whisper hears, after loudness normalization. In one pass the normalizer lifts long quiet stretches: the hiss at -50 dB came out at -19 dB, as loud as speech, and no phrase was ever dropped. Before the fix Sottovoce scored 14.5%, with 101 words added and 18 subtitle phrases.
 - **A limit, still open.** After a long pause Whisper's long-form mode sometimes writes a subtitle phrase over a window that ends in real speech, and the first sentence after the pause is never written. The phrase is removed; the sentence is still missing. That is most of the 34 words dropped. It's on the [roadmap](https://github.com/thetouchsite/sottovoce/blob/main/ROADMAP.md).
+
+## Where it runs
+
+The whole engine, `transcribe.run()`, on each path it can take: PyTorch on the NVIDIA card, OpenVINO on the Intel GPU built into the processor, OpenVINO on the processor alone. Through OpenVINO the model is the OpenVINO organisation's int8 conversion of large-v3. The same data and scoring as above.
+
+```sh
+python research/wer.py ami     --configs sottovoce@cuda,sottovoce@intel-gpu,sottovoce@cpu
+python research/wer.py fleurs  --configs sottovoce@intel-gpu,sottovoce@cpu
+python research/wer.py silence --configs sottovoce@intel-gpu,sottovoce@cpu
+python research/wer.py ami     --configs sottovoce@intel-gpu+turbo,sottovoce@cpu+turbo
+```
+
+| | AMI, WER | AMI, speed | An hour of call | FLEURS, WER | Long pauses, words added |
+| --- | --- | --- | --- | --- | --- |
+| NVIDIA RTX 5090 Laptop, PyTorch | 25.4% | 7.6× | 8 min | 4.3% | 47 |
+| **Intel Arc 140T, OpenVINO** | 25.3% | **10.8×** | **6 min** | 4.4% | 54 |
+| Core Ultra 9 285H, OpenVINO | 25.5% | 5.2× | 12 min | 4.4% | 56 |
+| Intel Arc 140T, turbo | 26.5% | 28.5× | 2 min | | |
+| Core Ultra 9 285H, turbo | 26.1% | 9.2× | 7 min | | |
+
+*An hour of call* is 60 minutes over the AMI speed: whole meetings are what a call is like. The NVIDIA figures on FLEURS and the long pauses are the *Sottovoce* rows above.
+
+- **The same accuracy on every path**, within a few tenths. OpenVINO's int8 model makes as many mistakes as PyTorch's float16 one.
+- **On this laptop the Intel GPU built into the processor is faster than the RTX card.** It is one laptop, not a rule: this is why the page can **measure which is fastest** on three minutes of your own call, and use that one.
+- **The processor alone is usable**: an hour of call in about 12 minutes on this one. On FLEURS it is slower (2.4×) because Whisper always reads 30 seconds at a time, and a clip of five seconds costs nearly as much as thirty.
+- **Turbo** is about twice as fast through OpenVINO (2.6× on the Intel GPU, 1.8× on the processor), for 0.6 to 1.2 points more on AMI.
+- **A fix the long-pauses test found.** OpenVINO has none of the settings that let PyTorch redo a window that came out badly or skip a window of silence. In one file a window of hiss looped *"un'esplosione di"* a hundred times, and OpenVINO added 235 words nobody said, against PyTorch's 47. A looped stretch is now done again, only where the map of speech says someone talks: 54 words on the Intel GPU, 56 on the processor. On AMI the fix changed nothing.
+
+On the first ten FLEURS clips (`research/intel.py`, `research/cpu.py`):
+
+| On the processor or another device | WER | Speed |
+| --- | --- | --- |
+| PyTorch, float32, on the processor | 2.0% | 0.82× |
+| faster-whisper (CTranslate2), int8, on the processor | 2.5% | 0.49× |
+| **OpenVINO, int8, on the processor** | 2.5% | **4.25×** |
+| OpenVINO on the Intel GPU | 2.0% | 13.7× |
+| OpenVINO on the NVIDIA card, through OpenCL | 2.5% | 2.0× |
+| OpenVINO on the NPU, large-v3-turbo | 95.1% | 2.3× |
+
+On a processor OpenVINO is about five times faster than PyTorch. The NPU's transcripts are not usable, and OpenVINO on the NVIDIA card is far slower than PyTorch on it: neither is offered.
 
 ## Telling voices apart
 
