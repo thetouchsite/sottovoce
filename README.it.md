@@ -35,13 +35,21 @@ Trascini sulla pagina una call registrata, oppure registri la call da lì. Ottie
 
 ## Avvio rapido
 
-Servono una GPU NVIDIA e Python 3.10 o più recente.
+Un comando, niente da installare prima: porta il suo Python, non chiede i permessi di amministratore e sceglie il PyTorch che vede la tua GPU.
+
+**Windows**, in PowerShell:
+
+```powershell
+irm https://raw.githubusercontent.com/thetouchsite/sottovoce/main/installer/install.ps1 | iex
+```
+
+**Linux e macOS**, nel terminale:
 
 ```sh
-git clone https://github.com/thetouchsite/sottovoce && cd sottovoce
-Install.bat          # Linux/macOS: ./install.sh   (prima PyTorch con CUDA, poi il resto)
-Start.bat            # Linux/macOS: ./start.sh     (apre http://127.0.0.1:8200)
+curl -fsSL https://raw.githubusercontent.com/thetouchsite/sottovoce/main/installer/install.sh | bash
 ```
+
+Poi apri **Sottovoce** dal menu Start o dal desktop (su Linux dal menu delle applicazioni, su Mac da `~/Applications`). Le call stanno in una cartella `Sottovoce` nella tua cartella utente. Per aggiornare, rilancia lo stesso comando. È una GPU NVIDIA a renderlo veloce: senza, e su Mac, gira sulla CPU.
 
 Il primo avvio scarica Whisper large-v3 (2,9 GB, una volta sola). Poi trascini una registrazione sulla pagina, scegli lingua e opzioni, e premi **Trascrivi**. Il pulsante **IT** in fondo alla barra laterale mette la pagina in italiano.
 
@@ -52,7 +60,7 @@ pip install -r requirements-dev.txt
 python server.py --no-model --data examples/transcripts --glossary examples/glossary.txt
 ```
 
-Installazione a mano, riga di comando e API: [Getting started](docs/getting-started.md).
+Installazione da un clone, aggiornamento, rimozione, riga di comando e API: [Getting started](docs/getting-started.md).
 
 ## Confronto
 

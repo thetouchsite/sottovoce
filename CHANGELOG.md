@@ -4,6 +4,10 @@ What changed in each release, newest first. The format follows [Keep a Changelog
 
 ## [Unreleased]
 
+### Added
+
+- **Install with one command**, on Windows, Linux and macOS: `irm …/installer/install.ps1 | iex` in PowerShell, `curl -fsSL …/installer/install.sh | bash` in a terminal. Nothing to install first and nothing paid for: uv, at a fixed version checked against its SHA-256, brings Python 3.12; `installer/gpu.py` picks the PyTorch that sees the GPU (CUDA 13.0, CUDA 12.6 or CPU, by card and driver). The program goes in its own folder, the calls in `Sottovoce` in the home folder, never in *Documents*, which OneDrive may copy to the cloud. Shortcuts, and on Windows an entry in Settings → Apps that uninstalls it and leaves the calls. The same command updates: only what changed is downloaded, the voice models and the phone PIN stay. CI runs it end to end on Windows, Ubuntu and macOS: install, update, start, uninstall.
+
 ### Fixed
 
 - **Invented phrases on long pauses are dropped again.** Silence was measured on the audio Whisper hears, after loudness normalization, and in one pass the normalizer lifts long quiet stretches: the faint hiss of a line, at -50 dB, came out at -19 dB, as loud as speech. The map of speech then saw speech nearly everywhere and no *"Grazie a tutti"* was ever dropped there. Levels are now measured on a copy with one gain for the whole file. On the long-pauses test, subtitle phrases left fell from 18 to 1, and words added from 101 to 47. The call strip draws silence where there is silence.

@@ -79,15 +79,19 @@ And a rule learned the hard way, on another project: **never decide on a single 
 
 **Done when** a name suggested is right at least 95% of the time on a held-out set, and the fingerprints can be listed and deleted from the page.
 
-## 7. Linux and macOS launchers
+## 7. Linux and macOS, checked on real machines
 
-**Why.** The Python code is cross-platform and the tests run on Ubuntu, but only Windows had launchers.
+**Why.** The Python code is cross-platform, and the one-command installer runs on Linux and macOS.
 
-**Done so far.** `install.sh` and `start.sh` do what `Install.bat` and `Start.bat` do. PyTorch goes in first: from the CUDA index on Linux when `nvidia-smi` is there, the plain build otherwise and on macOS, which has no CUDA. Then the rest, and whether the GPU is seen. `./start.sh` passes its arguments to the server. On every push, CI checks both with `bash -n` and `shellcheck`.
+**Done so far.** `installer/install.sh` installs, updates and removes Sottovoce with one command, as `installer/install.ps1` does on Windows: uv brings Python, `installer/gpu.py` picks the PyTorch build. On every push CI runs it end to end on Ubuntu and macOS (and Windows): install, update, start the server, uninstall, with PyTorch for the CPU.
 
-**Still open.** Nobody has run them end to end. CI can't: the install downloads gigabytes and needs a GPU. And the author's machine runs Windows.
+**Still open.** CI has no GPU, and the author's machine runs Windows: nobody has transcribed with it on Linux with an NVIDIA card, or on a Mac. On a Mac Whisper runs on the CPU; Apple's GPU (MPS) is untested.
 
-**Done when** `install.sh` and `start.sh` work on a clean Ubuntu machine with an NVIDIA GPU, checked by someone who isn't the author.
+**Done when** a call is transcribed after the one-command install on a clean Ubuntu machine with an NVIDIA GPU and on an Apple-silicon Mac, checked by someone who isn't the author, with the time it took written in the benchmarks.
+
+## Not planned: a signed `.exe`
+
+A downloadable installer looks friendlier than a command, but unsigned it meets *"Windows protected your PC"*, and Smart App Control can block it outright. Signing costs about €105 a year (Microsoft Artifact Signing), or about $309 the first year for a certificate. The command needs neither, and updates in place. If a signed installer is ever worth its cost, uv and the same scripts would sit inside it.
 
 ## 8. Get back the sentence an invented phrase replaced
 
