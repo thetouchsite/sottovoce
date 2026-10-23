@@ -51,7 +51,7 @@
 
     PyTorch goes first, from its own index: see [the PyTorch trap](troubleshooting.md#the-gpu-is-not-used). On a Mac, `pip install torch` from PyPI. The calls are kept in `transcripts/` inside the clone. `installer/start.cmd` (Windows) and `installer/start.sh` start the server and open the page once it answers.
 
-The first start downloads Whisper large-v3 (2.9 GB, once) and loads it on the GPU. After that the server keeps it loaded: each new file only pays for its own transcription.
+The first transcription downloads Whisper large-v3 (2.9 GB, once). Whisper is loaded on the GPU when a transcription needs it, in about ten seconds, and leaves ten minutes after the last one: Sottovoce left open holds the GPU only while it works.
 
 ### What the installer does
 

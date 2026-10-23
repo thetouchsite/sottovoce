@@ -36,9 +36,9 @@ With the installer it's simpler: run the install command again, after updating t
 
 The installer does it in this order; so does *From a clone* in [Getting started](getting-started.md#install).
 
-## The first start is slow
+## The first transcription is slow
 
-The first start downloads Whisper large-v3 (2.9 GB), then loads it on the GPU. The first summary downloads the built-in model (8 GB) and the first voice separation downloads two small models (32 MB). Each happens once. Until Whisper is loaded the page says *Loading the model…* and transcription waits.
+The first transcription downloads Whisper large-v3 (2.9 GB), the first summary the built-in model (8 GB), the first voice separation two small models (32 MB). Each happens once, and the page shows it with a moving bar and the seconds counted. After a pause of ten minutes or more, Whisper is loaded again before transcribing: about ten seconds, shown as *loading the model*.
 
 On Windows, Hugging Face may warn that it can't create symlinks in its cache. It's harmless: files are copied instead.
 

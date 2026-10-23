@@ -4,9 +4,16 @@ What changed in each release, newest first. The format follows [Keep a Changelog
 
 ## [Unreleased]
 
+## [1.7.0] - 2026-10-23
+
+Record any call from the Sottovoce window on Windows, who spoke right 19 times in 20, and a program that opens in two seconds and holds the GPU only while it works.
+
 ### Added
 
 - **Record any call from the Sottovoce window** (Windows): your microphone and everything the computer plays, on two tracks, with `recorder.py` (WASAPI loopback through soundcard, BSD-3). Meet in a browser, the Teams or Zoom apps, WhatsApp, a phone call through the computer. Nothing is shared on screen. While it records, the output plays silence so Windows never stops sending: both tracks run on their devices' clocks (one minute, real devices: no correction needed, the file as long as the wall clock). Headphones that go or get plugged in mid-call are followed, the gap kept as silence. The file is written as it goes, its header kept current: a computer switched off mid-call leaves a recording that is offered at the next start. The icon by the clock gets a red dot, and **Stop recording and transcribe** in its menu. Quit asks to stop first; Quit again saves it among the interrupted recordings. A phone on the Wi-Fi can't start it.
+- **Stop, transcribe later**, in the window and in the icon's menu: the recording waits in the list, still on two tracks.
+- **Open the folder** of a call, or of all the calls, from the window (on the computer itself, not from a phone).
+- **The version** at the bottom of the side bar.
 
 ### Changed
 
@@ -16,12 +23,6 @@ What changed in each release, newest first. The format follows [Keep a Changelog
 - **The window opens in 2.4 s instead of 10.5**: at once with *starting*, then the page, without waiting for Whisper.
 - **Waits show they are moving**: a sliding bar and the seconds counted, for loading the model, the summary and the follow-up email.
 - **The window adapts to its size**: nothing runs past its edge between 960 and 1980 px, and a call scrolls once, with the tabs and the player kept at the top, instead of a box scrolling inside the page.
-
-### Added (also)
-
-- **Stop, transcribe later**, in the window and in the icon's menu: the recording waits in the list, still on two tracks.
-- **Open the folder** of a call, or of all the calls, from the window (on the computer itself, not from a phone).
-- **The version** at the bottom of the side bar.
 
 ### Fixed
 
@@ -171,7 +172,8 @@ The first release. Local transcription for recorded business calls, with Whisper
 - `Install.bat`, `Start.bat` and `Stop.bat` for Windows. PyTorch is installed first, from the CUDA index.
 - An Italian README.
 
-[Unreleased]: https://github.com/thetouchsite/sottovoce/compare/v1.6.2...HEAD
+[Unreleased]: https://github.com/thetouchsite/sottovoce/compare/v1.7.0...HEAD
+[1.7.0]: https://github.com/thetouchsite/sottovoce/compare/v1.6.2...v1.7.0
 [1.6.2]: https://github.com/thetouchsite/sottovoce/compare/v1.6.1...v1.6.2
 [1.6.1]: https://github.com/thetouchsite/sottovoce/compare/v1.6.0...v1.6.1
 [1.6.0]: https://github.com/thetouchsite/sottovoce/compare/v1.5.0...v1.6.0
