@@ -33,3 +33,6 @@ __pycache__/
 # Public datasets and results of research/wer.py, downloaded and written on first run
 /research/fleurs/
 /research/results/
+# The Windows setup: what installer/windows/build.ps1 downloads, draws and builds
+/installer/windows/build/
+/dist/

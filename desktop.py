@@ -32,6 +32,7 @@ ROOT = pathlib.Path(__file__).resolve().parent
 ICON = ROOT / "app" / "icon.ico"
 RUN_KEY = r"Software\Microsoft\Windows\CurrentVersion\Run"
 APP_ID = "TouchSite.Sottovoce"
+MUTEX = "TouchSiteSottovoce"          # the same name in installer/windows/Sottovoce.iss
 
 # The menu and the notices, in the language Windows speaks.
 WORDS = {
@@ -231,6 +232,10 @@ def main(argv=None):
     sys.stdout = sys.stderr = open(ours.log, "w", encoding="utf-8", buffering=1)
     # Its own name for Windows, so the taskbar shows Sottovoce's icon, not Python's.
     ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(APP_ID)
+    # A name Windows knows while Sottovoce runs: the setup and the uninstall
+    # (Sottovoce.iss, AppMutex) see it and ask to quit Sottovoce first,
+    # instead of failing on files in use. Held until the process ends.
+    state_mutex = ctypes.windll.kernel32.CreateMutexW(None, False, MUTEX)  # noqa: F841
     no_console_windows()
 
     # The window at once, with "starting"; then the server, the icon and the

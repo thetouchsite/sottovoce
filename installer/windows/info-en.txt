@@ -1,0 +1,29 @@
+﻿SOTTOVOCE
+Calls, transcribed on your computer.
+TouchSite Software
+
+BEFORE YOU INSTALL
+
+Everything stays on this computer.
+Recordings, transcripts, summaries and emails are not sent to any outside service. No account is needed and there is no telemetry. Sottovoce answers only this computer, not the network, unless you ask it to.
+
+What it downloads.
+While installing: Python and PyTorch, about 2 GB, chosen for your graphics card. Later, only when first used and after asking you: the transcription model (2.9 GB) and the summary model (8 GB).
+
+What it needs.
+Windows 10 or 11, 64-bit. An NVIDIA graphics card makes transcription much faster; without one it runs on the processor, more slowly. About 15 GB free on disk.
+
+Recording a conversation.
+In many countries, recording a conversation requires telling the other participants, or their consent. It is your responsibility to tell them and to follow the laws that apply to you, including the GDPR for the personal data the recordings hold.
+
+Transcripts are automatic.
+They are produced by artificial intelligence models and can contain mistakes, especially in names and numbers, and give a sentence to the wrong person. Check them before using them for decisions, contracts or messages.
+
+No warranty.
+Sottovoce is free software under the MIT licence, provided "as is", without warranty of any kind. The licence follows on the next page.
+
+Uninstalling.
+From Settings > Apps > Sottovoce. You will be asked whether to delete your calls and the downloaded models too: yes to both leaves the computer as it was.
+
+Source code and documentation: https://github.com/thetouchsite/sottovoce
+Contact: info@touchsitesoftware.it
