@@ -580,6 +580,20 @@ def tell_voices(words, audio, speakers=None, progress=None, breaks=None):
     return voices.assign(words, turns, keep, breaks), found
 
 
+# A track carries a voice where it is this far above its own background: 4x,
+# 12 dB. Comparing each track with its usual level alone failed when you
+# only listen: the microphone's usual level is then the room's hiss, so the
+# hiss looked like speech next to the others' voice. A recording made from
+# the computer with you silent went to "You" word for word, 31 of 31.
+ABOVE_BACKGROUND = 4.0
+
+
+def background(frames):
+    """A track's background level: the quietest tenth of its moments."""
+    import numpy as np
+    return max(float(np.percentile(frames, 10)), 1e-5) if len(frames) else 1e-5
+
+
 def _by_turns(words, breaks, left, right, rate, hop=0.02, floor=0.08):
     """label_speakers() with estimated word timings: see there."""
     import numpy as np
@@ -598,8 +612,13 @@ def _by_turns(words, breaks, left, right, rate, hop=0.02, floor=0.08):
     if ref_them < 1e-4:
         return ["Me"] * len(words)         # nobody else spoke
     l, r = L / ref_me, R / ref_them
-    # each moment: nobody (-1), you (0), the call (1)
-    side = np.where(np.maximum(l, r) < floor, -1, np.where(l > r, 0, 1))
+    heard_me = L > ABOVE_BACKGROUND * background(L)
+    heard_them = R > ABOVE_BACKGROUND * background(R)
+    # each moment: nobody (-1), you (0), the call (1). A track only wins a
+    # moment it is heard in; heard in both, the one more above its usual level.
+    me_wins = heard_me & (~heard_them | (l > r))
+    them_wins = heard_them & ~me_wins
+    side = np.where(np.maximum(l, r) < floor, -1, np.where(me_wins, 0, np.where(them_wins, 1, -1)))
     starts = sorted(set(breaks) | {len(words)})
     out = []
     for a, b in zip(starts, starts[1:]):

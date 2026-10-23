@@ -4,6 +4,15 @@ What changed in each release, newest first. The format follows [Keep a Changelog
 
 ## [Unreleased]
 
+### Added
+
+- **Record any call from the Sottovoce window** (Windows): your microphone and everything the computer plays, on two tracks, with `recorder.py` (WASAPI loopback through soundcard, BSD-3). Meet in a browser, the Teams or Zoom apps, WhatsApp, a phone call through the computer. Nothing is shared on screen. While it records, the output plays silence so Windows never stops sending: both tracks run on their devices' clocks (one minute, real devices: no correction needed, the file as long as the wall clock). Headphones that go or get plugged in mid-call are followed, the gap kept as silence. The file is written as it goes, its header kept current: a computer switched off mid-call leaves a recording that is offered at the next start. The icon by the clock gets a red dot, and **Stop recording and transcribe** in its menu. Quit asks to stop first; Quit again saves it among the interrupted recordings. A phone on the Wi-Fi can't start it.
+
+### Changed
+
+- **Who spoke, on two tracks: 19 words in 20 on the right side instead of 9 in 10.** A moment counts for a track only where it stands 12 dB above that track's own background. On the held-out AMI meeting, 96.4%, 97.4%, 95.0% with headsets and 96.8%, 96.6%, 96.6% with speakers, against 89.8% to 91.8% before, on the same transcription (`research/two_tracks.py --old-rule`). Found when a recording made while the user only listened went to *You* word for word.
+- In the window on Windows, **Record** records from the computer; recording from a browser tab stays for Linux and macOS.
+
 ## [1.6.2] - 2026-10-23
 
 ### Fixed

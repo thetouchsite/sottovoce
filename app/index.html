@@ -719,6 +719,20 @@ const IT = {
   'Quit Sottovoce': 'Esci da Sottovoce', 'Quit Sottovoce? The VRAM is freed.': 'Uscire da Sottovoce? La VRAM si libera.',
   'Record in the browser': 'Registra nel browser',
   'A call in a browser tab is recorded from the browser: this window can’t reach your tabs.': 'Una call in una scheda del browser si registra dal browser: questa finestra non vede le tue schede.',
+  'Start your call in any app:': 'Avvia la call con qualsiasi app:',
+  ', Teams, Zoom, WhatsApp, a phone call through the computer.': ', Teams, Zoom, WhatsApp, una telefonata dal computer.',
+  '. Nothing is shared on screen.': '. Sullo schermo non viene condiviso niente.',
+  'When the call ends, press': 'Quando la call finisce, premi',
+  'Your microphone and everything the computer plays are saved on two tracks, so the transcript says You and Them. Use headphones if you can, and tell the others you are recording.':
+    'Il tuo microfono e tutto quello che il computer riproduce finiscono su due tracce, così la trascrizione dice Tu e Loro. Se puoi usa le cuffie, e avvisa gli altri che registri.',
+  'The others (computer sound)': 'Gli altri (audio del computer)',
+  'Recording. Closing the window is fine: it goes on by the clock.': 'Registrazione in corso. Puoi chiudere la finestra: continua vicino all’orologio.',
+  'No sound from the computer yet. If the others are talking, check that the volume is not muted.':
+    'Ancora nessun suono dal computer. Se gli altri parlano, controlla che il volume non sia azzerato.',
+  'The recording did not start:': 'La registrazione non è partita:',
+  'a call is being recorded: stop it first': 'c’è una call in registrazione: fermala prima',
+  'Sottovoce was closed while recording. What was recorded until then is safe: transcribe it, or delete it.':
+    'Sottovoce è stato chiuso durante una registrazione. Quello registrato fin lì è al sicuro: trascrivilo, oppure eliminalo.',
   'Start recording': 'Avvia registrazione', 'Stop and transcribe': 'Ferma e trascrivi', 'Discard': 'Scarta',
   'Your microphone and the call are saved on two separate tracks, so the transcript says You and Them. With Separate voices on, the people on the call are told apart too. Use headphones, and tell the others you are recording.':
     'Il tuo microfono e la call finiscono su due tracce separate, quindi la trascrizione dice Tu e Loro. Con Separa le voci attivo, si distinguono anche le persone della call. Usa le cuffie, e avvisa gli altri che stai registrando.',
@@ -1415,6 +1429,7 @@ function drawRecordIdle(c){
   c = c || $('#record-body');
   if (!c) return;
   c.textContent = '';
+  if (inWindow && canCapture) return drawCaptureIdle(c);
   if (inWindow){
     const v = el('p', 'empty');
     v.textContent = 'A call in a browser tab is recorded from the browser: this window can’t reach your tabs.';
@@ -1565,14 +1580,16 @@ async function drawUnfinished(){
   try{ r = (await (await fetch('/api/recordings')).json()).recordings || []; }
   catch(e){ return; }
   // The one being recorded right now is not "interrupted".
-  r = r.filter(x => !(rec && rec.id === x.id));
+  r = r.filter(x => !(rec && rec.id === x.id) && !(capturing && capturing.id === x.id));
   box.textContent = '';
   if (!r.length) return;
   const p = panel('Interrupted recordings');
   const c = el('div', 'content');
   const n = el('p', 'note');
-  n.textContent = 'The page was closed while recording. What was recorded until then is safe: '
-    + 'transcribe it, or delete it.';
+  n.textContent = r.some(x => x.from === 'computer')
+    ? 'Sottovoce was closed while recording. What was recorded until then is safe: transcribe it, or delete it.'
+    : 'The page was closed while recording. What was recorded until then is safe: '
+      + 'transcribe it, or delete it.';
   c.append(n);
   for (const x of r){
     const row = el('div', 'queue-row');
@@ -1588,7 +1605,7 @@ async function drawUnfinished(){
         body: JSON.stringify({language: currentLanguage(), precise: precise(),
                               voices: voicesWanted()})})).json();
       if (j.error) return alert(T(j.error));
-      track(j.job, x.name + '.webm');
+      track(j.job, x.name);
       drawUnfinished();
     };
     const del = el('button', 'text-button danger');
@@ -1924,6 +1941,146 @@ async function stopRecording(keep){
     alert(T('The recording is saved, but could not be sent to transcription:') + ' ' + e.message
       + '. It is listed under “Interrupted recordings”.');
   }
+}
+
+/* ===================== recording from the computer itself ================= */
+// In Sottovoce's window on Windows the server records (recorder.py): your
+// microphone and everything the computer plays, any app, nothing shared on
+// screen. The page only starts, shows and stops it, so closing the window,
+// or reloading it, doesn't stop a call being recorded.
+
+let canCapture = false;
+let capturing = null;          // {id, name} while the computer records
+
+async function checkCapture(){
+  if (!inWindow) return;
+  let s;
+  try{ s = await (await fetch('/api/capture')).json(); } catch(e){ return; }
+  canCapture = !!s.available;
+  if (s.recording){
+    capturing = {id: s.recording.id, name: s.recording.name, quiet: 0};
+    drawCaptureLive();
+  } else drawRecordIdle();
+}
+
+function drawCaptureIdle(c){
+  const ol = el('ol', 'steps');
+  ol.innerHTML = '<li>Start your call in any app: <b>Google Meet</b>, Teams, Zoom, WhatsApp, a phone call through the computer.</li>'
+    + '<li>Press <b>Start recording</b>. Nothing is shared on screen.</li>'
+    + '<li>When the call ends, press <b>Stop and transcribe</b>.</li>';
+  const f = el('div', 'field');
+  f.innerHTML = '<label for="rec-name">Name of the call</label>'
+    + '<input id="rec-name" placeholder="e.g. Weekly sync with Northpine">';
+  const foot = el('div', 'rec-foot');
+  const b = el('button', 'primary');
+  b.type = 'button';
+  b.textContent = 'Start recording';
+  b.onclick = () => startCapture($('#rec-name').value.trim(), b);
+  foot.append(b);
+  const note = el('p', 'rec-note');
+  note.textContent = 'Your microphone and everything the computer plays are saved on two tracks, so the '
+    + 'transcript says You and Them. Use headphones if you can, and tell the others you are recording.';
+  c.append(ol, f, foot, note);
+}
+
+async function startCapture(name, button){
+  button.disabled = true;
+  let j;
+  try{
+    j = await (await fetch('/api/capture', {method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({name, language: currentLanguage(), precise: precise(),
+                            voices: voicesWanted()})})).json();
+  } catch(e){ j = {error: 'the server did not answer'}; }
+  if (j.error){
+    button.disabled = false;
+    const v = el('p', 'rec-note error');
+    v.textContent = T('The recording did not start:') + ' ' + T(j.error);
+    $('#record-body').append(v);
+    return;
+  }
+  capturing = {id: j.id, name: name, quiet: 0};
+  drawCaptureLive();
+  drawUnfinished();
+}
+
+function drawCaptureLive(){
+  const c = $('#record-body');
+  if (!c || !capturing) return;
+  c.textContent = '';
+  const live = el('div', 'live');
+  live.innerHTML = '<i class="dot"></i><span class="clock num" id="rec-clock">00:00</span>';
+  const m1 = el('div', 'meter');
+  m1.innerHTML = '<span>You (microphone)</span><div class="track"><i id="lvl-0"></i></div>';
+  const m2 = el('div', 'meter');
+  m2.id = 'meter-tab';
+  m2.innerHTML = '<span>The others (computer sound)</span><div class="track"><i id="lvl-1"></i></div>';
+  const hint = el('p', 'rec-note');
+  hint.id = 'rec-hint';
+  hint.textContent = 'Recording. Closing the window is fine: it goes on by the clock.';
+  const foot = el('div', 'rec-foot');
+  foot.style.marginTop = '16px';
+  const stop = el('button', 'primary stop');
+  stop.type = 'button';
+  stop.textContent = 'Stop and transcribe';
+  stop.onclick = () => stopCapture(true);
+  const cancel = el('button', 'text-button danger');
+  cancel.type = 'button';
+  cancel.textContent = 'Discard';
+  cancel.onclick = () => { if (confirm(T('Discard this recording? Nothing will be kept.'))) stopCapture(false); };
+  foot.append(stop, cancel);
+  c.append(live, m1, m2, hint, foot);
+  tickCapture();
+}
+
+async function tickCapture(){
+  if (!capturing) return;
+  let s;
+  try{ s = await (await fetch('/api/capture')).json(); } catch(e){ s = null; }
+  if (s && !s.recording){                         // stopped elsewhere: by the icon by the clock
+    capturing = null;
+    drawRecordIdle();
+    loadCalls();
+    return;
+  }
+  if (s && s.recording){
+    const r = s.recording;
+    const clock = $('#rec-clock');
+    if (clock) clock.textContent = mmss(r.seconds);
+    r.levels.forEach((v, i) => { const bar = $('#lvl-' + i); if (bar) bar.style.width = (v * 100).toFixed(0) + '%'; });
+    // Twenty seconds without a sound from the computer: the volume is off,
+    // or the call plays on another device.
+    capturing.quiet = r.levels[1] < 0.01 ? capturing.quiet + 1 : 0;
+    const hint = $('#rec-hint'), mt = $('#meter-tab');
+    if (hint && r.error) hint.textContent = r.error;
+    else if (hint && capturing.quiet > 80){
+      hint.textContent = 'No sound from the computer yet. If the others are talking, check that the volume is not muted.';
+      if (mt) mt.classList.add('quiet-tab');
+    } else if (mt) mt.classList.remove('quiet-tab');
+  }
+  setTimeout(tickCapture, 250);
+}
+
+async function stopCapture(keep){
+  const c = capturing;
+  if (!c || c.stopping) return;
+  c.stopping = true;
+  let j;
+  try{
+    j = await (await fetch('/api/capture/stop', {method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({keep, language: currentLanguage(), precise: precise(),
+                            voices: voicesWanted()})})).json();
+  } catch(e){ j = {error: 'the server did not answer'}; }
+  capturing = null;
+  if (view !== 'home') showHome();
+  drawRecordIdle();
+  if (!keep) return;
+  if (j.error){
+    drawUnfinished();
+    alert(T('The recording is saved, but could not be sent to transcription:') + ' ' + T(j.error)
+      + '. It is listed under “Interrupted recordings”.');
+    return;
+  }
+  track(j.job, c.name || 'Call');
 }
 
 /* ============================ the call strip ============================ */
@@ -3212,5 +3369,6 @@ showHome();
 checkEngine();
 checkLLM();
 loadCalls();
+checkCapture();
 </script>
 </html>

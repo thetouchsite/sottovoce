@@ -69,10 +69,11 @@ from fastapi import FastAPI, File, Form, Request, UploadFile
 from fastapi.responses import (FileResponse, HTMLResponse, JSONResponse, PlainTextResponse,
                                RedirectResponse, Response)
 
+import recorder
 import summary as S
 import transcribe as T
 
-VERSION = "1.6.2"
+VERSION = "1.7.0"
 ROOT = pathlib.Path(__file__).resolve().parent
 DATA = ROOT / "transcripts"            # set again by start() from --data
 INCOMING = DATA / "_incoming"
@@ -656,7 +657,12 @@ RID = re.compile(r"^[0-9a-f]{12}$")
 
 
 def recording(rid: str) -> pathlib.Path | None:
-    return RECORDINGS / f"{rid}.webm" if RID.match(rid) else None
+    """The recording's file: a .webm sent by the page, or a .wav recorded by
+    the computer itself (recorder.py). Both end the same way."""
+    if not RID.match(rid):
+        return None
+    wav = RECORDINGS / f"{rid}.wav"
+    return wav if wav.exists() else RECORDINGS / f"{rid}.webm"
 
 
 @app.post("/api/recordings")
@@ -687,26 +693,33 @@ async def api_recording_chunk(rid: str, request: Request):
 @app.post("/api/recordings/{rid}/finish")
 async def api_recording_finish(rid: str, request: Request):
     """Stops collecting and queues the recording for transcription, on two tracks."""
+    return finish_recording(rid, await request.json() if await request.body() else {})
+
+
+def finish_recording(rid: str, body: dict):
     f = recording(rid)
     if f is None or not f.exists():
         return JSONResponse({"error": "unknown recording"}, 404)
-    if f.stat().st_size == 0:
+    empty = 0
+    if f.suffix == ".wav":
+        recorder.repair(f)                 # cut off mid-call, its header is behind
+        empty = recorder.HEADER
+    if f.stat().st_size <= empty:
         return JSONResponse({"error": "the recording is empty"}, 400)
     refused = refuse_if_off()
     if refused:
         return refused
     meta_f = RECORDINGS / f"{rid}.json"
     meta = json.loads(meta_f.read_text(encoding="utf-8")) if meta_f.exists() else {}
-    body = await request.json() if await request.body() else {}
-    name = clean(body.get("name") or meta.get("name") or "Call") + ".webm"
-    language = language_of(body.get("language") or meta.get("language"))
-    dest = INCOMING / f"{rid}.webm"
+    choose = lambda k: body[k] if k in body else meta.get(k)          # noqa: E731
+    name = clean(choose("name") or "Call") + f.suffix
+    dest = INCOMING / f"{rid}{f.suffix}"
     shutil.move(str(f), dest)
     meta_f.unlink(missing_ok=True)
     original = take(dest, name)
-    return {"job": enqueue(original, name, language, two_tracks=True,
-                           precise=bool(body.get("precise")),
-                           voices=bool(body.get("voices")) and voices_installed())}
+    return {"job": enqueue(original, name, language_of(choose("language")), two_tracks=True,
+                           precise=bool(choose("precise")),
+                           voices=bool(choose("voices")) and voices_installed())}
 
 
 @app.get("/api/recordings")
@@ -714,9 +727,9 @@ def api_recordings():
     """Recordings that were never finished: the page offers to save them."""
     out = []
     for meta_f in sorted(RECORDINGS.glob("*.json")) if RECORDINGS.exists() else []:
-        f = meta_f.with_suffix(".webm")
-        if not f.exists():
-            continue
+        f = recording(meta_f.stem)
+        if f is None or not f.exists() or (capture and capture["id"] == meta_f.stem):
+            continue                       # the one recording now is not interrupted
         meta = json.loads(meta_f.read_text(encoding="utf-8"))
         out.append({"id": meta_f.stem, **meta, "bytes": f.stat().st_size,
                     "idle_s": round(time.time() - f.stat().st_mtime)})
@@ -731,6 +744,90 @@ def api_recording_delete(rid: str):
     f.unlink(missing_ok=True)
     (RECORDINGS / f"{rid}.json").unlink(missing_ok=True)
     return {"deleted": True}
+
+
+# --- recording from the computer itself (recorder.py) -----------------------------
+# Your microphone and everything the computer plays, on the same two tracks
+# as the page's: any call, nothing shared on screen. Only from the computer
+# Sottovoce runs on: a phone on the Wi-Fi (--lan) must not switch on this
+# computer's microphone.
+
+capture = None             # {"id", "capture": recorder.Capture, "name"} while one runs
+LOCAL = {"127.0.0.1", "::1"}
+
+
+def from_here(request: Request):
+    if (request.client.host if request.client else "") not in LOCAL:
+        return JSONResponse({"error": "recording works only on the computer running Sottovoce"}, 403)
+    return None
+
+
+@app.get("/api/capture")
+def api_capture():
+    now = None
+    if capture:
+        c = capture["capture"]
+        now = {"id": capture["id"], "name": capture["name"], "seconds": round(c.seconds, 1),
+               "levels": [round(v, 3) for v in c.levels], "error": c.error}
+    return {"available": recorder.available(), "recording": now}
+
+
+@app.post("/api/capture")
+async def api_capture_start(request: Request):
+    global capture
+    refused = from_here(request)
+    if refused:
+        return refused
+    if capture:
+        return JSONResponse({"error": "already recording"}, 409)
+    if not recorder.available():
+        return JSONResponse({"error": "recording the computer's sound needs Windows"}, 503)
+    body = await request.json() if await request.body() else {}
+    rid = uuid.uuid4().hex[:12]
+    RECORDINGS.mkdir(parents=True, exist_ok=True)
+    name = clean(body.get("name") or f"Call {time.strftime('%Y-%m-%d %H.%M')}")
+    meta_f = RECORDINGS / f"{rid}.json"
+    # The choices travel with the recording: Stop from the icon by the clock,
+    # or a recording saved after a crash, transcribes the way it was asked.
+    meta_f.write_text(json.dumps({
+        "started_at": time.strftime("%Y-%m-%d %H:%M"), "name": name,
+        "language": body.get("language") or "auto", "precise": bool(body.get("precise")),
+        "voices": bool(body.get("voices")), "from": "computer"}), encoding="utf-8")
+    c = recorder.Capture(RECORDINGS / f"{rid}.wav")
+    try:
+        c.start()
+    except Exception as e:
+        meta_f.unlink(missing_ok=True)
+        return JSONResponse({"error": f"the recording did not start: {e}"}, 503)
+    capture = {"id": rid, "capture": c, "name": name}
+    return {"id": rid}
+
+
+def stop_capture():
+    """Stops the recording and keeps its file, unfinished: what Quit does, so
+    the next start offers it like any interrupted recording. Returns its id."""
+    global capture
+    if not capture:
+        return None
+    now, capture = capture, None
+    now["capture"].stop()
+    return now["id"]
+
+
+@app.post("/api/capture/stop")
+async def api_capture_stop(request: Request):
+    refused = from_here(request)
+    if refused:
+        return refused
+    if not capture:
+        return JSONResponse({"error": "nothing is being recorded"}, 404)
+    body = await request.json() if await request.body() else {}
+    rid = stop_capture()
+    if not body.get("keep", True):
+        recording(rid).unlink(missing_ok=True)
+        (RECORDINGS / f"{rid}.json").unlink(missing_ok=True)
+        return {"discarded": True}
+    return finish_recording(rid, {k: body[k] for k in ("name", "language", "precise", "voices") if k in body})
 
 
 # --- history ----------------------------------------------------------------------
@@ -1528,6 +1625,8 @@ def api_shutdown():
     """
     if any(j["state"] == "running" for j in jobs.values()) or line_up.qsize():
         return JSONResponse({"error": "a transcription is running: wait for it to finish"}, 409)
+    if capture:
+        return JSONResponse({"error": "a call is being recorded: stop it first"}, 409)
 
     def shortly():
         time.sleep(0.4)          # time to answer the page

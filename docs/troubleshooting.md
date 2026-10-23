@@ -50,9 +50,11 @@ On Windows, Hugging Face may warn that it can't create symlinks in its cache. It
 
 ## Recording
 
-- **"No sound from the call yet"**: the tab was shared without its audio. Stop, start again, pick the call's tab and leave **Also share tab audio** on.
-- **No Start recording button:** recording needs Chrome or Edge on the computer running Sottovoce. Firefox and Safari can't capture another tab's sound, and from a phone the browser doesn't allow it.
-- **The page closed during a call:** open it again. The interrupted recording is offered on the home screen: transcribe it, or delete it.
+- **"No sound from the computer yet"** (Windows): the others' voices don't reach the computer's output. Check the volume isn't muted, and that the call plays on this computer.
+- **"The recording did not start"** (Windows): another program holds the microphone in exclusive mode, or Windows has no default microphone or output. **Settings → System → Sound** shows both.
+- **"No sound from the call yet"** (browser): the tab was shared without its audio. Stop, start again, pick the call's tab and leave **Also share tab audio** on.
+- **No Start recording button** (browser): recording needs Chrome or Edge on the computer running Sottovoce. Firefox and Safari can't capture another tab's sound, and from a phone the browser doesn't allow it.
+- **Sottovoce closed during a call:** open it again. The interrupted recording is offered on the home screen: transcribe it, or delete it.
 
 ## The phone can't connect
 

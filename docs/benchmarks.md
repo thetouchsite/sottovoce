@@ -88,6 +88,8 @@ Who said each word on a call recorded on two tracks, your microphone and the cal
 
 ```sh
 python research/two_tracks.py                        # the current method
+python research/two_tracks.py --old-rule             # the same, as before 1.7
+python research/two_tracks.py --tune                 # the other meeting
 python research/two_tracks.py --method per_track     # each track transcribed on its own
 ```
 
@@ -95,12 +97,14 @@ Held-out meeting `IS1009a`. *Right side* is the share of words given to the righ
 
 | People | Setup | Current: right side | Current: words / invented | Per track: right side | Per track: words / invented |
 | --- | --- | --- | --- | --- | --- |
-| 2 | headset | **89.8%** | 1,606 / 77 | 62.1% | 2,421 / 102 |
-| 3 | headset | **91.8%** | 1,602 / 89 | 61.8% | 2,525 / 110 |
-| 4 | headset | **90.7%** | 1,641 / 66 | 63.2% | 2,552 / 121 |
-| 2 | speakers | **90.8%** | 1,624 / 115 | 62.1% | 2,421 / 98 |
-| 3 | speakers | **91.8%** | 1,647 / 81 | 61.8% | 2,523 / 110 |
-| 4 | speakers | **89.2%** | 1,631 / 68 | 63.3% | 2,543 / 121 |
+| 2 | headset | **96.4%** | 1,606 / 77 | 62.1% | 2,421 / 102 |
+| 3 | headset | **97.4%** | 1,599 / 86 | 61.8% | 2,525 / 110 |
+| 4 | headset | **95.0%** | 1,641 / 66 | 63.2% | 2,552 / 121 |
+| 2 | speakers | **96.8%** | 1,620 / 108 | 62.1% | 2,421 / 98 |
+| 3 | speakers | **96.6%** | 1,647 / 81 | 61.8% | 2,523 / 110 |
+| 4 | speakers | **96.6%** | 1,631 / 68 | 63.3% | 2,543 / 121 |
+
+**Since 1.7, a moment counts for a track only where it stands 12 dB above that track's own background.** Before, each track was compared only with its usual level, and when you mostly listen, your microphone's usual level is the room's hiss: hiss looked like speech. A recording made from the computer while the user only listened went to *You* word for word, 31 of 31. On the same transcription, the old rule (`--old-rule`) gives 89.8%, 91.8%, 90.7% with headsets and 90.6%, 91.8%, 89.2% with speakers. The 12 dB were chosen before measuring, from that recording, not tuned on these meetings; on the other one (`--tune`, `ES2004a`) the new rule gives 96.7%, 93.0%, 94.3% and 96.7%, 93.5%, 94.8%.
 
 The current method transcribes the two tracks mixed and lays each line's words over the moments someone speaks in it. Transcribing each track on its own puts every word on its side by construction, but in an AMI room every headset hears the others clearly, so Whisper transcribes them twice. A real Meet call is kinder to it (the call's track never carries your voice), so it stays on the roadmap, to be measured on real calls.
 

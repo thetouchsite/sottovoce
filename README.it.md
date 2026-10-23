@@ -29,7 +29,7 @@ Trascini sulla pagina una call registrata, oppure registri la call da lì. Ottie
 
 - **Ti mostra dove il testo è debole.** La *striscia della call* disegna tutta la registrazione in una banda: parlato, silenzio, frasi tolte, righe corrette. Clicchi in un punto e ascolti da lì.
 - **Toglie quello che nessuno ha detto.** Sul silenzio Whisper scrive sottotitoli imparati da YouTube: *"Grazie per la visione"*. Sottovoce li toglie solo dove l'audio è molto sotto il parlato, ed elenca ogni rimozione. Su un test pubblico con pause lunghe aggiunge 47 parole che nessuno ha detto, dove Whisper da solo ne aggiunge 318 ([misurato](docs/benchmarks.md#long-pauses)).
-- **Sa chi ha parlato.** Una call registrata dal browser tiene il tuo microfono e la call su due tracce: *Tu* e *Loro* sono misurati, non indovinati. Su qualsiasi registrazione separa le voci senza account e senza token, con un [errore del 12% su riunioni pubbliche](docs/benchmarks.md#telling-voices-apart).
+- **Sa chi ha parlato.** Una call registrata qui tiene il tuo microfono e la call su due tracce, da qualsiasi app su Windows, da una scheda del browser altrove: *Tu* e *Loro* sono misurati, non indovinati. Su qualsiasi registrazione separa le voci senza account e senza token, con un [errore del 12% su riunioni pubbliche](docs/benchmarks.md#telling-voices-apart).
 - **Tiene giusti i tuoi nomi.** Un glossario corregge i nomi di clienti e prodotti dopo la trascrizione, e si può riapplicare alle call vecchie.
 - **Resta sulla tua macchina.** Niente account, niente telemetria, niente LLM remoti. Ogni call è una cartella di file normali; riassunti ed email li scrive un modello che gira in locale.
 
@@ -66,7 +66,7 @@ Installazione da un clone, aggiornamento, rimozione, riga di comando e API: [Get
 
 | | **Sottovoce** | [Meetily](https://github.com/Zackriya-Solutions/meetily) | [Vibe](https://github.com/thewh1teagle/vibe) | [noScribe](https://github.com/kaixxx/noScribe) | [Buzz](https://github.com/chidiwilliams/buzz) | [WhisperX](https://github.com/m-bain/whisperX) |
 | --- | --- | --- | --- | --- | --- | --- |
-| Registra le call | Scheda del browser + microfono, **su due tracce separate** | Microfono + audio di sistema | Microfono, audio di sistema, telefono | File | Microfono, dal vivo | File |
+| Registra le call | Microfono + audio di sistema su Windows, scheda del browser + microfono altrove, **su due tracce separate** | Microfono + audio di sistema | Microfono, audio di sistema, telefono | File | Microfono, dal vivo | File |
 | Chi parla | Due tracce, o voci **senza account** | Edizione Pro, in arrivo | Sì | Sì (pyannote) | Sì | Sì (token Hugging Face) |
 | Riassunti | **Solo locali**: modello incorporato, LM Studio, Ollama | Ollama o API cloud | Ollama o API Claude | – | Plugin | – |
 | Mostra dove ricontrollare | **Striscia della call, rimozioni elencate** | – | – | – | – | – |
@@ -77,7 +77,7 @@ Installazione da un clone, aggiornamento, rimozione, riga di comando e API: [Get
 
 <sub>Dal README di ogni progetto al 23 ottobre 2026. Se qualcosa è cambiato, apri una issue e la tabella viene corretta.</sub>
 
-Sottovoce è fatto per le call di lavoro: registrate prima o registrate qui, lette e corrette, archiviate col cliente. Se oggi ti servono qualsiasi GPU, un'app desktop nativa o i sottotitoli dal vivo, Vibe e Buzz sono ottime scelte.
+Sottovoce è fatto per le call di lavoro: registrate prima o registrate qui, lette e corrette, archiviate col cliente. Se oggi ti servono qualsiasi GPU, un'app nativa su macOS o Linux o i sottotitoli dal vivo, Vibe e Buzz sono ottime scelte.
 
 ## Domande frequenti
 

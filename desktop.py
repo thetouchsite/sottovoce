@@ -43,6 +43,12 @@ WORDS = {
                    "Sottovoce continua a lavorare qui, vicino all'orologio. Per chiuderlo: Esci, dal menu di questa icona."),
     "done": ("Transcribed", "Trascritta"),
     "failed": ("Transcription failed", "Trascrizione non riuscita"),
+    "stop rec": ("Stop recording and transcribe", "Ferma la registrazione e trascrivi"),
+    "transcribing": ("Recording stopped: it is being transcribed.", "Registrazione fermata: la sto trascrivendo."),
+    "kept": ("Recording saved: it waits among the interrupted recordings.",
+             "Registrazione salvata: la trovi tra le registrazioni interrotte."),
+    "recording": ("A call is being recorded. Stop it first, or Quit again: it is saved and offered at the next start.",
+                  "C'è una call in registrazione. Fermala prima, oppure Esci di nuovo: viene salvata e te la ripropone al prossimo avvio."),
     "after": ("Sottovoce closes as soon as the transcription ends. To close it now, Quit again.",
               "Sottovoce si chiude appena finisce la trascrizione. Per chiuderlo subito, Esci di nuovo."),
     "taken": ("Port {port} is used by another program: Sottovoce can't start.",
@@ -112,6 +118,17 @@ def no_console_windows(popen=subprocess.Popen):
 def busy(jobs, queued) -> bool:
     """Whether quitting now would throw a transcription away."""
     return bool(queued) or any(j["state"] == "running" for j in list(jobs.values()))
+
+
+def recording_icon(image):
+    """The icon with a red dot: a call is being recorded. Seen by you only."""
+    from PIL import ImageDraw
+    img = image.convert("RGBA").copy()
+    s = img.size[0]
+    r = s * 0.22
+    ImageDraw.Draw(img).ellipse([s - 2 * r - s * 0.02, s - 2 * r - s * 0.02, s - s * 0.02, s - s * 0.02],
+                                fill="#e5484d", outline="#111113", width=max(1, int(s * 0.04)))
+    return img
 
 
 def answers(port) -> bool:
@@ -212,7 +229,10 @@ def main(argv=None):
     from PIL import Image
 
     quitting = threading.Event()
-    state = {"window": None, "visible": not ours.hidden, "told": False, "leaving": False}
+    state = {"window": None, "visible": not ours.hidden, "told": False, "leaving": False,
+             "recording": False}
+    plain = Image.open(ICON)
+    images = {False: plain, True: recording_icon(plain)}
 
     def show(*_):
         w = state["window"]
@@ -227,10 +247,14 @@ def main(argv=None):
         # During a transcription, Quit waits for it to end; Quit again closes
         # now. No dialog: one asked from the icon's thread froze while
         # Whisper kept Python busy, and a second click stacked another.
-        if busy(server.jobs, server.line_up.qsize()) and not state["leaving"]:
+        # A call being recorded has no end to wait for: the first Quit says
+        # so, the second saves it among the interrupted recordings.
+        working = busy(server.jobs, server.line_up.qsize())
+        if (working or server.capture) and not state["leaving"]:
             state["leaving"] = True
-            icon.notify(say("after"), "Sottovoce")
+            icon.notify(say("recording" if server.capture else "after"), "Sottovoce")
             return
+        server.stop_capture()
         quitting.set()
         serving.should_exit = True
         icon.stop()
@@ -240,7 +264,17 @@ def main(argv=None):
     def toggle_startup(*_):
         set_startup(not startup_on(), rest)
 
-    icon = pystray.Icon("Sottovoce", Image.open(ICON), "Sottovoce", pystray.Menu(
+    def stop_recording(*_):
+        def stop():
+            rid = server.stop_capture()
+            if rid is None:
+                return
+            done = server.finish_recording(rid, {})
+            icon.notify(say("kept" if not isinstance(done, dict) else "transcribing"), "Sottovoce")
+        threading.Thread(target=stop, daemon=True).start()
+
+    icon = pystray.Icon("Sottovoce", plain, "Sottovoce", pystray.Menu(
+        pystray.MenuItem(say("stop rec"), stop_recording, visible=lambda _: server.capture is not None),
         pystray.MenuItem(say("open"), show, default=True),
         pystray.MenuItem(say("calls"), lambda *_: subprocess.Popen(["explorer", str(server.DATA)])),
         pystray.MenuItem(say("startup"), toggle_startup, checked=lambda _: startup_on()),
@@ -257,7 +291,12 @@ def main(argv=None):
             for name, how in finished(seen, server.jobs):
                 if not state["visible"]:
                     icon.notify(name, say(how))
-            if state["leaving"] and not busy(server.jobs, server.line_up.qsize()):
+            now = server.capture is not None
+            if now != state["recording"]:          # the red dot, and Stop in the menu
+                state["recording"] = now
+                icon.icon = images[now]
+                icon.update_menu()
+            if state["leaving"] and not now and not busy(server.jobs, server.line_up.qsize()):
                 quit_app()
             time.sleep(2)
     threading.Thread(target=watch, daemon=True).start()

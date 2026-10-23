@@ -29,7 +29,7 @@ Drop a recorded call on the page, or record the call from it. You get the transc
 
 - **It shows where the text is weak.** The *call strip* draws the whole recording as one band: speech, silence, phrases removed, lines corrected. Click anywhere to listen from there.
 - **It removes what nobody said.** On silence, Whisper writes subtitles it learned from YouTube: *"Thanks for watching"*. Sottovoce drops them only where the audio is far below speech, and lists every removal. On a public test with long pauses it adds 47 words nobody said, where Whisper alone adds 318 ([measured](docs/benchmarks.md#long-pauses)).
-- **It knows who spoke.** A call recorded from the browser keeps your microphone and the call on two tracks: *You* and *Them* are measured, not guessed. On any recording, voices are told apart with no account and no token, at a [12% error rate on public meetings](docs/benchmarks.md#telling-voices-apart).
+- **It knows who spoke.** A call recorded here keeps your microphone and the call on two tracks, from any app on Windows, from a browser tab elsewhere: *You* and *Them* are measured, not guessed. On any recording, voices are told apart with no account and no token, at a [12% error rate on public meetings](docs/benchmarks.md#telling-voices-apart).
 - **It keeps your names right.** A glossary fixes client and product names after transcription, and can be applied again to older calls.
 - **It stays on your machine.** No account, no telemetry, no remote LLM. Every call is a folder of plain files; summaries and emails are written by a model that runs locally.
 
@@ -66,7 +66,7 @@ Installing from a clone, updating, removing, the command line and the API: [Gett
 
 | | **Sottovoce** | [Meetily](https://github.com/Zackriya-Solutions/meetily) | [Vibe](https://github.com/thewh1teagle/vibe) | [noScribe](https://github.com/kaixxx/noScribe) | [Buzz](https://github.com/chidiwilliams/buzz) | [WhisperX](https://github.com/m-bain/whisperX) |
 | --- | --- | --- | --- | --- | --- | --- |
-| Records calls | Browser tab + mic, **on two separate tracks** | Mic + system audio | Mic, system audio, phone | Files | Mic, live | Files |
+| Records calls | Mic + system audio on Windows, browser tab + mic elsewhere, **on two separate tracks** | Mic + system audio | Mic, system audio, phone | Files | Mic, live | Files |
 | Who spoke | Two tracks, or voices **with no account** | Pro edition, coming soon | Yes | Yes (pyannote) | Yes | Yes (Hugging Face token) |
 | Summaries | **Local only**: built-in model, LM Studio, Ollama | Ollama or cloud APIs | Ollama or Claude API | – | Plugin | – |
 | Shows where the text needs checking | **Call strip, removals listed** | – | – | – | – | – |
@@ -77,7 +77,7 @@ Installing from a clone, updating, removing, the command line and the API: [Gett
 
 <sub>From each project's README on 23 October 2026. If something has changed, open an issue and the table will be fixed.</sub>
 
-Sottovoce is built for business calls: recorded or recorded here, read and corrected, filed with the client. If you need any GPU, a native desktop app or live captions today, Vibe and Buzz are excellent choices.
+Sottovoce is built for business calls: recorded or recorded here, read and corrected, filed with the client. If you need any GPU, a native app on macOS or Linux, or live captions today, Vibe and Buzz are excellent choices.
 
 ## FAQ
 

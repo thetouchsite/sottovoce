@@ -12,13 +12,13 @@ What Sottovoce doesn't do, or doesn't do well yet. Most of these are on the [roa
 
 ## Recording
 
-- **Calls in a browser tab only**, in Chrome or Edge. Desktop apps (Zoom, Teams, Webex) and phone calls through the computer can't be recorded yet. From the Sottovoce window, recording opens the browser.
+- **Recording any call is Windows only.** On Linux and macOS, only calls in a browser tab (Chrome or Edge) can be recorded.
 - **The window and the icon by the clock are Windows only.** On Linux and macOS, Sottovoce opens in the browser and is stopped from the page or its terminal.
 - **No live transcript** during the call: the transcript arrives when the call ends.
 
 ## Who spoke
 
-- **On two-track calls**, about 9 words in 10 go to the right person on [real microphones](benchmarks.md#two-track-calls). Fast, overlapping exchanges are where it errs most.
+- **On two-track calls**, about 19 words in 20 go to the right person on [real microphones](benchmarks.md#two-track-calls). Fast, overlapping exchanges are where it errs most.
 - **Telling voices apart** can merge two similar voices, give a short "yes" to the wrong person, and fold someone who talks for less than about 15 seconds into the nearest voice. The number of people can't be set by hand. See [Telling voices apart](voices.md#where-it-goes-wrong).
 
 ## The text

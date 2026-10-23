@@ -5,6 +5,8 @@ guarantees: what it reads, what it writes, and what it refuses.
 """
 import json
 
+import pytest
+
 from conftest import NORTHPINE, SUPPLIER
 
 
@@ -440,3 +442,58 @@ def test_info_is_never_read_half_written(data):
     assert bad == [] and server.read_info(d)["n"] == 199
     assert not (d / "info.json.tmp").exists()
 
+
+
+# --- recording from the computer itself (recorder.py), with a stand-in -------------
+
+class FakeCapture:
+    """Writes a second of a quiet stereo WAV when stopped: no devices."""
+
+    def __init__(self, path):
+        self.path, self.seconds, self.levels, self.error = path, 0.0, [0.2, 0.1], None
+
+    def start(self):
+        import recorder
+        self.path.write_bytes(recorder.header(0))
+
+    def stop(self):
+        import recorder
+        self.path.write_bytes(recorder.header(0) + b"\x00\x00" * 2 * recorder.RATE)
+        return self.path
+
+
+@pytest.fixture
+def here(client, monkeypatch):
+    """The same server, asked from the computer it runs on."""
+    import recorder
+    import server
+    from fastapi.testclient import TestClient
+    monkeypatch.setattr(recorder, "available", lambda: True)
+    monkeypatch.setattr(recorder, "Capture", FakeCapture)
+    yield TestClient(server.app, client=("127.0.0.1", 50000))
+    server.capture = None
+
+
+def test_a_phone_cannot_switch_on_the_computers_microphone(here, client):
+    assert client.post("/api/capture", json={}).status_code == 403          # not 127.0.0.1
+    assert here.get("/api/capture").json() == {"available": True, "recording": None}
+
+
+def test_a_computer_recording_is_one_at_a_time_and_discarded_without_a_trace(here, data):
+    rid = here.post("/api/capture", json={"name": "Weekly"}).json()["id"]
+    now = here.get("/api/capture").json()["recording"]
+    assert now["id"] == rid and now["name"] == "Weekly" and now["levels"] == [0.2, 0.1]
+    assert here.post("/api/capture", json={}).status_code == 409
+    assert here.get("/api/recordings").json()["recordings"] == []          # live, not interrupted
+    assert here.post("/api/shutdown").status_code == 409                    # the power button waits
+    assert here.post("/api/capture/stop", json={"keep": False}).json() == {"discarded": True}
+    assert list((data / "transcripts" / "_recordings").iterdir()) == []
+
+
+def test_a_kept_recording_without_the_model_waits_with_the_choices_made(here, data):
+    here.post("/api/capture", json={"name": "Weekly", "language": "it", "voices": True})
+    r = here.post("/api/capture/stop", json={})
+    assert r.status_code == 503                                             # --no-model here
+    listed = here.get("/api/recordings").json()["recordings"]
+    assert [(x["name"], x["language"], x["voices"], x["from"]) for x in listed] == [("Weekly", "it", True, "computer")]
+    assert listed[0]["bytes"] == 44 + 4 * 48000
