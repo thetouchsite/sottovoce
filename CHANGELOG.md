@@ -4,6 +4,11 @@ What changed in each release, newest first. The format follows [Keep a Changelog
 
 ## [Unreleased]
 
+### Security
+
+- **Cross-site requests and DNS rebinding are refused.** Any page open in the browser could send requests to `127.0.0.1:8200`: a form posted to `/api/shutdown` stopped the server, and with DNS rebinding a page could have read `/api/history`. Now requests that change state are refused when the browser says they come from another site (`Origin`, `Sec-Fetch-Site`), and only the names the server is reached by are accepted in `Host` (`127.0.0.1`, `localhost`, `[::1]` on its port; with `--lan`, also this computer's addresses and name).
+- `SECURITY.md`: what is protected and how, the limits of `--lan` (a PIN over plain http), and how to report a problem privately.
+
 ### Added
 
 - **Notes**, first in the Download menu: one Markdown file for the client's folder, with date, length and who took part, the summary, and the whole transcript with names and minutes, its headings in the language of the call.
