@@ -749,6 +749,10 @@ const IT = {
   'a call is being recorded: stop it first': 'c’è una call in registrazione: fermala prima',
   'Sottovoce was closed while recording. What was recorded until then is safe: transcribe it, or delete it.':
     'Sottovoce è stato chiuso durante una registrazione. Quello registrato fin lì è al sicuro: trascrivilo, oppure eliminalo.',
+  'The first transcription downloads the transcription model, Whisper large-v3: 2.9 GB, once, a few minutes. Download it now?':
+    'La prima trascrizione scarica il modello di trascrizione, Whisper large-v3: 2,9 GB, una volta sola, qualche minuto. Scaricarlo adesso?',
+  'Summaries and emails are written by a model that runs on this computer. The first time it is downloaded: 8 GB, once, a few minutes. Download it now?':
+    'Riassunti ed email li scrive un modello che gira su questo computer. La prima volta va scaricato: 8 GB, una volta sola, qualche minuto. Scaricarlo adesso?',
   'Start recording': 'Avvia registrazione', 'Stop and transcribe': 'Ferma e trascrivi', 'Discard': 'Scarta',
   'Your microphone and the call are saved on two separate tracks, so the transcript says You and Them. With Separate voices on, the people on the call are told apart too. Use headphones, and tell the others you are recording.':
     'Il tuo microfono e la call finiscono su due tracce separate, quindi la trascrizione dice Tu e Loro. Con Separa le voci attivo, si distinguono anche le persone della call. Usa le cuffie, e avvisa gli altri che stai registrando.',
@@ -1046,6 +1050,7 @@ let rec = null;            // the recording in progress, if any
 async function checkEngine(){
   try{
     const d = await (await fetch('/api/status')).json();
+    whisperOnDisk = d.downloaded !== false;
     const light = $('.light'), t = $('#engine-text');
     // Which Sottovoce this is: what to say when asking for help, or after an update.
     if (d.version){
@@ -1524,6 +1529,7 @@ function drawWaiting(){
   all.dataset.need = 'model';
   all.dataset.label = w.length > 1 ? 'Transcribe all ' + w.length : 'Transcribe';
   all.onclick = async () => {
+    if (!okToTranscribe()) return;
     all.disabled = true;
     for (const v of w){
       try{
@@ -1627,6 +1633,7 @@ async function drawUnfinished(){
     go.textContent = 'Transcribe';
     go.disabled = !ready;
     go.onclick = async () => {
+      if (!okToTranscribe()) return;
       const j = await (await fetch('/api/recordings/' + x.id + '/finish', {method:'POST',
         headers:{'Content-Type':'application/json'},
         body: JSON.stringify({language: currentLanguage(), precise: precise(),
@@ -1684,6 +1691,7 @@ async function keepUp(){
     const r = (await (await fetch('/api/jobs')).json()).jobs || [];
     for (const j of r) if (!queue.some(q => q.id === j.id)) track(j.id, j.name);
     const s = (await (await fetch('/api/calls/stamp')).json()).stamp;
+    whisperOnDisk = (await (await fetch('/api/status')).json()).downloaded !== false;
     if (callsStamp !== null && s !== callsStamp) loadCalls();
     callsStamp = s;
   } catch(e){ /* the server is restarting: try again later */ }
@@ -1973,6 +1981,12 @@ async function stopRecording(keep){
   }
   const name = (r.name || 'Call ' + new Date(r.started).toISOString().slice(0, 16).replace('T', ' ')
     .replace(':', '.'));
+  if (!okToTranscribe()){                  // kept: listed under the interrupted recordings
+    if (view !== 'home') showHome();
+    drawRecordIdle();
+    drawUnfinished();
+    return;
+  }
   try{
     const j = await (await fetch('/api/recordings/' + r.id + '/finish', {method:'POST',
       headers:{'Content-Type':'application/json'},
@@ -2006,6 +2020,19 @@ async function openFolder(name){
 if (onThisComputer){
   $('#open-folder').hidden = false;
   $('#open-folder').onclick = () => openFolder();
+}
+
+/* ===================== the models: downloaded when asked ================= */
+// The first transcription downloads Whisper, the first summary its model:
+// 2.9 GB and 8 GB are not taken from someone's disk and connection on a
+// click that said "Transcribe" or "Summarize", without a word. Asked once,
+// until the model is on disk.
+let whisperOnDisk = true;      // from /api/status
+function okToTranscribe(){
+  return whisperOnDisk || confirm(T('The first transcription downloads the transcription model, Whisper large-v3: 2.9 GB, once, a few minutes. Download it now?'));
+}
+function okToWrite(){
+  return !llm || !llm.builtin || llm.downloaded || confirm(T('Summaries and emails are written by a model that runs on this computer. The first time it is downloaded: 8 GB, once, a few minutes. Download it now?'));
 }
 
 /* ============================ waiting, shown ============================ */
@@ -2157,6 +2184,8 @@ async function tickCapture(){
 async function stopCapture(keep, transcribe = true){
   const c = capturing;
   if (!c || c.stopping) return;
+  // Not now: the recording is kept, to transcribe when the model may come.
+  if (keep && transcribe && !okToTranscribe()) transcribe = false;
   c.stopping = true;
   let j;
   try{
@@ -2507,6 +2536,7 @@ function followupPanel(l){
   }
 
   async function write(redo){
+    if (!okToWrite()) return;
     c.textContent = '';
     c.append(working(T('the model is writing the email…'),
       'Still working: the first time in a while, the model loads first, up to a minute.'));
@@ -2679,6 +2709,7 @@ function showPending(l){
     note.textContent = estimate();
     d.addEventListener('change', () => { note.textContent = estimate(); });
     b.onclick = async () => {
+      if (!okToTranscribe()) return;
       b.disabled = true;
       try{
         const r = await (await fetch('/api/transcribe/' + encodeURIComponent(l.folder), {
@@ -3153,6 +3184,7 @@ function readingPanel(l, st, jump){
     }
   }
   async function ask(redo){
+    if (!okToWrite()) return;
     box.className = 'reader';
     box.textContent = '';
     context.textContent = '';

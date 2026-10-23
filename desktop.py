@@ -46,6 +46,10 @@ WORDS = {
     "failed": ("Transcription failed", "Trascrizione non riuscita"),
     "stop rec": ("Stop recording and transcribe", "Ferma la registrazione e trascrivi"),
     "stop later": ("Stop recording, transcribe later", "Ferma la registrazione, trascrivi dopo"),
+    "needs model": ("Recording saved. Transcribing it downloads the transcription model the first time "
+                    "(2.9 GB): open it and press Transcribe.",
+                    "Registrazione salvata. Per trascriverla, la prima volta si scarica il modello di "
+                    "trascrizione (2,9 GB): aprila e premi Trascrivi."),
     "saved": ("Recording saved: it waits in the list, to transcribe when you want.",
               "Registrazione salvata: la trovi nell'elenco, da trascrivere quando vuoi."),
     "transcribing": ("Recording stopped: it is being transcribed.", "Registrazione fermata: la sto trascrivendo."),
@@ -293,7 +297,12 @@ def main(argv=None):
                 rid = server.stop_capture()
                 if rid is None:
                     return
-                if transcribe:
+                if transcribe and not server.T.downloaded():
+                    # The first transcription downloads 2.9 GB: not without asking,
+                    # and the icon's menu has no page to ask in.
+                    server.keep_for_later(rid)
+                    icon.notify(say("needs model"), "Sottovoce")
+                elif transcribe:
                     done = server.finish_recording(rid, {})
                     icon.notify(say("kept" if not isinstance(done, dict) else "transcribing"), "Sottovoce")
                 else:
