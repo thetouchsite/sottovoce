@@ -49,3 +49,13 @@ def test_no_nvidia_gpu_gets_the_cpu_index_and_macos_gets_pypi():
 def test_the_oldest_driver_for_cuda_12_6_differs_by_system():
     assert "update" not in gpu.pick("Linux", ("NVIDIA GeForce GTX 1080", "525.60.13", "6.1"))[1]
     assert "update" in gpu.pick("Windows", ("NVIDIA GeForce GTX 1080", "527.56", "6.1"))[1]
+
+
+def test_the_windows_setup_copies_every_module_of_the_program():
+    # 1.9.0 was first built with updates.py left out of a list of names.
+    from conftest import ROOT
+    import re
+    iss = (ROOT / "installer" / "windows" / "Sottovoce.iss").read_text(encoding="utf-8")
+    copied = set(re.findall(r'^Source: "\{#Root\}\\([^"\\]+\.py)"', iss, re.M))
+    modules = {p.name for p in ROOT.glob("*.py")}
+    assert "*.py" in copied or modules <= copied, modules - copied

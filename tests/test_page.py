@@ -441,3 +441,18 @@ def test_loading_whisper_shows_as_such_with_the_seconds_moving(page):
     page.wait_for_function("(document.querySelector('.queue-row .qstage') || {}).textContent"
                            " === 'loading the model · 4 s · about ten seconds'", timeout=10000)
     assert page.locator(".queue-row .bar.indeterminate").count() == 1
+
+
+def test_a_newer_version_is_announced_under_the_calls(page):
+    import json as j
+    state = {"state": "idle", "available": {"version": "9.9.9", "notes": "Faster on every computer."},
+             "checked_at": 1, "error": None, "done": 0, "total": 0, "current": "1.8.0", "check": True,
+             "off": False, "installs": True, "how": None}
+    page.route("**/api/update", lambda r: r.fulfill(body=j.dumps(state), content_type="application/json"))
+    page.reload()
+    note = page.locator("#update-note")
+    note.locator("text=Sottovoce 9.9.9 is out").wait_for()
+    assert note.locator("button", has_text="Update now").count() == 1
+    page.locator("#v-settings").click()
+    page.locator("#update-panel", has_text="This is Sottovoce 1.8.0. Sottovoce 9.9.9 is out.").wait_for()
+    assert page.locator("#update-panel input[role=switch]").is_checked()

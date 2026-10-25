@@ -4,6 +4,20 @@ What changed in each release, newest first. The format follows [Keep a Changelog
 
 ## [Unreleased]
 
+## [1.9.0] - 2026-10-25
+
+Sottovoce updates itself, and installs only what TouchSite Software signed.
+
+### Added
+
+- **Updates on Windows.** At start and once a day Sottovoce asks GitHub whether a newer version is out, and says so under the list of calls and in **Settings → Updates**, with the notes. **Update now** downloads the setup, checks it, waits for any transcription or recording to end, closes, installs silently and opens again: 38 seconds from the click to the new version on the computer measured. Elsewhere, or from a clone, the page says how to update. Turned off in Settings, with `--no-update-check` or `SOTTOVOCE_NO_UPDATE_CHECK=1`.
+- **Signed updates.** Each release carries `latest.json` and its Ed25519 signature; the public key is in `updates.py`, the private one never goes to GitHub. An unsigned manifest is ignored; a setup that isn't the signed one is deleted, never run. `installer/sign_release.py` makes the key and signs a release. `cryptography` (Apache-2.0 or BSD) checks the signature.
+
+### Fixed
+
+- The Windows setup copies every module of the program (`*.py`), instead of a list of names a new module could be left out of.
+
+
 ## [1.8.0] - 2026-10-24
 
 Sottovoce runs on the computer you have, not only on an NVIDIA card; a Windows setup to double-click; and summaries from a model you already have in LM Studio or Ollama.
