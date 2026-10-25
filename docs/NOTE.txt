@@ -1,0 +1,9 @@
+Nome dispositivo	ET
+Processore	12th Gen Intel(R) Core(TM) i7-1255U (2.60 GHz)
+RAM installata	16,0 GB (15,8 GB utilizzabile)
+Scheda grafica	Intel(R) Iris(R) Xe Graphics (128 MB)
+Archiviazione	391 GB di 477 GB utilizzati
+ID dispositivo	1F3DF261-B360-49DB-9EDA-7BA2F68F11D9
+ID prodotto	00356-06296-36305-AAOEM
+Tipo sistema	Sistema operativo a 64 bit, processore basato su x64
+Penna e tocco	Supporto input penna e tocco con 10 punti tocco

@@ -909,6 +909,7 @@ const IT = {
 
   // notes and the follow-up email
   'Notes': 'Appunti', "summary and transcript, for the client's folder": 'riassunto e trascrizione, per la cartella del cliente',
+  'Word': 'Word', 'the same notes, ready to print or send': 'gli stessi appunti, pronti da stampare o mandare',
   'Follow-up email': 'Email di follow-up', 'Email': 'Email', 'Share': 'Condividi', 'Write it again': 'Riscrivila',
   'Write the follow-up': 'Scrivi il follow-up', 'Changes saved.': 'Modifiche salvate.',
   'the model is writing the email…': "il modello sta scrivendo l'email…",
@@ -2487,6 +2488,11 @@ function downloadMenu(l){
   notes.innerHTML = 'Notes<span>summary and transcript, for the client\'s folder</span>';
   notes.onclick = () => m.removeAttribute('open');
   list.append(notes);
+  const docx = el('a');
+  docx.href = base + '.docx';
+  docx.innerHTML = 'Word<span>the same notes, ready to print or send</span>';
+  docx.onclick = () => m.removeAttribute('open');
+  list.append(docx);
   for (const [fmt, what] of [['md', 'to read, in paragraphs'], ['txt', 'line by line, timestamps'],
                              ['srt', 'subtitles'], ['vtt', 'subtitles for the web'],
                              ['json', 'lines and word timings']]){

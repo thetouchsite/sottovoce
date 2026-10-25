@@ -144,10 +144,11 @@ def test_search_and_jump(page):
 
 
 def test_download_menu_offers_every_format(page):
+    # Word, the notes set for printing, included
     open_call(page, SUPPLIER)
     page.locator(".menu:not(.more) summary").click()
     links = page.locator(".menu-list a").evaluate_all("a => a.map(x => x.getAttribute('href'))")
-    assert [h.rsplit(".", 1)[1] for h in links] == ["notes", "md", "txt", "srt", "vtt", "json"]
+    assert [h.rsplit(".", 1)[1] for h in links] == ["notes", "docx", "md", "txt", "srt", "vtt", "json"]
 
 
 def test_glossary_view(page):
