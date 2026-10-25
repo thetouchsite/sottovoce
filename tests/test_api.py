@@ -576,3 +576,20 @@ def test_the_status_says_whether_whisper_is_on_disk(client, monkeypatch):
 def test_the_page_is_checked_again_at_every_load(client):
     # After an update, the window showed the page it had cached from before.
     assert client.get("/").headers["cache-control"] == "no-cache"
+
+
+def test_the_notes_as_a_word_document(client):
+    import io
+    from docx import Document
+    r = client.get(f"/api/history/{NORTHPINE}/download.docx")
+    assert r.status_code == 200
+    assert r.headers["content-type"].startswith("application/vnd.openxmlformats-officedocument.wordprocessingml")
+    assert "notes.docx" in r.headers["content-disposition"]
+    doc = Document(io.BytesIO(r.content))
+    text = [p.text for p in doc.paragraphs]
+    assert text[0] == "Northpine launch sync"
+    assert {"People", "Summary", "Transcript"} <= set(text)
+    first = next(p for p in doc.paragraphs if p.text.startswith("00:00"))
+    assert [r.text for r in first.runs if r.bold] == ["   Voice 1"]                # the speaker in bold
+    assert "page" in doc.sections[0].footer.paragraphs[0].text
+    assert client.get("/api/history/nothing-here/download.docx").status_code == 404
