@@ -23,6 +23,9 @@ pystray>=0.19; sys_platform == "win32"
 # what the computer plays, through WASAPI.
 soundcard>=0.4.6; sys_platform == "win32"
 
+# Checking the signature of an update before installing it (updates.py).
+cryptography>=43
+
 # Whisper on an Intel GPU or on the processor (transcribe.py, "where Whisper
 # runs"): on a processor about five times faster than PyTorch. It brings
 # openvino-telemetry along, which only OpenVINO's model converter (ovc) uses;

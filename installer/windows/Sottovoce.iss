@@ -112,12 +112,8 @@ Name: "desktop"; Description: "{cm:Desktop}"; GroupDescription: "{cm:Shortcuts}"
 
 [Files]
 ; The program: the code next to its .venv, as the one-command install lays it out.
-Source: "{#Root}\server.py"; DestDir: "{app}\app"; Flags: ignoreversion
-Source: "{#Root}\desktop.py"; DestDir: "{app}\app"; Flags: ignoreversion
-Source: "{#Root}\transcribe.py"; DestDir: "{app}\app"; Flags: ignoreversion
-Source: "{#Root}\summary.py"; DestDir: "{app}\app"; Flags: ignoreversion
-Source: "{#Root}\voices.py"; DestDir: "{app}\app"; Flags: ignoreversion
-Source: "{#Root}\recorder.py"; DestDir: "{app}\app"; Flags: ignoreversion
+; Every module at the top of the repository: a list by name once left one out.
+Source: "{#Root}\*.py"; DestDir: "{app}\app"; Flags: ignoreversion
 Source: "{#Root}\requirements.txt"; DestDir: "{app}\app"; Flags: ignoreversion
 Source: "{#Root}\glossary.example.txt"; DestDir: "{app}\app"; Flags: ignoreversion
 Source: "{#Root}\app\*"; DestDir: "{app}\app\app"; Flags: ignoreversion recursesubdirs createallsubdirs
@@ -145,6 +141,10 @@ Name: "{autodesktop}\Sottovoce"; Filename: "{app}\app\.venv\Scripts\pythonw.exe"
 
 [Run]
 Filename: "{app}\app\.venv\Scripts\pythonw.exe"; Parameters: """{app}\app\desktop.py"" --data ""{code:DataDir}\transcripts"" --glossary ""{code:DataDir}\glossary.txt"" --log ""{app}\sottovoce.log"""; WorkingDir: "{app}\app"; Description: "{cm:Launch}"; Flags: nowait postinstall skipifsilent; Check: Prepared
+; An update installed by Sottovoce itself (updates.py) runs this setup
+; silently with /RELAUNCH=1: Sottovoce starts again by itself afterwards. postinstall:
+; run at the end, after prepare.ps1, as postinstall entries are in silent mode.
+Filename: "{app}\app\.venv\Scripts\pythonw.exe"; Parameters: """{app}\app\desktop.py"" --data ""{code:DataDir}\transcripts"" --glossary ""{code:DataDir}\glossary.txt"" --log ""{app}\sottovoce.log"""; WorkingDir: "{app}\app"; Flags: nowait postinstall; Check: Relaunch
 
 [UninstallDelete]
 ; Everything the program folder gained after the copy: Python, .venv, the
@@ -168,6 +168,11 @@ end;
 function Prepared(): Boolean;
 begin
   Result := PrepareDone;
+end;
+
+function Relaunch(): Boolean;
+begin
+  Result := PrepareDone and WizardSilent and (ExpandConstant('{param:RELAUNCH|0}') = '1');
 end;
 
 // The one-command install wrote its own entry in Settings > Apps: this setup

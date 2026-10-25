@@ -74,8 +74,9 @@ from fastapi.responses import (FileResponse, HTMLResponse, JSONResponse, PlainTe
 import recorder
 import summary as S
 import transcribe as T
+import updates as U
 
-VERSION = "1.8.0"
+VERSION = "1.9.0"
 ROOT = pathlib.Path(__file__).resolve().parent
 DATA = ROOT / "transcripts"            # set again by start() from --data
 INCOMING = DATA / "_incoming"
@@ -1503,11 +1504,12 @@ def load_settings():
                        if isinstance(v, (int, float)) and v > 0})
     llm = s.get("llm") or {}
     S.choice.update(program=llm.get("program"), model=llm.get("model"))
+    update_prefs["check"] = (s.get("updates") or {}).get("check", True) is not False
 
 
 def save_settings(**more):
     data = {**read_settings(), **more, "engine": dict(T.chosen), "speeds": dict(T.measured),
-            "llm": dict(S.choice)}
+            "llm": dict(S.choice), "updates": dict(update_prefs)}
     tmp = settings_file().with_suffix(".tmp")
     tmp.write_text(json.dumps(data, indent=1), encoding="utf-8")
     os.replace(tmp, settings_file())
@@ -1652,6 +1654,102 @@ def api_llm_choice(body: dict):
     S.choice.update(program=program, model=m if program in ("LM Studio", "Ollama") else None)
     save_settings()
     return {"choice": dict(S.choice)}
+
+
+# --- updates ----------------------------------------------------------------------
+# See updates.py: one signed manifest asked of GitHub at start and once a day,
+# the setup run silently once Sottovoce has quit, never during a call.
+
+update_prefs = {"check": True}       # Settings; also off with --no-update-check
+update_off = False                   # --no-update-check or SOTTOVOCE_NO_UPDATE_CHECK
+update = {"state": "idle", "available": None, "checked_at": None, "error": None, "done": 0, "total": 0}
+
+
+def checks_updates() -> bool:
+    return update_prefs["check"] and not update_off
+
+
+def check_updates():
+    r = U.check(VERSION)
+    update.update(available=r.get("available"), checked_at=r.get("checked_at"), error=r.get("error"))
+
+
+def updates_every_day():
+    shutil.rmtree(U.folder(), ignore_errors=True)       # a setup that has run: Sottovoce is running again
+    while True:
+        if checks_updates():
+            check_updates()
+        time.sleep(U.EVERY)
+
+
+def working() -> bool:
+    """A transcription, a recording or a measurement under way: not the moment to quit."""
+    return bool(line_up.qsize() or capture or measuring.get("state") == "running"
+                or any(j["state"] == "running" for j in list(jobs.values())))
+
+
+def install_update():
+    """Download, check, wait for quiet, then hand over to the setup and quit."""
+    try:
+        update.update(state="downloading", error=None, done=0, total=update["available"]["windows"].get("size") or 0)
+        setup = U.download(update["available"], lambda d, t: update.update(done=d, total=t))
+        update["state"] = "waiting"
+        while working():
+            time.sleep(5)
+        update["state"] = "installing"
+        U.install(setup)
+        time.sleep(0.5)
+        if quit_app is not None:
+            quit_app()
+        else:
+            import signal
+            os.kill(os.getpid(), signal.SIGTERM)
+    except Exception as e:
+        update.update(state="error", error=f"{type(e).__name__}: {e}")
+
+
+def update_view() -> dict:
+    return {**update, "current": VERSION, "check": update_prefs["check"], "off": update_off,
+            "installs": U.installed(), "how": None if U.installed() else U.how_to_update()}
+
+
+@app.get("/api/update")
+def api_update():
+    """Whether a newer Sottovoce is out, from the last check."""
+    return update_view()
+
+
+@app.post("/api/update")
+def api_update_set(body: dict):
+    """{"check": false} stops the daily question to GitHub; remembered."""
+    if "check" in body:
+        update_prefs["check"] = bool(body["check"])
+        save_settings()
+    return update_view()
+
+
+@app.post("/api/update/check")
+def api_update_check():
+    if update_off:
+        return JSONResponse({"error": "update checks are off (--no-update-check)"}, 409)
+    check_updates()
+    return update_view()
+
+
+@app.post("/api/update/install")
+def api_update_install(request: Request):
+    """Installs the update: from this computer only, and only one signed and newer."""
+    if (request.client.host if request.client else "") not in LOCAL:
+        return JSONResponse({"error": "updates are installed from the computer itself"}, 403)
+    if not update["available"]:
+        return JSONResponse({"error": "no update to install"}, 400)
+    if not U.installed():
+        return JSONResponse({"error": "this copy is not installed by the setup", "how": U.how_to_update()}, 400)
+    if update["state"] in ("downloading", "waiting", "installing"):
+        return update_view()
+    threading.Thread(target=install_update, daemon=True).start()
+    update["state"] = "downloading"
+    return update_view()
 
 
 # --- the summary --------------------------------------------------------------
@@ -1963,6 +2061,8 @@ def options(argv=None) -> argparse.Namespace:
     ap.add_argument("--lan", action="store_true",
                     help="reachable from other devices on your network, e.g. your phone, "
                          "with a PIN asked once per device")
+    ap.add_argument("--no-update-check", action="store_true",
+                    help="never ask GitHub whether a newer version is out")
     ap.add_argument("--pin", default=None,
                     help="the PIN for --lan (default: one made up the first time, then kept)")
     return ap.parse_args(argv)
@@ -1975,6 +2075,9 @@ def configure(args) -> str:
     # Browsing only means no GPU work at all: the built-in LLM stays off too.
     S.builtin_allowed = not (args.no_model or args.no_llm)
     start(args.data, args.glossary, model=not args.no_model)
+    global update_off
+    update_off = args.no_update_check or os.environ.get("SOTTOVOCE_NO_UPDATE_CHECK") == "1"
+    threading.Thread(target=updates_every_day, daemon=True).start()
     print(f"\n  Sottovoce {VERSION} on  http://127.0.0.1:{args.port}")
     print("  Whisper large-v3: on the fastest of " + ", ".join(T.PATHS.values()) + " this computer has")
     print(f"  transcripts in: {DATA}")

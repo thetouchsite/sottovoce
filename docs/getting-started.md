@@ -83,7 +83,9 @@ Your calls are not in *Documents* on purpose: on many Windows computers OneDrive
 
 ### Updating and removing
 
-**Update:** stop Sottovoce, then open the new setup, or run the same install command again. Only what changed is downloaded; your calls, the voice models and the PIN your phone knows stay.
+**Update:** on Windows, from 1.9.0 on, Sottovoce says when a new version is out, under the list of calls and in **Settings → Updates**. **Update now** downloads it, checks its signature, waits for any transcription or recording to end, closes, installs and opens again, in about a minute. Or stop Sottovoce and open the new setup, or run the same install command again. Only what changed is downloaded; your calls, the models, the settings and the PIN your phone knows stay.
+
+Sottovoce asks GitHub for the latest version at start and once a day; nothing else is sent. Turn it off in **Settings → Updates**, or start it with `--no-update-check` or `SOTTOVOCE_NO_UPDATE_CHECK=1`: then it never asks. An update is installed only if it carries TouchSite Software's signature ([how](https://github.com/thetouchsite/sottovoce/blob/main/SECURITY.md#updates)). From 1.8.0 or older, install 1.9.0 by hand once; the updates after it come by themselves.
 
 **Remove:** on Windows, **Settings → Apps → Sottovoce → Uninstall**; on Linux and macOS, run `uninstall.sh` in the program folder. It removes the program, the shortcuts and the start with Windows, then asks whether to delete your calls too, and the models Sottovoce downloaded (only those, not the rest of the cache). No keeps them. Yes to both leaves the computer as it was.
 

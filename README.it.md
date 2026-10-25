@@ -85,7 +85,7 @@ Sottovoce è fatto per le call di lavoro: registrate prima o registrate qui, let
 ## Domande frequenti
 
 **Esce qualcosa dal mio computer?**
-No. Trascrizione, separazione delle voci e riassunti girano in locale, e la pagina non carica niente da internet. I modelli si scaricano una volta, al primo uso, da Hugging Face e GitHub. Vedi [SECURITY.md](SECURITY.md).
+No. Trascrizione, separazione delle voci e riassunti girano in locale, e la pagina non carica niente da internet. I modelli si scaricano una volta, al primo uso, da Hugging Face e GitHub. Una volta al giorno Sottovoce chiede a GitHub se è uscita una versione nuova, e nient'altro; si può spegnere. Vedi [SECURITY.md](SECURITY.md).
 
 **Che GPU serve?**
 Nessuna è obbligatoria. Whisper large-v3 gira su una scheda NVIDIA (PyTorch), su una GPU Intel, Arc o dentro il processore, o sul solo processore, Intel o AMD (entrambi con OpenVINO), con la stessa precisione. Sul portatile misurato, un'ora di call ha richiesto circa 6 minuti sulla GPU Intel, 8 sulla scheda RTX e 12 sul processore ([dove gira](docs/benchmarks.md#where-it-runs)); un computer più piccolo è più lento, e la pagina mostra quanto ci mette sul tuo. Il modello incorporato per i riassunti chiede una scheda NVIDIA con circa 8 GB liberi; senza, scegli un modello che hai in LM Studio od Ollama.

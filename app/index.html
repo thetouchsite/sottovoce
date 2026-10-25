@@ -113,6 +113,13 @@
   .list{overflow-y:auto;min-height:0;padding:0 8px 16px}
   .sidebar-foot{padding:8px 16px 14px;border-top:1px solid var(--rule)}
   .sidebar-foot:has(button[hidden]){display:none}
+  /* A newer Sottovoce: under the list, out of the way, on every view. */
+  .update-note{margin:0 12px 10px;padding:12px 14px;border-radius:8px;border:1px solid var(--accent);
+    display:grid;gap:6px;justify-items:start}
+  .update-note[hidden]{display:none}
+  .update-note b{font-weight:500;font-size:14px}
+  .update-note p{margin:0;color:var(--muted);font-size:var(--fs-small);line-height:1.5}
+  .update-note code{font-size:11px;word-break:break-all;color:var(--text)}
   .item{display:block;width:100%;text-align:left;padding:9px 8px;
     border-radius:var(--radius-card);position:relative;line-height:1.35}
   .item:hover{background:var(--surface)}
@@ -645,6 +652,7 @@
     <input type="search" id="search" placeholder="Search every call">
   </div>
   <div class="list" id="list"></div>
+  <div class="update-note" id="update-note" hidden></div>
   <div class="sidebar-foot">
     <button class="text-button" id="open-folder" type="button" hidden>Open the folder of the calls</button>
   </div>
@@ -743,6 +751,24 @@ const IT = {
   'Not running: started when a summary is asked. Your models:': 'Spento: si avvia quando chiedi un riassunto. I tuoi modelli:',
   'a transcription is running: wait for it to finish': 'una trascrizione è in corso: aspetta che finisca',
   'no transcribed call to measure on yet': 'ancora nessuna call trascritta su cui misurare',
+  // updates
+  'Updates': 'Aggiornamenti', 'Update now': 'Aggiorna ora', 'Check now': 'Controlla ora',
+  'Check for updates': 'Controlla gli aggiornamenti', 'To update:': 'Per aggiornare:',
+  'downloading the update': "scarico l'aggiornamento",
+  'Downloaded: it installs when the transcription or the recording ends.':
+    'Scaricato: si installa quando finisce la trascrizione o la registrazione.',
+  'Installing: Sottovoce closes and opens again by itself.': 'Installo: Sottovoce si chiude e si riapre da solo.',
+  'Off: Sottovoce was started with --no-update-check.': 'Spento: Sottovoce è stato avviato con --no-update-check.',
+  'Once a day Sottovoce asks GitHub whether a newer version is out. Nothing else is sent: no calls, nothing about this computer. An update is installed only if it carries TouchSite Software’s signature.':
+    'Una volta al giorno Sottovoce chiede a GitHub se è uscita una versione nuova. Non manda altro: nessuna call, niente su questo computer. Un aggiornamento si installa solo se porta la firma di TouchSite Software.',
+  'Sottovoce downloads the update, closes, installs it and opens again. Your calls, models and settings stay. Update now?':
+    "Sottovoce scarica l'aggiornamento, si chiude, lo installa e si riapre. Call, modelli e impostazioni restano. Aggiornare adesso?",
+  'updates are installed from the computer itself': 'gli aggiornamenti si installano dal computer stesso',
+  'no update to install': 'nessun aggiornamento da installare',
+  'this copy is not installed by the setup': "questa copia non è installata con l'installazione",
+  'update checks are off (--no-update-check)': 'il controllo degli aggiornamenti è spento (--no-update-check)',
+  "the update's signature does not verify: ignored": "la firma dell'aggiornamento non torna: ignorato",
+  'the downloaded setup is not the one that was signed: deleted': "l'installazione scaricata non è quella firmata: cancellata",
   'browsing only, Whisper not loaded': 'solo consultazione, Whisper non caricato', 'No calls yet.': 'Ancora nessuna call.',
   'Where you are': 'Dove sei', 'Back to the start (Esc)': "Torna all'inizio (Esc)", 'Sottovoce': 'Sottovoce',
   'adding…': 'aggiungo…',
@@ -1008,6 +1034,12 @@ const IT_RULES = [
   [/^loading the model on the (.+)…$/, (_, p) => 'carico il modello sulla ' + p + '…'],
   [/^transcribing on the (.+)…$/, (_, p) => 'trascrivo sulla ' + p + '…'],
   [/^Built in: (.+)$/, (_, m) => 'Integrato: ' + m],
+  [/^Sottovoce ([\d.]+) is out$/, (_, v) => 'È uscito Sottovoce ' + v],
+  [/^This is Sottovoce ([\d.]+)\. Sottovoce ([\d.]+) is out\.$/, (_, a, b) => 'Questo è Sottovoce ' + a + '. È uscito Sottovoce ' + b + '.'],
+  [/^This is Sottovoce ([\d.]+)\. It is the latest\.$/, (_, a) => 'Questo è Sottovoce ' + a + '. È la versione più recente.'],
+  [/^This is Sottovoce ([\d.]+)\.$/, (_, a) => 'Questo è Sottovoce ' + a + '.'],
+  [/^The update stopped: (.+)$/, (_, e) => "L'aggiornamento si è fermato: " + (translated(e) || e)],
+  [/^The last check failed: (.+)$/, (_, e) => "L'ultimo controllo non è riuscito: " + (translated(e) || e)],
   [/^Installed, with no models: download one in (.+) first\.$/, (_, p) => 'Installato, senza modelli: scaricane prima uno in ' + p + '.'],
   [/^(LM Studio|Ollama) model$/, (_, p) => 'Modello di ' + p],
 ];
@@ -3556,6 +3588,7 @@ async function showSettings(){
   lp.append(Object.assign(el('p', 'quiet'), {textContent: 'looking for LM Studio and Ollama…'}));
   d.append(lp);
   drawLLM(lp);
+  d.append(updatePanel());
 }
 
 function enginePanel(e){
@@ -3713,6 +3746,128 @@ async function drawLLM(p){
   p.append(c);
 }
 
+/* ============================== updates ================================= */
+// A newer Sottovoce, from the server's daily check of its signed manifest:
+// a note under the list of calls, and the choices in Settings.
+
+let upd = null, updTimer = null;
+const UPDATING = ['downloading', 'waiting', 'installing'];
+
+async function checkUpdate(){
+  clearTimeout(updTimer);
+  try{ upd = await (await fetch('/api/update')).json(); } catch(e){ upd = null; }
+  drawUpdateNote();
+  const p = $('#update-panel');
+  if (p && view === 'settings') p.replaceWith(updatePanel());
+  updTimer = setTimeout(checkUpdate, upd && UPDATING.includes(upd.state) ? 1000 : 60000);
+}
+
+function updateStateText(u){
+  if (u.state === 'downloading')
+    return 'downloading the update' + (u.total ? ' · ' + Math.round(100 * u.done / u.total) + '%' : '…');
+  if (u.state === 'waiting') return 'Downloaded: it installs when the transcription or the recording ends.';
+  if (u.state === 'installing') return 'Installing: Sottovoce closes and opens again by itself.';
+  if (u.state === 'error') return 'The update stopped: ' + u.error;
+  return '';
+}
+
+function drawUpdateNote(){
+  const n = $('#update-note');
+  const a = upd && upd.available;
+  n.hidden = !a;
+  if (!a) return;
+  n.textContent = '';
+  const b = el('b');
+  b.textContent = 'Sottovoce ' + a.version + ' is out';
+  const notes = el('p', 'data');
+  notes.textContent = a.notes && a.notes.length > 180 ? a.notes.slice(0, 177).trim() + '…' : (a.notes || '');
+  n.append(b, notes);
+  if (UPDATING.includes(upd.state) || upd.state === 'error'){
+    const s = el('p', 'state');
+    s.textContent = updateStateText(upd);
+    n.append(s);
+    if (upd.state !== 'error') return;
+  }
+  if (upd.installs){
+    const go = el('button', 'secondary');
+    go.type = 'button';
+    go.textContent = 'Update now';
+    go.onclick = installUpdate;
+    n.append(go);
+  } else {
+    const s = el('p', 'state');
+    s.textContent = 'To update:';
+    const c = el('code', 'data');
+    c.textContent = upd.how;
+    n.append(s, c);
+  }
+}
+
+async function installUpdate(){
+  if (!confirm(T('Sottovoce downloads the update, closes, installs it and opens again. Your calls, models and settings stay. Update now?')))
+    return;
+  try{ await postJSON('/api/update/install'); } catch(x){ alert(T(x.message)); }
+  checkUpdate();
+}
+
+function updatePanel(){
+  const p = panel('Updates');
+  p.id = 'update-panel';
+  const c = el('div', 'content');
+  const u = upd || {};
+  const intro = el('p', 'finding');
+  intro.textContent = 'This is Sottovoce ' + (u.current || '') + '. '
+    + (u.available ? 'Sottovoce ' + u.available.version + ' is out.'
+       : u.checked_at && !u.error ? 'It is the latest.' : '');
+  c.append(intro);
+  const t = el('label', 'option' + (u.check && !u.off ? ' on' : '') + (u.off ? ' off' : ''));
+  t.style.marginTop = '16px';
+  const s = el('input', 'switch');
+  s.type = 'checkbox';
+  s.setAttribute('role', 'switch');
+  s.checked = !!u.check && !u.off;
+  s.disabled = !!u.off;
+  s.onchange = async () => {
+    try{ await postJSON('/api/update', {check: s.checked}); } catch(x){ alert(T(x.message)); }
+    if (s.checked) try{ await postJSON('/api/update/check'); } catch(x){}
+    checkUpdate();
+  };
+  const tt = el('div');
+  tt.innerHTML = '<b>' + esc('Check for updates') + '</b><small>'
+    + esc(u.off ? 'Off: Sottovoce was started with --no-update-check.'
+        : 'Once a day Sottovoce asks GitHub whether a newer version is out. Nothing else is sent: no calls, nothing about this computer. An update is installed only if it carries TouchSite Software’s signature.')
+    + '</small>';
+  t.append(s, tt);
+  c.append(t);
+  const row = el('div', 'measure');
+  if (UPDATING.includes(u.state) || u.state === 'error' || u.error){
+    const st = el('p', 'finding');
+    st.textContent = u.state === 'idle' ? 'The last check failed: ' + u.error : updateStateText(u);
+    row.append(st);
+  }
+  if (!u.off){
+    const b = el('button', 'secondary');
+    b.type = 'button';
+    b.textContent = 'Check now';
+    b.onclick = async () => {
+      b.disabled = true;
+      try{ await postJSON('/api/update/check'); } catch(x){ alert(T(x.message)); }
+      checkUpdate();
+    };
+    row.append(b);
+  }
+  if (u.available && u.installs && !UPDATING.includes(u.state)){
+    const go = el('button', 'primary');
+    go.type = 'button';
+    go.textContent = 'Update now';
+    go.onclick = installUpdate;
+    row.append(go);
+  }
+  c.append(row);
+  p.append(c);
+  return p;
+}
+
 /* ============================== wiring ================================== */
 
 $('#v-home').onclick = showHome;
@@ -3796,5 +3951,6 @@ checkLLM();
 loadCalls();
 checkCapture();
 keepUp();
+checkUpdate();
 </script>
 </html>

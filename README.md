@@ -85,7 +85,7 @@ Sottovoce is built for business calls: recorded or recorded here, read and corre
 ## FAQ
 
 **Does anything leave my computer?**
-No. Transcription, voice separation and summaries run locally, and the page loads nothing from the internet. Models are downloaded once, on first use, from Hugging Face and GitHub. See [SECURITY.md](SECURITY.md).
+No. Transcription, voice separation and summaries run locally, and the page loads nothing from the internet. Models are downloaded once, on first use, from Hugging Face and GitHub. Once a day Sottovoce asks GitHub whether a newer version is out, and nothing else; you can turn that off. See [SECURITY.md](SECURITY.md).
 
 **Which GPU do I need?**
 None is required. Whisper large-v3 runs on an NVIDIA card (PyTorch), on an Intel GPU, Arc or built into the processor, or on the processor alone, Intel or AMD (both through OpenVINO), with the same accuracy. On the laptop measured, an hour of call took about 6 minutes on its Intel GPU, 8 on its RTX card and 12 on its processor ([where it runs](docs/benchmarks.md#where-it-runs)); a smaller computer is slower, and the page shows how long it takes on yours. The built-in summary model needs an NVIDIA card with about 8 GB free; without one, pick a model you have in LM Studio or Ollama.
