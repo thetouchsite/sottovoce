@@ -22,3 +22,7 @@ pytest>=8
 scipy>=1.10
 # The icon with a red dot while recording (desktop.recording_icon)
 pillow>=10
+# The notes as a Word document (word.py)
+python-docx>=1.1
+# Checking the signature of an update (updates.py)
+cryptography>=43

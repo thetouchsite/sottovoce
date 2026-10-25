@@ -8,6 +8,8 @@ It is built on the work of others. Installed with it, or downloaded on first use
   Transformers              Hugging Face             Apache-2.0
   OpenVINO, OpenVINO GenAI  Intel                    Apache-2.0
   FastAPI, Uvicorn          their authors            MIT, BSD-3-Clause
+  python-docx               Steve Canny and contributors   MIT
+  cryptography              the Python Cryptographic Authority   Apache-2.0 or BSD-3-Clause
   pywebview                 Roman Sirokov and contributors   BSD-3-Clause
   pystray                   Moses Palmér             LGPL-3.0
   soundcard                 Bastian Bechtold         BSD-3-Clause

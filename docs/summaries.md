@@ -6,7 +6,7 @@ The **Summary** tab of a call asks a local LLM for a few lines of synthesis, the
 
 ## Notes, for the client's folder
 
-**Download → Notes** gives one Markdown file to keep with a client's documents: date, length, who took part and how long each talked, the summary, then the whole transcript with names and minutes. Its headings are in the language of the call (*Appunti, Partecipanti, Trascrizione* for an Italian call). It is meant to sit next to the client's other documents, and to be read by whoever, or whatever assistant, works on that client next.
+**Download → Notes** gives one Markdown file, and **Download → Word** the same as a Word document, set for printing or sending, to keep with a client's documents: date, length, who took part and how long each talked, the summary, then the whole transcript with names and minutes. Its headings are in the language of the call (*Appunti, Partecipanti, Trascrizione* for an Italian call). It is meant to sit next to the client's other documents, and to be read by whoever, or whatever assistant, works on that client next.
 
 ## The follow-up email
 

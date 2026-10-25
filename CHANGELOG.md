@@ -4,6 +4,15 @@ What changed in each release, newest first. The format follows [Keep a Changelog
 
 ## [Unreleased]
 
+## [1.9.1] - 2026-10-25
+
+The notes of a call as a Word document.
+
+### Added
+
+- **Download → Word**: the notes of a call as a `.docx`, ready to print or send. The same as **Notes**: the title, date, length and language; who took part and how long each talked; the summary with its headings and lists; the follow-up email if there is one; the whole transcript, the minute in grey and the speaker in bold; the page number at the foot. In the language of the call, which is also the language Word checks the spelling in. Written by python-docx (MIT).
+
+
 ## [1.9.0] - 2026-10-25
 
 Sottovoce updates itself, and installs only what TouchSite Software signed.

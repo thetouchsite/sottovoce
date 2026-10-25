@@ -76,7 +76,7 @@ import summary as S
 import transcribe as T
 import updates as U
 
-VERSION = "1.9.0"
+VERSION = "1.9.1"
 ROOT = pathlib.Path(__file__).resolve().parent
 DATA = ROOT / "transcripts"            # set again by start() from --data
 INCOMING = DATA / "_incoming"
@@ -1129,52 +1129,63 @@ def api_open(name: str):
             "speech": speech_of(d, data, audio)}
 
 
-def notes(d: pathlib.Path, info: dict, stem: str, segments) -> tuple[str, str]:
-    """The notes of a call, as one Markdown file for the client's folder.
+def notes_parts(d: pathlib.Path, info: dict, stem: str, segments) -> dict:
+    """What the notes of a call say, before they are Markdown or Word.
 
-    Who, when and how long; the summary, if there is one; then the whole
-    transcript with names and minutes. Written in the language of the call:
-    a file meant to sit next to the client's other documents, and to be read
-    by whoever (or whatever) works on that client next.
+    Who, when and how long; the summary and the follow-up email, if there are
+    any; then the whole transcript with names and minutes. In the language of
+    the call: meant to sit next to the client's other documents, and to be
+    read by whoever (or whatever) works on that client next.
     """
     it = info.get("language") == "it"
     t = (lambda i, e: i if it else e)
     names = info.get("speaker_names") or {}
-    title = info.get("title") or stem
     day = d.name.split("_", 1)[0] if "_" in d.name else ""
-    out = [f"# {title}", ""]
     facts = [f"{t('Data', 'Date')}: {day}" if day else None,
              f"{t('Durata', 'Duration')}: {T.mmss(info.get('duration_s') or 0)}",
              f"{t('Lingua', 'Language')}: {info.get('language') or '?'}"]
-    out.append(" · ".join(x for x in facts if x))
-    people = speakers_of(segments, names)
-    if people:
-        def label(x):
-            if x["name"]:
-                return x["name"] + (t(" (io)", " (me)") if x["tag"] == "Me" else "")
-            return {"Me": t("Io", "Me"), "Them": t("Loro", "Them")}.get(x["tag"], x["tag"])
-        out.append(f"{t('Partecipanti', 'People')}: "
-                   + ", ".join(f"{label(x)} ({T.mmss(x['seconds'])})" for x in people))
+
+    def label(x):
+        if x["name"]:
+            return x["name"] + (t(" (io)", " (me)") if x["tag"] == "Me" else "")
+        return {"Me": t("Io", "Me"), "Them": t("Loro", "Them")}.get(x["tag"], x["tag"])
+    summary_md, followup_md = d / "summary.md", d / "followup.md"
+    return {
+        "it": it, "language": info.get("language"), "title": info.get("title") or stem,
+        "facts": [x for x in facts if x],
+        "people": [(label(x), T.mmss(x["seconds"])) for x in speakers_of(segments, names)],
+        "summary": summary_md.read_text(encoding="utf-8").strip() if summary_md.exists() else None,
+        "followup": followup_md.read_text(encoding="utf-8").strip() if followup_md.exists() else None,
+        "paragraphs": [(T.mmss(p["start"]), T.who(p, names) if p.get("speaker") else None, p["text"])
+                       for p in T.paragraphs(segments)],
+        "word": t("appunti", "notes"),
+    }
+
+
+def notes(d: pathlib.Path, info: dict, stem: str, segments) -> tuple[str, str]:
+    """The notes as one Markdown file for the client's folder (notes_parts)."""
+    n = notes_parts(d, info, stem, segments)
+    t = (lambda i, e: i if n["it"] else e)
+    out = [f"# {n['title']}", "", " · ".join(n["facts"])]
+    if n["people"]:
+        out.append(f"{t('Partecipanti', 'People')}: " + ", ".join(f"{a} ({b})" for a, b in n["people"]))
     out += ["", f"## {t('Riassunto', 'Summary')}", ""]
-    summary_md = d / "summary.md"
-    if summary_md.exists():
+    if n["summary"]:
         # one level down, under this file's own title
-        body = re.sub(r"^(#{1,5}) ", lambda m: "#" + m[1] + " ",
-                      summary_md.read_text(encoding="utf-8").strip(), flags=re.M)
-        out.append(body)
+        out.append(re.sub(r"^(#{1,5}) ", lambda m: "#" + m[1] + " ", n["summary"], flags=re.M))
     else:
         out.append(t("_Nessun riassunto: si può chiedere dalla pagina della call._",
                      "_No summary yet: it can be asked for on the call's page._"))
     out += ["", f"## {t('Trascrizione', 'Transcript')}", ""]
-    for p in T.paragraphs(segments):
-        by = f" · {T.who(p, names)}" if p.get("speaker") else ""
-        out.append(f"**{T.mmss(p['start'])}{by}** — {p['text']}\n")
-    return "\n".join(out).rstrip() + "\n", t("appunti", "notes")
+    for minute, who, text in n["paragraphs"]:
+        out.append(f"**{minute}{f' · {who}' if who else ''}** — {text}\n")
+    return "\n".join(out).rstrip() + "\n", n["word"]
 
 
 @app.get("/api/history/{name}/download.{fmt}")
 def api_download(name: str, fmt: str):
-    """The transcript as .txt, .md, .srt, .vtt or .json.
+    """The transcript as .txt, .md, .srt, .vtt or .json; the notes as .notes
+    (Markdown) or .docx (Word).
 
     txt and md are the files in the folder. The others are written on the fly
     from the .txt and the word timings, so they always match the corrections.
@@ -1190,6 +1201,18 @@ def api_download(name: str, fmt: str):
         body, word = notes(d, info, txt.stem, segments)
         filename = f"{txt.stem} - {word}.md"
         return Response(body, media_type="text/markdown; charset=utf-8",
+                        headers={"Content-Disposition": "attachment; filename*=UTF-8''"
+                                 + urllib.parse.quote(filename)})
+    if fmt == "docx" and d.is_dir() and (d / "info.json").exists():
+        import word
+        info = read_info(d)
+        txt, segments = read_call(d, info.get("duration_s"))
+        if txt is None:
+            return JSONResponse({"error": "not found"}, 404)
+        parts = notes_parts(d, info, txt.stem, segments)
+        filename = f"{txt.stem} - {parts['word']}.docx"
+        return Response(word.document(parts),
+                        media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
                         headers={"Content-Disposition": "attachment; filename*=UTF-8''"
                                  + urllib.parse.quote(filename)})
     if fmt not in T.FORMATS or not d.is_dir():
