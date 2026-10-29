@@ -20,6 +20,7 @@ What Sottovoce doesn't do, or doesn't do well yet. Most of these are on the [roa
 ## Who spoke
 
 - **On two-track calls**, about 19 words in 20 go to the right person on [real microphones](benchmarks.md#two-track-calls). Fast, overlapping exchanges are where it errs most.
+- **If you never speak**, a microphone muted only in the meeting app still hears the room, and bits of lines go to *You*: on AMI meetings made that way, 62% to 70% of words on the right side instead of 95% to 97%. Turn on **I only listen**, or use **I didn't speak** on the call afterwards. Telling a far voice in the room from yours by the tracks' levels alone broke the calls where you do speak; it is on the [roadmap](https://github.com/thetouchsite/sottovoce/blob/main/ROADMAP.md).
 - **Telling voices apart** can merge two similar voices, give a short "yes" to the wrong person, and fold someone who talks for less than about 15 seconds into the nearest voice. The number of people can't be set by hand. See [Telling voices apart](voices.md#where-it-goes-wrong).
 
 ## The text

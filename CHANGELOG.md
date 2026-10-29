@@ -4,6 +4,23 @@ What changed in each release, newest first. The format follows [Keep a Changelog
 
 ## [Unreleased]
 
+## [1.9.2] - 2026-10-29
+
+Long calls no longer freeze the computer, and a call you only listened to goes all to the others.
+
+### Added
+
+- **I only listen**, under **Start recording**: for a course, a webinar or a meeting where you don't speak, every line goes to the people of the call. Muting the microphone in the meeting app doesn't stop Windows' microphone hearing the room, and a far voice took bits of lines to *You*.
+- **I didn't speak: all to the others**, in the **⋯** menu of a two-track call already transcribed: your lines go to the voices around them, word for word.
+- **Settings** asks whether a new version is out each time it opens.
+
+### Fixed
+
+- **Precise word timings** took tens of GB of RAM on a long call (49 GB on a 74-minute one) and froze the computer: transformers kept the attention weights of every window to the end. They are dropped as soon as the timings are out: 2.7 GB for the same call, and on the AMI meetings 5.9× real time instead of 0.7× ([measured](docs/benchmarks.md#long-calls-in-pieces)).
+- A call longer than six minutes goes to Whisper in pieces of about five, cut in pauses: the memory no longer grows with the length; 25.0% of words wrong on the AMI meetings, 25.4% whole.
+- An older Intel GPU (UHD, HD, Iris Plus) is no longer used by itself: preparing Whisper for a UHD 620 froze the computer and Sottovoce closed. Whisper runs on the processor; Arc and Iris Xe are used as before.
+- If a transcription on the Intel GPU fails, it is done again on the processor at once; if Sottovoce closes during one, the next start says so in **Settings → Transcription** and doesn't use that GPU by itself.
+
 ## [1.9.1] - 2026-10-25
 
 The notes of a call as a Word document.

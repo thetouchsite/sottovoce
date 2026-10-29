@@ -48,6 +48,14 @@ With the installer it's simpler: run the install command again, after updating t
 
 The installer does it in this order; so does *From a clone* in [Getting started](getting-started.md#install).
 
+## A long call freezes the computer
+
+Before 1.9.2, a call of an hour with **Precise word timings** on took tens of GB of RAM (49 GB measured on a 74-minute call) and froze the computer. Update: from 1.9.2 the same call takes 2.7 GB. On a computer without an NVIDIA card, an hour of call keeps the processor busy for the whole transcription: let it work, plugged in.
+
+## Sottovoce closed while transcribing on an Intel GPU
+
+An older Intel GPU (UHD, HD, Iris Plus) is not used by itself from 1.9.2: Whisper runs on the processor instead. If a transcription on the Intel GPU closes Sottovoce, the next start says so in **Settings → Transcription** (*failed here last time*) and uses the processor; you can still pick the GPU there by hand.
+
 ## The first transcription is slow
 
 The first transcription downloads Whisper large-v3 (2.9 GB for an NVIDIA card, 1.5 GB through OpenVINO), the first summary the built-in model (8 GB), the first voice separation two small models (32 MB). Each happens once, and the page shows it with a moving bar and the seconds counted. After a pause of ten minutes or more, Whisper is loaded again before transcribing: about ten seconds, shown as *loading the model*.

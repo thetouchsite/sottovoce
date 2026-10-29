@@ -14,6 +14,11 @@ faintly across the room. Two setups:
     headset     as recorded
     speakers    the right track also leaks into the left at -25 dB, as when
                 the call plays from loudspeakers instead of headphones
+    listening   you never speak (your microphone muted in the meeting app,
+                not in Windows): the left track is only the call coming back
+                from the loudspeakers, -30 dB and 40 ms late, over a faint
+                hiss. Every word is the others'. Found on a real call, where
+                bits of every line went to "You".
 
 and calls of 2, 3 and 4 people (the most talkative ones; "you" is the
 person who talks most).
@@ -111,6 +116,11 @@ def call(by_person, ref, n, setup):
     right = np.sum([by_person[p] for p in people[1:]], axis=0)
     if setup == "speakers":
         left = left + right * 10 ** (-25 / 20)
+    if setup == "listening":
+        late = int(0.04 * RATE)
+        echo = np.concatenate([np.zeros(late), right[:-late]]) * 10 ** (-30 / 20)
+        hiss = np.random.default_rng(0).normal(0, 10 ** (-70 / 20), len(right))
+        left = echo + hiss
     peak = max(np.abs(left).max(), np.abs(right).max()) or 1
     return left / peak * 0.9, right / peak * 0.9, you, people
 
@@ -186,13 +196,15 @@ def per_track(stereo, language):
 METHODS = {"current": current, "per_track": per_track}
 
 
-def grade(segments, ref, you, people):
+def grade(segments, ref, you, people, silent=False):
     def side(t):
         who = {s for a, b, s in ref if a <= t < b and s in people}
         others = {s for a, b, s in ref if a <= t < b and s not in people}
         if len(who) != 1 or others:
             return None
-        return "Me" if you in who else "Them"
+        if you in who:
+            return None if silent else "Me"     # not on either track when you never speak
+        return "Them"
     pairs = [(side((w[0] + w[1]) / 2), s.get("speaker")) for s in segments for w in s.get("words") or []]
     known = [(a, b) for a, b in pairs if a]
     # Words where nobody was speaking, give or take half a second: invented.
@@ -216,7 +228,7 @@ def main():
     by_person, ref = headsets(m)
     print(f"\n  {m}, {'tuning' if args.tune else 'held out'}, method: {args.method}\n")
     print("  people  setup      right side   words graded   words   invented   lines   seconds")
-    for setup in ("headset", "speakers"):
+    for setup in ("headset", "speakers", "listening"):
         for n in (2, 3, 4):
             left, right, you, people = call(by_person, ref, n, setup)
             with tempfile.TemporaryDirectory() as tmp:
@@ -225,7 +237,7 @@ def main():
                 t0 = time.time()
                 segments = METHODS[args.method](stereo, "en")
                 secs = time.time() - t0
-            acc, graded, words, lines, invented = grade(segments, ref, you, people)
+            acc, graded, words, lines, invented = grade(segments, ref, you, people, setup == "listening")
             print(f"  {n:>6}  {setup:9}  {acc:10.1%}   {graded:>12}   {words:>5}   {invented:>8}   "
                   f"{lines:>5}   {secs:7.0f}", flush=True)
     print()

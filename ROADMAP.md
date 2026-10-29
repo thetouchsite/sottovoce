@@ -97,6 +97,14 @@ And a rule learned the hard way, on another project: **never decide on a single 
 
 **Done when** words dropped on the long-pauses test fall to Whisper alone's (5 of 1,175) with no more words added, and FLEURS and AMI stay where they are.
 
-## Not planned: a signed `.exe`
+## 9. Tell a far voice in the room from yours
 
-A downloadable installer looks friendlier than a command, but unsigned it meets *"Windows protected your PC"*, and Smart App Control can block it outright. Signing costs about €105 a year (Microsoft Artifact Signing), or about $309 the first year for a certificate. The command needs neither, and updates in place. If a signed installer is ever worth its cost, uv and the same scripts would sit inside it.
+**Why.** On two tracks, a word is yours where your microphone stands above its own usual level. If you never speak, that usual level is the room, and a far voice in it (someone else, the television) takes bits of the call's lines: on AMI meetings made that way, 62% to 70% of words on the right side instead of 95% to 97% (`research/two_tracks.py`, the *listening* setup). Two rules on the tracks' levels were tried and dropped: they fixed this and broke the calls where you speak, down to 24%. Today **I only listen** and **I didn't speak** do it by hand.
+
+**How.** Not by loudness: by whether the microphone carries speech close to it, with a speech detector on the microphone's track, or Whisper's own confidence on it.
+
+**Done when** the *listening* setup reaches the others' 95% with the *headset* and *speakers* setups where they are.
+
+## Later: a signed setup
+
+`Sottovoce-Setup.exe` exists since 1.8.0, unsigned: the first install meets *"Windows protected your PC"*, and Smart App Control can block it. Updates installed by Sottovoce itself don't meet it. Signing costs about €105 a year (Microsoft Artifact Signing), or about $309 the first year for a certificate: worth it once the setup is downloaded by people who don't know where it comes from.

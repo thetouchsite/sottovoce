@@ -42,9 +42,24 @@ Four AMI test meetings, one from each series (`ES2004a`, `IS1009a`, `TS3003a`, `
 | --- | --- | --- | --- | --- | --- |
 | large-v3 | 30.3% | 4.3% | 23.7% | 2.3% | 10.7× real time |
 | turbo | 28.4% | 4.2% | 23.2% | 0.9% | 35.4× |
-| **Sottovoce** | **25.4%** | 4.0% | 20.5% | 0.9% | 7.7× |
+| **Sottovoce** | **25.0%** | 4.3% | 19.5% | 1.1% | 6.2× |
 
-Most errors are dropped words: in AMI four people talk over each other, and the reference has every word of every one of them, short *yeah*s included. Whisper writes one voice at a time. These figures are not comparable with leaderboards that cut AMI into single utterances first: here nobody has cut the meeting.
+Most errors are dropped words: in AMI four people talk over each other, and the reference has every word of every one of them, short *yeah*s included. Whisper writes one voice at a time. These figures are not comparable with leaderboards that cut AMI into single utterances first: here nobody has cut the meeting. Sottovoce gives Whisper a long meeting in pieces of about five minutes, as it does a call ([below](#long-calls-in-pieces)).
+
+### Long calls in pieces
+
+From 1.9.2 a call longer than six minutes goes to Whisper in pieces of about five, each cut in the middle of a pause. The same four AMI meetings, on the NVIDIA card, with `research/wer.py ami --configs sottovoce@cuda,sottovoce@cuda+whole,sottovoce@cuda+precise`:
+
+| | WER | Speed | Peak RAM |
+| --- | --- | --- | --- |
+| Whole (`+whole`, as before 1.9.2) | 25.4% | 6.7× real time | 4.3 GB |
+| **In pieces** | **25.0%** | 6.2× | 3.9 GB |
+| In pieces, precise word timings, as 1.9.1 kept them | 24.7% | 0.7× | 42.8 GB |
+| **In pieces, precise word timings** | **24.8%** | 5.9× | 3.9 GB |
+
+With precise word timings transformers copies all the attention weights of every 30-second window to the computer's memory, about 3 GB a window, and keeps them to the end, though only the timings computed from them are used. From 1.9.2 Sottovoce drops them as soon as the timings are out (`lean_timings` in `transcribe.py`): on five minutes of a real call, 40 GB as transformers keeps them, 2.6 GB dropped, the same 721 words at the same times.
+
+On a private 74-minute call with precise word timings, 1.9.1 reached 49 GB and froze the computer; 1.9.2 transcribes it in 935 seconds with a peak of 2.7 GB.
 
 ### Long pauses
 

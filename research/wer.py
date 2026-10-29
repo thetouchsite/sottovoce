@@ -164,20 +164,30 @@ def plain(model_id, wav, language):
     return words
 
 
+# What follows the path, in any order: +turbo (the turbo model), +precise
+# (precise word timings), +whole (the call given to Whisper whole, not in
+# pieces of transcribe.PIECE seconds).
+OPTIONS = ("+turbo", "+precise", "+whole")
+how = {"precise": False}
+
+
 def engine_config(config):
     """ "sottovoce@intel-gpu+turbo" -> ("intel-gpu", True); None if not the engine."""
     if not config.startswith("sottovoce"):
         return None
     rest = config[len("sottovoce"):]
-    turbo = rest.endswith("+turbo")
-    p = rest.removesuffix("+turbo").removeprefix("@")
+    turbo = "+turbo" in rest
+    p = rest
+    for o in OPTIONS:
+        p = p.replace(o, "")
+    p = p.removeprefix("@")
     if p and p not in T.PATHS:
         raise SystemExit(f"unknown path {p!r}: {', '.join(T.PATHS)}")
     return p, turbo
 
 
 def ours(wav, language):
-    r = T.run(wav, language)
+    r = T.run(wav, language, precise=how["precise"])
     return [w for s in r["segments"] for w in (s.get("words") or [])]
 
 
@@ -192,6 +202,8 @@ def load(config):
         if p and p not in T.found():
             raise SystemExit(f"{p} is not on this computer: {', '.join(T.found())}")
         T.choose(p, turbo)
+        how["precise"] = "+precise" in config
+        T.PIECES = "+whole" not in config
         T.engine()
     elif MODELS[config] not in _plain:
         _plain.clear()
@@ -240,9 +252,17 @@ def run_set(name, items, language, configs):
         s = score([i[1] for i in items], hyps, norm)
         results[c] = {**s, "seconds": round(secs), "audio_seconds": round(audio_s)}
         if engine_config(c):
-            results[c]["engine"] = T.key()
+            results[c]["engine"] = T.key(how["precise"])
+            # The most RAM this process has held so far: run one config per
+            # process to read it for that config alone.
+            try:
+                import psutil
+                results[c]["peak_ram_gb"] = round(psutil.Process().memory_info().peak_wset / 2 ** 30, 1)
+            except (ImportError, AttributeError):
+                pass
         print(f"  {c:10}  {s['wer']:6.1%}  {s['sub']:6.1%}  {s['del']:6.1%}  {s['ins']:6.1%}  "
-              f"{secs:9.0f}   {audio_s / secs:10.1f}", flush=True)
+              f"{secs:9.0f}   {audio_s / secs:10.1f}"
+              + (f"   peak RAM {results[c]['peak_ram_gb']} GB" if "peak_ram_gb" in results[c] else ""), flush=True)
     return results
 
 

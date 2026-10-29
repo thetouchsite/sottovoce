@@ -752,6 +752,13 @@ const IT = {
   'a transcription is running: wait for it to finish': 'una trascrizione è in corso: aspetta che finisca',
   'no transcribed call to measure on yet': 'ancora nessuna call trascritta su cui misurare',
   // updates
+  'I only listen': 'Ascolto soltanto',
+  'failed here last time: not used by itself': "l'ultima volta qui non ha funzionato: non si usa da solo",
+  'A course, a webinar: everything said goes to the others, whatever your microphone hears. Muting it in the meeting app does not stop it hearing the room.':
+    "Un corso, un webinar: tutto quello che si dice va agli altri, qualunque cosa senta il tuo microfono. Spegnerlo nell'app della riunione non gli impedisce di sentire la stanza.",
+  "I didn't speak: all to the others": 'Non ho parlato: tutto agli altri',
+  'Every line now given to you goes to the people of the call. The summary and the email are written again. Go ahead?':
+    'Ogni riga ora data a te passa alle persone della call. Riassunto ed email andranno riscritti. Procedere?',
   'Updates': 'Aggiornamenti', 'Update now': 'Aggiorna ora', 'Check now': 'Controlla ora',
   'Check for updates': 'Controlla gli aggiornamenti', 'To update:': 'Per aggiornare:',
   'downloading the update': "scarico l'aggiornamento",
@@ -2194,6 +2201,13 @@ function drawCaptureIdle(c){
   const f = el('div', 'field');
   f.innerHTML = '<label for="rec-name">Name of the call</label>'
     + '<input id="rec-name" placeholder="e.g. Weekly sync with Northpine">';
+  // Not remembered from one call to the next: left on, it would give your own
+  // words to the others in the next call you do speak in.
+  store.set('sottovoce-listen', '0');
+  const listen = optionTile('listen-toggle', 'I only listen',
+    'A course, a webinar: everything said goes to the others, whatever your microphone hears. '
+    + 'Muting it in the meeting app does not stop it hearing the room.', 'sottovoce-listen');
+  listen.style.marginTop = '14px';
   const foot = el('div', 'rec-foot');
   const b = el('button', 'primary');
   b.type = 'button';
@@ -2203,7 +2217,7 @@ function drawCaptureIdle(c){
   const note = el('p', 'rec-note');
   note.textContent = 'Your microphone and everything the computer plays are saved on two tracks, so the '
     + 'transcript says You and Them. Use headphones if you can, and tell the others you are recording.';
-  c.append(ol, f, foot, note);
+  c.append(ol, f, listen, foot, note);
 }
 
 async function startCapture(name, button){
@@ -2213,7 +2227,7 @@ async function startCapture(name, button){
   try{
     j = await (await fetch('/api/capture', {method:'POST', headers:{'Content-Type':'application/json'},
       body: JSON.stringify({name, language: currentLanguage(), precise: precise(),
-                            voices: voicesWanted()})})).json();
+                            voices: voicesWanted(), listen_only: store.get('sottovoce-listen') === '1'})})).json();
   } catch(e){ j = {error: 'the server did not answer'}; }
   if (j.error){
     button.disabled = false;
@@ -2705,6 +2719,19 @@ function moreMenu(l, h1){
   del.textContent = 'Delete…';
   del.onclick = () => { m.removeAttribute('open'); deleteCall(l); };
   list.append(rn);
+  if (l.two_tracks && (l.speakers || []).some(x => x.tag === 'Me')){
+    const lo = el('button');
+    lo.type = 'button';
+    lo.textContent = "I didn't speak: all to the others";
+    lo.onclick = async () => {
+      m.removeAttribute('open');
+      if (!confirm(T('Every line now given to you goes to the people of the call. The summary and the email are written again. Go ahead?')))
+        return;
+      try{ await postJSON('/api/listened/' + encodeURIComponent(l.folder)); } catch(x){ alert(T(x.message)); return; }
+      openCall(l.folder);
+    };
+    list.append(lo);
+  }
   if (onThisComputer){
     const fo = el('button');
     fo.type = 'button';
@@ -3595,6 +3622,10 @@ async function showSettings(){
   d.append(lp);
   drawLLM(lp);
   d.append(updatePanel());
+  // Opening Settings asks again, as well as once a day: a version published
+  // after Sottovoce started would otherwise wait for tomorrow.
+  if (upd && upd.check && !upd.off && !UPDATING.includes(upd.state))
+    postJSON('/api/update/check').then(checkUpdate).catch(() => {});
 }
 
 function enginePanel(e){
@@ -3614,6 +3645,7 @@ function enginePanel(e){
     const bits = [x.program === 'openvino' ? 'OpenVINO' : 'PyTorch'];
     if (x.speed) bits.push(hourIn(x.speed) + (x.measured ? ', measured here' : ''));
     if (!x.downloaded && x.download_gb) bits.push(x.download_gb + ' GB to download the first time');
+    if (x.avoided) bits.push('failed here last time: not used by itself');
     tiles.append(choiceTile('engine-path', PATH_NAMES[x.id] || x.id, bits.join(' · '), x.id === e.path,
       () => setEngine({path: x.id})));
   }
