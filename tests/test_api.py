@@ -593,3 +593,17 @@ def test_the_notes_as_a_word_document(client):
     assert [r.text for r in first.runs if r.bold] == ["   Voice 1"]                # the speaker in bold
     assert "page" in doc.sections[0].footer.paragraphs[0].text
     assert client.get("/api/history/nothing-here/download.docx").status_code == 404
+
+
+def test_i_didnt_speak_gives_my_lines_to_the_others_and_keeps_the_words(client, data):
+    before = client.get(f"/api/history/{SUPPLIER}").json()
+    assert any(s["speaker"] == "Me" for s in before["segments"])
+    words_before = [w[2] for s in before["segments"] for w in s["words"]]
+    r = client.post(f"/api/listened/{SUPPLIER}").json()
+    assert r["changed"]
+    after = client.get(f"/api/history/{SUPPLIER}").json()
+    assert all(s["speaker"] != "Me" for s in after["segments"])
+    assert [w[2] for s in after["segments"] for w in s["words"]] == words_before    # not a word lost
+    assert after["listen_only"] is True
+    assert not (data / "transcripts" / SUPPLIER / "summary.md").exists()
+    assert client.post(f"/api/listened/{SUPPLIER}").json() == {"changed": False}      # once is enough

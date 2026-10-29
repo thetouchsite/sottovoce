@@ -3,6 +3,8 @@
 Each test names the bug or the measurement it protects. Several of them were
 real bugs once, caught by eye; these catch them the next time.
 """
+import pytest
+
 import transcribe as T
 
 
@@ -240,3 +242,63 @@ def test_two_tracks_lay_a_lines_words_over_who_really_speaks_in_it():
     assert T.label_speakers(words, me, them, rate)[3] == "Them"
     # Laid over the speech, the line splits where the voice changes.
     assert T.label_speakers(words, me, them, rate, breaks=breaks) == ["Me"] * 4 + ["Them"] * 2
+
+
+def test_a_long_call_is_cut_in_pauses_of_about_five_minutes():
+    speech = [(i * 10, i * 10 + 8) for i in range(100)]               # a 2-second pause every 10 s
+    parts = T.pieces(1000, speech)
+    assert parts[0][0] == 0 and parts[-1][1] == 1000
+    assert all(b == c for (_, b), (c, _) in zip(parts, parts[1:]))     # nothing lost between pieces
+    assert all(not (x < cut < y) for (cut, _) in parts[1:] for x, y in speech)   # never inside speech
+    assert all(150 <= b - a <= 360 for a, b in parts[:-1])
+    assert T.pieces(200, speech) == [(0.0, 200)]                       # a short call goes whole
+
+
+def test_pieces_come_back_in_place(monkeypatch, tmp_path):
+    import numpy as np
+    import soundfile as sf
+    wav = tmp_path / "a.wav"
+    sf.write(str(wav), np.zeros(16000 * 800, dtype="float32"), 16000)
+    seen = []
+
+    class Engine:
+        def segments(self, clip, language, speech=None):
+            seen.append(len(clip) / 16000)
+            return [{"text": " una frase", "timestamp": (1.0, 2.0)}]
+    monkeypatch.setattr(T, "engine", lambda: Engine())
+    speech = [(0, 10), (300, 310), (600, 610)]
+    words, language, breaks = T.listen(wav, "it", speech=speech)
+    parts = T.pieces(800, speech)
+    assert len(seen) == len(parts) == 3 and abs(sum(seen) - 800) < 0.01
+    assert [w[0] for w in words[::2]] == [round(a + 1.0, 2) for a, _ in parts]   # shifted by each piece's start
+    assert breaks == {0, 2, 4}
+
+
+def test_listening_only_never_asks_the_microphone(monkeypatch):
+    monkeypatch.setattr(T, "label_speakers", lambda *a, **k: pytest.fail("the microphone was asked"))
+    import numpy as np
+    words = [[0.0, 0.5, "Buongiorno"], [0.5, 1.0, "a"], [1.0, 1.5, "tutti"]]
+    monkeypatch.setattr(T, "read_two_tracks", lambda src: (np.ones(16000), np.ones(16000), 16000))
+    monkeypatch.setattr(T, "listen", lambda *a, **k: (words, "it", {0}))
+    monkeypatch.setattr(T, "prepare", lambda src, dest, two_tracks=False: 2.0)
+    monkeypatch.setattr(T, "level_copy", lambda *a, **k: None)
+    monkeypatch.setattr(T, "speech_regions", lambda *a, **k: [(0.0, 1.5)])
+    monkeypatch.setattr(T, "speech_level", lambda *a, **k: 0.1)
+    monkeypatch.setattr(T, "drop_phantoms", lambda *a, **k: [])
+    monkeypatch.setattr(T, "loaded", lambda: True)
+    r = T.run("call.wav", "it", two_tracks=True, listen_only=True)
+    assert {s["speaker"] for s in r["segments"]} == {"Them"}
+
+
+def test_lean_timings_drops_the_attentions_and_keeps_the_timings():
+    class Model:
+        def _extract_token_timestamps(self, outputs, heads):
+            return [len(outputs["cross_attentions"]), heads]
+
+    outputs = {"sequences": [1, 2], "cross_attentions": ("a", "b"),
+               "encoder_attentions": ("c",), "decoder_attentions": None}
+    m = Model()
+    T.lean_timings(m)
+    assert m._extract_token_timestamps(outputs, "heads") == [2, "heads"]
+    assert outputs == {"sequences": [1, 2], "cross_attentions": (),
+                       "encoder_attentions": (), "decoder_attentions": None}

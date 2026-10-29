@@ -23,6 +23,8 @@ Whisper large-v3 runs on the whole recording in its own long-form mode, with its
 
 Word times come one of two ways. By default each line's time is shared among its words by their length, at no extra cost. With **Precise word timings**, Whisper aligns every word itself, at about twice the time ([measured](benchmarks.md#word-timings)).
 
+A call longer than six minutes goes to Whisper in pieces of about five, each cut in the middle of a pause, and the times are put back in place afterwards. With precise word timings, the attention weights each window's timings are computed from are dropped at once instead of kept to the end: an hour of call took 49 GB of RAM before 1.9.2 and froze the computer, 2.7 GB now ([measured](benchmarks.md#long-calls-in-pieces)).
+
 ## 3. Who spoke
 
 - **Two tracks** (a call recorded from the page): your microphone is one track and the call is the other. Each Whisper line's words are laid over the moments someone actually speaks in it, and each word goes to the track that carries that moment.

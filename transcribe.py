@@ -166,6 +166,9 @@ measured: dict[str, float] = {}
 # wins over both: a way to try OpenVINO on a computer with an NVIDIA card.
 chosen = {"path": None, "turbo": False}
 
+# Paths not taken by themselves any more: one that failed here, or whose
+# transcription the program didn't survive (the server keeps the list).
+avoid: set[str] = set()
 _found: list[str] | None = None
 _found_lock = threading.Lock()
 _intel: str | None = None
@@ -173,16 +176,26 @@ _engine = None
 _lock = threading.Lock()
 
 
+def recent_intel(name: str) -> bool:
+    """An Intel GPU worth running Whisper on: Arc or Iris Xe (2020 on).
+
+    The older ones (UHD, HD, Iris Plus) share a few hundred MB and the
+    computer's memory: on a Core i5-8250U with a UHD 620 and 8 GB, preparing
+    Whisper for it froze the computer and Sottovoce closed."""
+    n = name.lower()
+    return "intel" in n and ("arc" in n or "iris(r) xe" in n or "iris xe" in n)
+
+
 def _intel_gpu() -> str | None:
-    """OpenVINO's name for the first Intel GPU, "GPU.0", or None.
+    """OpenVINO's name for the first recent Intel GPU, "GPU.0", or None.
 
     OpenVINO lists an NVIDIA card as a GPU too, through OpenCL: only Intel's
-    are kept."""
+    are kept, and of those only recent_intel() ones."""
     try:
         import openvino as ov
         core = ov.Core()
         for d in core.available_devices:
-            if d.startswith("GPU") and "intel" in str(core.get_property(d, "FULL_DEVICE_NAME")).lower():
+            if d.startswith("GPU") and recent_intel(str(core.get_property(d, "FULL_DEVICE_NAME"))):
                 return d
     except Exception:
         pass
@@ -226,9 +239,12 @@ def _look() -> list[str]:
 
 
 def path() -> str:
-    """Where Whisper runs: forced, else chosen, else the first found."""
+    """Where Whisper runs: forced, else chosen, else the first found that
+    hasn't failed here."""
     want = os.environ.get("SOTTOVOCE_ENGINE") or chosen["path"]
-    return want if want in found() else found()[0]
+    if want in found():
+        return want
+    return next((p for p in found() if p not in avoid), found()[0])
 
 
 def program(p=None) -> str:
@@ -325,6 +341,27 @@ def engine():
         return _engine
 
 
+def lean_timings(model):
+    """Drops Whisper's attention weights once the word timings are out of them.
+
+    For precise timings transformers asks every 30-second window for all its
+    attentions, copies them to the computer's memory and keeps them to the end
+    of the call: about 3 GB a window, though only the timings computed from
+    them are used afterwards. On 5 minutes of a real call, 40 GB of RAM as
+    transformers does it, 2.6 GB with this; the same 721 words, same times.
+    """
+    extract = model._extract_token_timestamps
+
+    def timings(outputs, *args, **kwargs):
+        t = extract(outputs, *args, **kwargs)
+        for k in ("encoder_attentions", "decoder_attentions", "cross_attentions"):
+            if outputs.get(k) is not None:
+                outputs[k] = ()
+        return t
+
+    model._extract_token_timestamps = timings
+
+
 class _Torch:
     """Whisper through the transformers pipeline."""
 
@@ -335,13 +372,18 @@ class _Torch:
             "automatic-speech-recognition", model=repo,
             dtype=torch.float16 if device == "cuda" else torch.float32,
             device=device, model_kwargs={"attn_implementation": "sdpa"})
+        lean_timings(self.p.model)
+
+    @staticmethod
+    def _input(audio):
+        return {"raw": audio, "sampling_rate": 16000} if not isinstance(audio, (str, pathlib.Path)) else str(audio)
 
     def segments(self, wav, language, speech=None):
-        r = self.p(str(wav), return_timestamps=True, generate_kwargs=_decode(language))
+        r = self.p(self._input(wav), return_timestamps=True, generate_kwargs=_decode(language))
         return r.get("chunks", [])
 
     def words(self, wav, language):
-        r = self.p(str(wav), return_timestamps="word", generate_kwargs=_decode(language))
+        r = self.p(self._input(wav), return_timestamps="word", generate_kwargs=_decode(language))
         out = []
         for c in r.get("chunks", []):
             token = c["text"].strip()
@@ -430,6 +472,8 @@ class _OpenVINO:
 
     @staticmethod
     def _audio(wav):
+        if not isinstance(wav, (str, pathlib.Path)):
+            return wav
         import soundfile as sf
         audio, rate = sf.read(str(wav), dtype="float32")
         assert rate == 16000, rate
@@ -747,16 +791,54 @@ def listen(wav, language=None, speech_start=0.0, precise=False, speech=None):
     e = engine()
     if not language:
         language = detect_language(wav, speech_start)
-    words, breaks = [], None
-    if precise:
-        try:
-            words = e.words(wav, language)
-        except Exception as x:                              # pragma: no cover
-            print(f"  word timestamps failed ({type(x).__name__}): using segments")
-            precise = False
-    if not precise:
-        words, breaks = spread(e.segments(wav, language, speech))
-    return tidy(words), _code(language), breaks
+    import soundfile as sf
+    audio, rate = sf.read(str(wav), dtype="float32")
+    duration = len(audio) / rate
+    words, breaks = [], set()
+    for a, b in pieces(duration, speech or [], PIECE if PIECES else duration + 1):
+        clip = audio[int(a * rate):int(b * rate)]
+        local = None if speech is None else [(max(x, a) - a, min(y, b) - a) for x, y in speech if x < b and a < y]
+        got = None
+        if precise:
+            try:
+                got = e.words(clip, language)
+            except Exception as x:                          # pragma: no cover
+                print(f"  word timestamps failed ({type(x).__name__}): using segments")
+                precise = False
+        if got is None:
+            got, br = spread(e.segments(clip, language, local))
+            breaks |= {len(words) + i for i in br}
+        words += [[w0 + a, w1 + a, t] for w0, w1, t in got]
+    return tidy(words), _code(language), None if precise else breaks
+
+
+# A long call goes to Whisper in pieces of about five minutes, cut in a pause.
+# Pieces of about five minutes: on four AMI meetings 25.0% of words wrong in
+# pieces, 25.4% whole, and 3.9 GB of RAM against 4.3 (docs/benchmarks.md).
+# The 49 GB of a 74-minute call with precise timings was the attention
+# weights, not the length: see lean_timings().
+PIECE = 300
+PIECES = True
+
+
+def pieces(duration, speech, piece=PIECE):
+    """(start, end) of the pieces: each about `piece` seconds, cut in the
+    middle of the longest pause between half a piece and a piece and a fifth
+    from its start, so no word is cut. One piece when the call is short."""
+    if duration <= piece * 1.2:
+        return [(0.0, duration)]
+    gaps = [(b1, a2) for (_, b1), (a2, _) in zip(speech, speech[1:]) if a2 > b1]
+    edges, start = [0.0], 0.0
+    while duration - start > piece * 1.2:
+        near = [g for g in gaps if start + piece * 0.5 < (g[0] + g[1]) / 2 < start + piece * 1.2]
+        # the longest pause, rounded to a tenth of a second; of those, the nearest the piece's length
+        best = max(near, key=lambda g: (round(g[1] - g[0], 1), -abs((g[0] + g[1]) / 2 - start - piece)),
+                   default=None)
+        cut = (best[0] + best[1]) / 2 if best else start + piece
+        edges.append(cut)
+        start = cut
+    edges.append(duration)
+    return list(zip(edges, edges[1:]))
 
 
 def spread(chunks):
@@ -1268,13 +1350,21 @@ def render(fmt, segments, title, duration, names=None, **meta) -> str:
 
 # --- the whole job ------------------------------------------------------------------
 
-def run(source, language=None, progress=None, two_tracks=False, precise=False, voices=False):
+def run(source, language=None, progress=None, two_tracks=False, precise=False, voices=False,
+        listen_only=False):
     """From a file to lines. `progress(stage, seconds_to_transcribe)` for the page.
 
     Returns a dict: segments (lines with words, and speaker for two tracks or
     voices), seconds, speech_seconds, corrected (name -> count), phantoms,
     speech (the map), language, word_times, and speakers_found when the voices
     were told apart.
+
+    `listen_only`, on two tracks: you didn't speak, so every word is the
+    call's, whatever the microphone heard. A microphone muted in the meeting
+    app, not in Windows, still hears the room: on a real call, a far voice
+    in the room took bits of every line to "You", and no rule on the two
+    tracks' levels told it from you speaking without breaking the calls
+    where you do (research/two_tracks.py, the "listening" setup).
     """
     source = pathlib.Path(source)
     with tempfile.TemporaryDirectory() as tmp:
@@ -1319,7 +1409,8 @@ def run(source, language=None, progress=None, two_tracks=False, precise=False, v
             if progress:
                 progress("telling the two voices apart", seconds)
             left, right, rate = read_two_tracks(source)
-            speakers = label_speakers(words, left, right, rate, breaks=breaks)
+            speakers = (["Them"] * len(words) if listen_only
+                        else label_speakers(words, left, right, rate, breaks=breaks))
 
         found = None
         if voices and words:

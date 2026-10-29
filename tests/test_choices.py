@@ -349,3 +349,46 @@ def test_a_loop_that_comes_back_every_time_keeps_one_copy():
     out = e.segments("a.wav", "it", speech=[(0.0, 30.0)])
     assert [t for _, t in asked[1:]] == list(T.DECODE["temperature"])   # warmer each time, as PyTorch does
     assert out[0]["text"] == "Il t-rex è un'esplosione di"
+
+
+# --- a GPU that may not take it ----------------------------------------------------------
+
+def test_an_old_intel_gpu_is_left_to_the_processor():
+    assert T.recent_intel("Intel(R) Arc(TM) 140T GPU (32GB) (iGPU)")
+    assert T.recent_intel("Intel(R) Iris(R) Xe Graphics")
+    assert not T.recent_intel("Intel(R) UHD Graphics 620")          # the MateBook D that froze
+    assert not T.recent_intel("NVIDIA GeForce RTX 5090 Laptop GPU")
+
+
+def test_a_path_avoided_is_not_taken_by_itself_but_can_be_chosen(paths, monkeypatch):
+    paths("intel-gpu", "cpu")
+    monkeypatch.setattr(T, "avoid", {"intel-gpu"})
+    assert T.path() == "cpu"
+    T.choose("intel-gpu")
+    assert T.path() == "intel-gpu"
+
+
+def test_sottovoce_that_died_on_the_intel_gpu_avoids_it_next_time(client, data, paths, monkeypatch):
+    paths("intel-gpu", "cpu")
+    monkeypatch.setattr(T, "avoid", set())
+    server.save_settings(trying="intel-gpu")          # what was written before the transcription that never ended
+    server.load_settings()
+    assert "intel-gpu" in T.avoid and T.path() == "cpu"
+    saved = json.loads((data / "transcripts" / "_settings.json").read_text(encoding="utf-8"))
+    assert saved["avoid"] == ["intel-gpu"] and saved.get("trying") is None
+
+
+def test_an_error_on_the_intel_gpu_is_done_again_on_the_processor(client, paths, monkeypatch):
+    paths("intel-gpu", "cpu")
+    monkeypatch.setattr(T, "avoid", set())
+    monkeypatch.setattr(T, "release", lambda: None)
+    tried = []
+
+    def run(original, language, progress, **how):
+        tried.append(T.path())
+        if T.path() == "intel-gpu":
+            raise RuntimeError("CL_OUT_OF_RESOURCES")
+        return {"ok": True}
+    monkeypatch.setattr(T, "run", run)
+    assert server.transcribe_safely("call.wav", "it", None) == {"ok": True}
+    assert tried == ["intel-gpu", "cpu"] and "intel-gpu" in T.avoid

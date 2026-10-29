@@ -28,6 +28,10 @@ Each line Whisper writes is laid over the moments in it when someone actually sp
 
 If more than one person is on the call's side, tick **Separate voices** (or press it later on the call): *Them* is split into *Voice 1*, *Voice 2*…, and *You* stays a measurement. See [Telling voices apart](voices.md).
 
+## If you only listen
+
+A course, a webinar, a meeting where you don't speak: turn on **I only listen** before **Start recording**, and every line goes to the people of the call. Muting your microphone in the meeting app doesn't stop Windows' microphone hearing the room, and Sottovoce records Windows' microphone: on a real call recorded that way, a far voice in the room took bits of every line to *You*. Already transcribed? In the call's **⋯** menu, **I didn't speak: all to the others** gives your lines to the voices around them, word for word.
+
 ## Nothing is lost if Sottovoce closes
 
 A recording is written to disk as it goes. If Sottovoce is closed, the computer switches off, or the browser tab is closed, the next start offers the interrupted recording: transcribe it, or delete it.

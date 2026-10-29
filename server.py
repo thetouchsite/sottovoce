@@ -76,7 +76,7 @@ import summary as S
 import transcribe as T
 import updates as U
 
-VERSION = "1.9.1"
+VERSION = "1.9.2"
 ROOT = pathlib.Path(__file__).resolve().parent
 DATA = ROOT / "transcripts"            # set again by start() from --data
 INCOMING = DATA / "_incoming"
@@ -451,7 +451,8 @@ def probe_seconds(f: pathlib.Path) -> float | None:
 
 
 def process(job_id: str, original: pathlib.Path, language: str | None,
-            two_tracks: bool = False, precise: bool = False, voices: bool = False) -> None:
+            two_tracks: bool = False, precise: bool = False, voices: bool = False,
+            listen_only: bool = False) -> None:
     job = jobs[job_id]
     d = original.parent
     # What the folder already knew (a name given, when it was added) stays.
@@ -479,8 +480,8 @@ def process(job_id: str, original: pathlib.Path, language: str | None,
                                         + (audio_seconds / 24 if voices else 0)) if fast else 0
 
         t0 = time.time()
-        r = T.run(original, language, progress, two_tracks=two_tracks, precise=precise,
-                  voices=voices)
+        r = transcribe_safely(original, language, progress, two_tracks=two_tracks, precise=precise,
+                              voices=voices, listen_only=listen_only)
         taken = round(time.time() - t0)
         segments, seconds = r["segments"], r["seconds"]
         used = r.get("engine") or T.key(precise)
@@ -514,6 +515,8 @@ def process(job_id: str, original: pathlib.Path, language: str | None,
         }
         if two_tracks:
             info["two_tracks"] = True
+            if listen_only:
+                info["listen_only"] = True
         if "speakers_found" in r:
             info["speakers_found"] = r["speakers_found"]
         if two_tracks or "speakers_found" in r:
@@ -579,8 +582,35 @@ def language_of(language: str | None) -> str | None:
     return re.sub(r"[^a-z]", "", language.lower())[:3] or None
 
 
+def transcribe_safely(original, language, progress, **how):
+    """T.run, on a GPU that may not take it.
+
+    Before an Intel GPU is used, the settings say so ("trying"): if
+    Sottovoce doesn't come back from the transcription, the next start finds
+    it there and avoids that GPU (load_settings). If it fails with an error
+    instead, the same call is done again on the processor at once.
+    """
+    p = T.path()
+    risky = p == "intel-gpu"
+    if risky:
+        save_settings(trying=p)
+    try:
+        return T.run(original, language, progress, **how)
+    except Exception as e:
+        if not risky:
+            raise
+        print(f"  the Intel GPU failed ({type(e).__name__}: {e}): again on the processor")
+        T.avoid.add(p)
+        T.release()
+        save_settings(trying=None, avoid=sorted(T.avoid))
+        return T.run(original, language, progress, **how)
+    finally:
+        if risky:
+            save_settings(trying=None)
+
+
 def enqueue(original: pathlib.Path, name: str, language: str | None, two_tracks=False,
-            precise=False, voices=False) -> str:
+            precise=False, voices=False, listen_only=False) -> str:
     """Queues the recording already in its folder."""
     job_id = uuid.uuid4().hex[:8]
     ahead = line_up.qsize()
@@ -591,7 +621,7 @@ def enqueue(original: pathlib.Path, name: str, language: str | None, two_tracks=
     jobs[job_id] = {"state": "running", "name": name, "folder": d.name,
                     "stage": f"queued, {ahead} ahead" if ahead else "queued",
                     "started": time.time()}
-    line_up.put((job_id, original, language, two_tracks, precise, voices))
+    line_up.put((job_id, original, language, two_tracks, precise, voices, listen_only))
     return job_id
 
 
@@ -675,7 +705,8 @@ async def api_transcribe_added(name: str, request: Request):
                            language_of(body.get("language")),
                            two_tracks=bool(body.get("two_tracks") or info.get("two_tracks")),
                            precise=bool(body.get("precise")),
-                           voices=bool(body.get("voices")) and voices_installed())}
+                           voices=bool(body.get("voices")) and voices_installed(),
+                           listen_only=bool(body.get("listen_only", info.get("listen_only"))))}
 
 
 @app.get("/api/calls/stamp")
@@ -783,7 +814,8 @@ def finish_recording(rid: str, body: dict):
     original = take(dest, name)
     return {"job": enqueue(original, name, language_of(choose("language")), two_tracks=True,
                            precise=bool(choose("precise")),
-                           voices=bool(choose("voices")) and voices_installed())}
+                           voices=bool(choose("voices")) and voices_installed(),
+                           listen_only=bool(choose("listen_only")))}
 
 
 @app.get("/api/recordings")
@@ -881,7 +913,8 @@ async def api_capture_start(request: Request):
     meta_f.write_text(json.dumps({
         "started_at": time.strftime("%Y-%m-%d %H:%M"), "name": name,
         "language": body.get("language") or "auto", "precise": bool(body.get("precise")),
-        "voices": bool(body.get("voices")), "from": "computer"}), encoding="utf-8")
+        "voices": bool(body.get("voices")), "listen_only": bool(body.get("listen_only")),
+        "from": "computer"}), encoding="utf-8")
     c = recorder.Capture(RECORDINGS / f"{rid}.wav")
     try:
         c.start()
@@ -918,7 +951,8 @@ async def api_capture_stop(request: Request):
         return {"discarded": True}
     if not body.get("transcribe", True):
         return keep_for_later(rid, body.get("name"))
-    return finish_recording(rid, {k: body[k] for k in ("name", "language", "precise", "voices") if k in body})
+    return finish_recording(rid, {k: body[k] for k in ("name", "language", "precise", "voices", "listen_only")
+                                  if k in body})
 
 
 def keep_for_later(rid: str, name: str | None = None):
@@ -935,6 +969,7 @@ def keep_for_later(rid: str, name: str | None = None):
     meta_f.unlink(missing_ok=True)
     original = take(dest, clean(name or meta.get("name") or "Call") + f.suffix)
     write_info(original.parent, {"original": original.name, "status": "waiting", "two_tracks": True,
+                                 **({"listen_only": True} if meta.get("listen_only") else {}),
                                  "uploaded_at": meta.get("started_at") or time.strftime("%Y-%m-%d %H:%M"),
                                  "duration_s": probe_seconds(original)})
     return {"folder": original.parent.name}
@@ -1106,6 +1141,7 @@ def api_open(name: str):
             "name": data.get("title") or data.get("original", txt.stem),
             "language": data.get("language"),
             "two_tracks": bool(data.get("two_tracks")),
+            "listen_only": bool(data.get("listen_only")),
             "word_times": data.get("word_times"),
             # Who speaks, with the names given to them; speakers_found is
             # there once the voices were told apart (1 when only one was).
@@ -1431,6 +1467,54 @@ def api_speakers(name: str, body: dict):
     return {"speaker_names": names, "speakers": speakers_of(segments, names)}
 
 
+@app.post("/api/listened/{name}")
+def api_listened(name: str):
+    """"I didn't speak": every line given to you goes to the others.
+
+    For a call recorded on two tracks while you only listened, the
+    microphone muted in the meeting app but still hearing the room. Each word
+    that was yours takes the voice of the words around it (the one before,
+    or after at the start), so Voice 2 stays Voice 2. The lines change, so
+    the summary and the email go, as when voices are told apart again.
+    """
+    d = folder(name)
+    if not d.is_dir() or not (d / "info.json").exists():
+        return JSONResponse({"error": "not found"}, 404)
+    txt, segments = read_call(d)
+    if txt is None or not segments:
+        return JSONResponse({"error": "transcript missing"}, 404)
+    words, labels, breaks = [], [], set()
+    for s in segments:
+        breaks.add(len(words))
+        for w in s["words"]:
+            words.append(list(w))
+            labels.append(s.get("speaker"))
+    if "Me" not in labels:
+        return {"changed": False}
+    others = [x for x in labels if x != "Me"]
+    fallback = others[0] if others else "Them"
+    last = None
+    for i, x in enumerate(labels):
+        if x == "Me":
+            nxt = next((y for y in labels[i + 1:] if y != "Me"), None)
+            labels[i] = last or nxt or fallback
+        else:
+            last = x
+    lines = T.lines_from_words(words, labels, breaks)
+    txt.write_text(T.as_txt(lines), encoding="utf-8")
+    write_words(d, lines)
+    info = read_info(d)
+    info["listen_only"] = True
+    info["speaker_names"] = {k: v for k, v in (info.get("speaker_names") or {}).items() if k != "Me"}
+    info["segments"] = len(lines)
+    info["lines_by_speaker"] = {x["tag"]: x["lines"] for x in speakers_of(lines)}
+    write_info(d, info)
+    _write_md(d, txt)
+    (d / "summary.md").unlink(missing_ok=True)
+    (d / "followup.md").unlink(missing_ok=True)
+    return {"changed": True, "lines": len(lines)}
+
+
 _voices_busy = threading.Lock()
 
 
@@ -1528,10 +1612,17 @@ def load_settings():
     llm = s.get("llm") or {}
     S.choice.update(program=llm.get("program"), model=llm.get("model"))
     update_prefs["check"] = (s.get("updates") or {}).get("check", True) is not False
+    # A transcription on this path never came back: Sottovoce closed in it.
+    T.avoid.clear()
+    T.avoid.update(p for p in s.get("avoid") or [] if p in T.PATHS)
+    if s.get("trying") in T.PATHS:
+        T.avoid.add(s["trying"])
+        print(f"  the last transcription on {T.PATHS[s['trying']]} did not finish: not using it by itself")
+        save_settings(trying=None, avoid=sorted(T.avoid))
 
 
 def save_settings(**more):
-    data = {**read_settings(), **more, "engine": dict(T.chosen), "speeds": dict(T.measured),
+    data = {**read_settings(), "avoid": sorted(T.avoid), **more, "engine": dict(T.chosen), "speeds": dict(T.measured),
             "llm": dict(S.choice), "updates": dict(update_prefs)}
     tmp = settings_file().with_suffix(".tmp")
     tmp.write_text(json.dumps(data, indent=1), encoding="utf-8")
@@ -1574,7 +1665,8 @@ def engine_view() -> dict:
         m = T.model(p)
         paths.append({"id": p, "name": T.PATHS[p], "program": T.program(p), "model": m,
                       "downloaded": T.downloaded(m), "download_gb": T.SIZE_GB.get(m),
-                      "speed": T.speed(False, p), "measured": T.key(False, p) in T.measured})
+                      "speed": T.speed(False, p), "measured": T.key(False, p) in T.measured,
+                      "avoided": p in T.avoid})
     return {"path": T.path(), "automatic": T.chosen["path"] is None,
             "forced": os.environ.get("SOTTOVOCE_ENGINE") or None, "turbo": T.chosen["turbo"],
             "model": T.model(), "speed": T.speed(), "paths": paths,
