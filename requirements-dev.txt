@@ -26,3 +26,5 @@ pillow>=10
 python-docx>=1.1
 # Checking the signature of an update (updates.py)
 cryptography>=43
+# Reading a call in pieces (transcribe.listen)
+soundfile>=0.12
